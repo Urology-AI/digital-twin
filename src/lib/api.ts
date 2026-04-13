@@ -1,13 +1,12 @@
 // ── localStorage keys ─────────────────────────────────────────────────────────
-const LS_API_URL     = "compass_api_url";
-const LS_HEALTH_PATH = "compass_health_path";
-const LS_LLM_ENDPOINT = "compass_llm_endpoint";
-const LS_LLM_API_KEY  = "compass_llm_api_key";
-const LS_LLM_MODEL    = "compass_llm_model";
+// Nothing sensitive is ever stored here.
+// The LLM endpoint lives on the server; the admin token is just an access credential.
+const LS_API_URL      = "compass_api_url";
+const LS_HEALTH_PATH  = "compass_health_path";
+const LS_ADMIN_TOKEN  = "compass_admin_token";
 
-// ── Backend URL (the Render service) ─────────────────────────────────────────
+// ── Backend URL (the Render / hosted service) ─────────────────────────────────
 
-/** Base URL of the COMPASS backend service. Falls back to build-time env or same-origin. */
 export function getApiUrl(): string {
   return localStorage.getItem(LS_API_URL) ?? import.meta.env.VITE_API_URL ?? "";
 }
@@ -17,7 +16,7 @@ export function setApiUrl(url: string): void {
   v ? localStorage.setItem(LS_API_URL, v) : localStorage.removeItem(LS_API_URL);
 }
 
-// ── Health check path (for Render monitoring) ─────────────────────────────────
+// ── Health check path ─────────────────────────────────────────────────────────
 
 export function getHealthPath(): string {
   return localStorage.getItem(LS_HEALTH_PATH) ?? "/health";
@@ -25,29 +24,28 @@ export function getHealthPath(): string {
 
 export function setHealthPath(path: string): void {
   const v = (path.trim() || "/health").replace(/^([^/])/, "/$1");
-  v === "/health" ? localStorage.removeItem(LS_HEALTH_PATH) : localStorage.setItem(LS_HEALTH_PATH, v);
+  v === "/health"
+    ? localStorage.removeItem(LS_HEALTH_PATH)
+    : localStorage.setItem(LS_HEALTH_PATH, v);
 }
 
-// ── LLM config (sent to the backend on every AI request) ─────────────────────
+// ── Admin token ───────────────────────────────────────────────────────────────
+// Used to update the server-side LLM endpoint. Not the LLM key itself.
 
-export interface LlmConfig {
-  endpoint: string;
-  api_key: string;
-  model: string;
+export function getAdminToken(): string {
+  return localStorage.getItem(LS_ADMIN_TOKEN) ?? "";
 }
 
-export function getLlmConfig(): LlmConfig {
+export function setAdminToken(token: string): void {
+  const v = token.trim();
+  v ? localStorage.setItem(LS_ADMIN_TOKEN, v) : localStorage.removeItem(LS_ADMIN_TOKEN);
+}
+
+function adminHeaders(): HeadersInit {
   return {
-    endpoint: localStorage.getItem(LS_LLM_ENDPOINT) ?? "",
-    api_key:  localStorage.getItem(LS_LLM_API_KEY)  ?? "",
-    model:    localStorage.getItem(LS_LLM_MODEL)     ?? "",
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${getAdminToken()}`,
   };
-}
-
-export function setLlmConfig(cfg: LlmConfig): void {
-  cfg.endpoint ? localStorage.setItem(LS_LLM_ENDPOINT, cfg.endpoint.trim()) : localStorage.removeItem(LS_LLM_ENDPOINT);
-  cfg.api_key  ? localStorage.setItem(LS_LLM_API_KEY,  cfg.api_key.trim())  : localStorage.removeItem(LS_LLM_API_KEY);
-  cfg.model    ? localStorage.setItem(LS_LLM_MODEL,    cfg.model.trim())    : localStorage.removeItem(LS_LLM_MODEL);
 }
 
 // ── HTTP helpers ──────────────────────────────────────────────────────────────
@@ -65,11 +63,10 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// ── API calls ─────────────────────────────────────────────────────────────────
+// ── Public endpoints ──────────────────────────────────────────────────────────
 
 export interface HealthResponse {
   status: string;
-  model: string;
   endpoint_set: boolean;
 }
 
@@ -84,24 +81,62 @@ export async function checkApiHealth(
 
 export interface TestLlmResponse {
   ok: boolean;
-  model: string;
-  endpoint: string;
+  endpoint_set: boolean;
   error?: string;
 }
 
-/** Sends the frontend's LLM config to the backend to verify the AI connection. */
-export async function testLlmEndpoint(
+/** Status indicator: calls GET /api/test — uses server's stored config, no credentials needed. */
+export async function testLlmEndpoint(baseUrl = getApiUrl()): Promise<TestLlmResponse> {
+  const res = await fetch(`${baseUrl}/api/test`);
+  if (!res.ok) throw new Error(`Test failed (${res.status} ${res.statusText})`);
+  return res.json();
+}
+
+// ── Admin endpoints (require ADMIN_TOKEN) ─────────────────────────────────────
+
+export interface ServerConfig {
+  endpoint_set: boolean;
+  model: string;
+}
+
+/** Fetches current server config (endpoint_set flag + model name — endpoint URL is never returned). */
+export async function fetchServerConfig(baseUrl = getApiUrl()): Promise<ServerConfig> {
+  const res = await fetch(`${baseUrl}/api/config`, { headers: adminHeaders() });
+  if (!res.ok) throw new Error(`Config fetch failed (${res.status})`);
+  return res.json();
+}
+
+/** Updates the server-side LLM endpoint and/or model. Omit a field to leave it unchanged. */
+export async function updateServerConfig(
+  patch: { endpoint?: string; model?: string },
   baseUrl = getApiUrl(),
-  llmCfg = getLlmConfig(),
+): Promise<void> {
+  const res = await fetch(`${baseUrl}/api/config`, {
+    method: "PATCH",
+    headers: adminHeaders(),
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => res.statusText);
+    throw new Error(`Config update failed (${res.status}): ${detail}`);
+  }
+}
+
+/** Test with specific values before saving (settings dialog pre-save check). Admin-only. */
+export async function testLlmCustom(
+  values: { endpoint?: string; model?: string },
+  baseUrl = getApiUrl(),
 ): Promise<TestLlmResponse> {
   const res = await fetch(`${baseUrl}/api/test`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ llm_config: llmCfg }),
+    headers: adminHeaders(),
+    body: JSON.stringify(values),
   });
-  if (!res.ok) throw new Error(`Test request failed (${res.status} ${res.statusText})`);
+  if (!res.ok) throw new Error(`Test failed (${res.status} ${res.statusText})`);
   return res.json();
 }
+
+// ── AI endpoints ──────────────────────────────────────────────────────────────
 
 export interface AnalyzeResponse {
   narrative: string;
@@ -113,11 +148,7 @@ export async function analyzePatient(
   clinical: Record<string, unknown>,
   predictions: Record<string, unknown>,
 ): Promise<AnalyzeResponse> {
-  return post<AnalyzeResponse>("/api/analyze", {
-    clinical,
-    predictions,
-    llm_config: getLlmConfig(),
-  });
+  return post<AnalyzeResponse>("/api/analyze", { clinical, predictions });
 }
 
 export interface ChatMessage {
@@ -133,9 +164,5 @@ export async function chatWithAssistant(
   messages: ChatMessage[],
   clinical?: Record<string, unknown>,
 ): Promise<ChatResponse> {
-  return post<ChatResponse>("/api/chat", {
-    messages,
-    clinical,
-    llm_config: getLlmConfig(),
-  });
+  return post<ChatResponse>("/api/chat", { messages, clinical });
 }
