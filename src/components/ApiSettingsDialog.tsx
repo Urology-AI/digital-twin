@@ -221,7 +221,7 @@ export function ApiSettingsDialog({ open, onClose, onSave }: Props) {
               <Input
                 id="llm-endpoint"
                 type="url"
-                placeholder="http://localhost:11434/v1/chat/completions"
+                placeholder="http://your-server:8000/v1/chat/completions"
                 value={llmEndpoint}
                 onChange={(e) => { setLlmEndpoint(e.target.value); setLlmState("idle"); }}
                 className="font-mono text-xs"
@@ -234,7 +234,7 @@ export function ApiSettingsDialog({ open, onClose, onSave }: Props) {
               <Input
                 id="llm-model"
                 type="text"
-                placeholder="leave blank if your endpoint doesn't need it"
+                placeholder="e.g. gemma4"
                 value={llmModel}
                 onChange={(e) => { setLlmModel(e.target.value); setLlmState("idle"); }}
                 className="font-mono text-xs"
