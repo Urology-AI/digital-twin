@@ -17,8 +17,8 @@ export const COMPASS_TO_3D: Record<string, string> = {
   "8p": "P-RM-M",
   "3p": "P-LM-M",
   "4p": "P-LM-L",
-  "10p": "P-RA",
-  "5p": "P-LA",
+  "10p": "A-RA",
+  "5p": "A-LA",
 };
 
 export const ZONE_ANATOMY: Record<
@@ -33,14 +33,12 @@ export const ZONE_ANATOMY: Record<
   "P-LM-M": { side: "L", zone: "base" },
   "P-RB-M": { side: "R", zone: "base" },
   "P-RM-M": { side: "R", zone: "base" },
-  "P-LA": { side: "L", zone: "apex" },
-  "P-RA": { side: "R", zone: "apex" },
   "A-LB": { side: "L", zone: "bladder_neck" },
   "A-RB": { side: "R", zone: "bladder_neck" },
   "A-LM": { side: "L", zone: "anterior" },
   "A-RM": { side: "R", zone: "anterior" },
-  "A-LA": { side: "L", zone: "anterior" },
-  "A-RA": { side: "R", zone: "anterior" },
+  "A-LA": { side: "L", zone: "apex" },
+  "A-RA": { side: "R", zone: "apex" },
 };
 
 export const NS_THRESHOLDS = {
@@ -242,7 +240,7 @@ export function createBaseThreeZones(): ThreeZoneRuntime[] {
     },
     {
       id: "A-RA",
-      name: "R Apex Anterior",
+      name: "R Apex",
       side: "R",
       level: "Apex",
       region: "Anterior",
@@ -254,34 +252,10 @@ export function createBaseThreeZones(): ThreeZoneRuntime[] {
     },
     {
       id: "A-LA",
-      name: "L Apex Anterior",
+      name: "L Apex",
       side: "L",
       level: "Apex",
       region: "Anterior",
-      subregion: "full",
-      cancer: 0.02,
-      ece: 0.01,
-      svi: 0.01,
-      psm: 0.05,
-    },
-    {
-      id: "P-RA",
-      name: "R Apex Posterior",
-      side: "R",
-      level: "Apex",
-      region: "Posterior",
-      subregion: "full",
-      cancer: 0.02,
-      ece: 0.01,
-      svi: 0.01,
-      psm: 0.05,
-    },
-    {
-      id: "P-LA",
-      name: "L Apex Posterior",
-      side: "L",
-      level: "Apex",
-      region: "Posterior",
       subregion: "full",
       cancer: 0.02,
       ece: 0.01,

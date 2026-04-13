@@ -98,6 +98,8 @@ export interface Prostate3DInputV1 {
     epe_mus?: boolean;
     svi_mus?: boolean;
     psma_epe?: boolean;
+    psma_svi?: boolean;
+    max_primus?: number | null;
     lymph_nodes_psma?: unknown;
   };
   zones: ZoneMap;

@@ -2,16 +2,16 @@
   "patients": [
     {
       "id": "patient-1",
-      "name": "Sample Patient",
+      "name": "New Case",
       "record": {
         "_schema": "prostate-3d-input-v1",
         "patient": {
-          "age": 64,
-          "psa": 6.5,
-          "psa_density": 0.144,
-          "bmi": 27,
-          "shim": 21,
-          "ipss": 8,
+          "age": null,
+          "psa": 0,
+          "psa_density": null,
+          "bmi": null,
+          "shim": null,
+          "ipss": null,
           "dm": false,
           "htn": false,
           "cad": false,
@@ -21,79 +21,48 @@
           "pde5": false
         },
         "prostate": {
-          "volume_cc": 45,
+          "volume_cc": 0,
           "dimensions_cm": null,
           "median_lobe_grade": 0
         },
         "biopsy": {
-          "max_grade_group": 2,
-          "total_positive_cores": 4,
-          "total_cores": 12,
-          "max_core_involvement_pct": 40,
+          "max_grade_group": 0,
+          "total_positive_cores": 0,
+          "total_cores": 0,
+          "max_core_involvement_pct": 0,
           "max_linear_extent_mm": 0,
           "max_pct_pattern45": 0,
           "has_cribriform": 0,
           "has_idc": 0,
           "has_pni": 0,
           "laterality": "bilateral",
-          "gg_left": 2,
-          "gg_right": 2,
-          "cores_left": 2,
-          "cores_right": 2,
-          "mc_left": 40,
-          "mc_right": 35,
-          "linear_left": 0,
-          "linear_right": 0,
+          "gg_left": null,
+          "gg_right": null,
+          "cores_left": null,
+          "cores_right": null,
+          "mc_left": null,
+          "mc_right": null,
+          "linear_left": null,
+          "linear_right": null,
           "decipher_score": null
         },
         "staging": {
           "epe": false,
           "svi": false,
-          "max_pirads": 4,
-          "max_suv": 12,
+          "max_pirads": 1,
+          "max_suv": null,
           "lesion_size_cm": null,
           "abutment": null,
           "adc_mean": null,
           "epe_mus": false,
           "svi_mus": false,
           "psma_epe": false,
+          "psma_svi": false,
+          "psma_ln": false,
           "lymph_nodes_psma": null
         },
         "zones": {},
-        "lesions": [
-          {
-            "id": "lesion-mri-1",
-            "source": "MRI",
-            "side": "L",
-            "zone": "Posterior",
-            "score": "4",
-            "epe": false,
-            "svi": false,
-            "corePct": 0,
-            "linear": 0,
-            "mriSize": 14,
-            "mriAbutment": 2,
-            "mriAdc": 800,
-            "level": "Mid",
-            "pirads": 4
-          },
-          {
-            "id": "lesion-psma-1",
-            "source": "PSMA",
-            "side": "L",
-            "zone": "Posterior",
-            "score": "12",
-            "epe": false,
-            "svi": false,
-            "corePct": 0,
-            "linear": 0,
-            "mriSize": 0,
-            "mriAbutment": -1,
-            "mriAdc": 0,
-            "level": "Mid",
-            "suv": 12
-          }
-        ]
+        "lesions": []
       }
     }
   ]

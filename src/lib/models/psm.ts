@@ -1,5 +1,5 @@
 import type { ClinicalState } from "@/types/patient";
-import { logPsad, sigmoid } from "@/lib/utils/math";
+import { logPsad, normalizeMaxCorePct, sigmoid } from "@/lib/utils/math";
 
 const PSM = {
   i: -1.251,
@@ -24,7 +24,7 @@ export function predictPsm(S: ClinicalState): number {
     gg2,
     gg3,
     gg45,
-    S.maxcore,
+    normalizeMaxCorePct(S.maxcore),
     S.cores,
     Math.max(S.pirads, 2),
     S.mri_epe,

@@ -1,4 +1,8 @@
 import { Button } from "@/components/ui/button";
+import { predictEcePatient, clampEcePatient } from "@/lib/models/ece";
+import { predictSviPatient } from "@/lib/models/svi";
+import { predictLni } from "@/lib/models/lni";
+import { predictBcrPreop } from "@/lib/models/bcr";
 import {
   Card,
   CardContent,
@@ -47,6 +51,15 @@ function riskCls(v: number) {
   return "text-red-500";
 }
 
+/** Approximate 90% CI on logit scale (SE ≈ 0.58 logit units, z = 1.64) */
+function computeCI(p: number): { lo: number; hi: number } {
+  if (p <= 0.001 || p >= 0.999) return { lo: p, hi: p };
+  const L = Math.log(p / (1 - p));
+  const lo = 1 / (1 + Math.exp(-(L - 0.951)));
+  const hi = 1 / (1 + Math.exp(-(L + 0.951)));
+  return { lo: Math.max(0.01, lo), hi: Math.min(0.99, hi) };
+}
+
 function bcrColor(pct: number) {
   if (pct === 0) return "text-emerald-500";
   if (pct < 15) return "text-amber-500";
@@ -88,7 +101,7 @@ export function PredictionPanel() {
       <Card className="border-dashed border-border/80 bg-muted/10">
         <CardContent className="py-12 text-center">
           <p className="text-sm text-muted-foreground">
-            Select a patient in the roster to run COMPASS models.
+            Select a patient to run COMPASS models.
           </p>
         </CardContent>
       </Card>
@@ -105,13 +118,16 @@ export function PredictionPanel() {
   const psmaLn = S.psma_ln || 0;
   const lniRisk = predictions.lni;
 
+  // SVI: only colour when ≥ 10%
+  const sviNeutral = predictions.svi < 0.10;
+
   const preds = [
-    { k: "ECE", v: predictions.ece },
-    { k: "SVI", v: predictions.svi },
-    { k: "Upgrade", v: predictions.upgrade },
-    { k: "PSM", v: predictions.psm },
-    { k: "BCR", v: predictions.bcr },
-    { k: "LNI", v: predictions.lni },
+    { k: "ECE",     v: predictions.ece,     neutral: false },
+    { k: "SVI",     v: predictions.svi,     neutral: sviNeutral },
+    { k: "Upgrade", v: predictions.upgrade, neutral: false },
+    { k: "PSM",     v: predictions.psm,     neutral: false },
+    { k: "BCR",     v: predictions.bcr,     neutral: false },
+    { k: "LNI",     v: predictions.lni,     neutral: false },
   ] as const;
 
   // NS zone detail
@@ -136,7 +152,6 @@ export function PredictionPanel() {
   (L.alerts ?? []).forEach((a) => allAlerts.push({ side: "L", a }));
   (R.alerts ?? []).forEach((a) => allAlerts.push({ side: "R", a }));
 
-  // NSG_DATA consequence grades to show
   const gradesToShow =
     predictions.nsL === predictions.nsR
       ? [{ grade: predictions.nsL, label: `Grade ${predictions.nsL}`, isLeft: true }]
@@ -145,7 +160,6 @@ export function PredictionPanel() {
           { grade: predictions.nsR, label: `R Grade ${predictions.nsR}`, isLeft: false },
         ];
 
-  // PLND recommendation
   let plndTitle: string, plndDetail: string, plndColor: string, plndIcon: string;
   if (!isHighRisk && !psmaLn) {
     plndTitle = "Consider Omitting PLND";
@@ -169,7 +183,6 @@ export function PredictionPanel() {
     plndDetail = "NCCN high-risk with PSMA LN+. Highest LNI probability. ePLND mandatory. Check SUVmax and station.";
   }
 
-  // PSMA LN+ station analysis
   const lymphNodes = (entry.record.staging?.lymph_nodes_psma ?? null) as LnNode[] | null;
 
   return (
@@ -182,7 +195,7 @@ export function PredictionPanel() {
                 COMPASS predictions
               </CardTitle>
               <CardDescription>
-                Calibrated outcome risks for the active case.
+                Preoperative outcome predictions at time of radical prostatectomy.
               </CardDescription>
             </div>
             <Button
@@ -199,49 +212,33 @@ export function PredictionPanel() {
         <CardContent className="space-y-5 pt-5">
           {/* Prediction cards */}
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            {preds.map((p) => (
-              <Tooltip key={p.k}>
-                <TooltipTrigger asChild>
-                  <div className="rounded-xl border border-border/70 bg-card px-2 py-3 text-center shadow-sm transition-shadow hover:shadow-md">
-                    <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {p.k}
-                    </div>
-                    <div className={cn("text-lg font-bold tabular-nums", riskCls(p.v))}>
-                      {Math.round(p.v * 100)}%
-                    </div>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="max-w-[220px]">
-                  {PREDICTION_EXPLANATIONS[p.k] ?? p.k}
-                </TooltipContent>
-              </Tooltip>
-            ))}
-          </div>
-
-          {/* Outcome profile bars */}
-          <div className="rounded-md border border-border/80 bg-muted/20 p-3">
-            <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Outcome profile
-            </div>
-            <div className="space-y-2">
-              {preds.map((p) => (
-                <div key={p.k} className="flex items-center gap-2 text-[11px]">
-                  <span className="w-8 shrink-0 text-muted-foreground">{p.k}</span>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={cn(
-                        "h-full rounded-full transition-all",
-                        p.v < 0.15 ? "bg-emerald-500" : p.v < 0.3 ? "bg-amber-500" : "bg-red-500",
+            {preds.map((p) => {
+              const ci = computeCI(p.v);
+              return (
+                <Tooltip key={p.k}>
+                  <TooltipTrigger asChild>
+                    <div className="rounded-xl border border-border/70 bg-card px-2 py-3 text-center shadow-sm transition-shadow hover:shadow-md">
+                      <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {p.k}
+                      </div>
+                      <div className={cn("text-lg font-bold tabular-nums", p.neutral ? "text-muted-foreground/50" : riskCls(p.v))}>
+                        {Math.round(p.v * 100)}%
+                      </div>
+                      {p.neutral ? (
+                        <div className="text-[8px] leading-tight text-muted-foreground/40">low</div>
+                      ) : (
+                        <div className="text-[8px] leading-tight text-muted-foreground/35">
+                          {Math.round(ci.lo * 100)}–{Math.round(ci.hi * 100)}%
+                        </div>
                       )}
-                      style={{ width: `${Math.min(100, p.v * 100)}%` }}
-                    />
-                  </div>
-                  <span className="w-10 shrink-0 text-right font-medium tabular-nums">
-                    {Math.round(p.v * 100)}%
-                  </span>
-                </div>
-              ))}
-            </div>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-[220px]">
+                    {PREDICTION_EXPLANATIONS[p.k] ?? p.k}
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
           </div>
 
           {/* Nerve Sparing — 5-Zone */}
@@ -258,7 +255,6 @@ export function PredictionPanel() {
                 </tr>
               </thead>
               <tbody>
-                {/* Side ECE */}
                 <tr className="border-b border-border/60">
                   <td className="py-1 font-medium">Side ECE</td>
                   <td className={cn("py-1 px-1", riskCls(predictions.eceL))}>
@@ -269,7 +265,6 @@ export function PredictionPanel() {
                   </td>
                 </tr>
 
-                {/* Focal / Extensive ECE */}
                 {predictions.ece >= 0.05 && (
                   <tr className="border-b border-border/60 text-muted-foreground">
                     <td className="py-1">If ECE</td>
@@ -285,7 +280,6 @@ export function PredictionPanel() {
                   </tr>
                 )}
 
-                {/* 5 zone rows */}
                 {zones5.map((z) => {
                   const lv = (L.zones?.[z.k] ?? 0) as number;
                   const rv = (R.zones?.[z.k] ?? 0) as number;
@@ -310,7 +304,6 @@ export function PredictionPanel() {
                   );
                 })}
 
-                {/* NS Grade */}
                 <tr>
                   <td className="py-2 font-bold">NS grade</td>
                   <td className="px-1 py-2">
@@ -323,7 +316,6 @@ export function PredictionPanel() {
               </tbody>
             </table>
 
-            {/* Surgical alerts */}
             {allAlerts.length > 0 && (
               <div className="mt-2 space-y-1">
                 {allAlerts.map((item, i) => (
@@ -342,13 +334,11 @@ export function PredictionPanel() {
               </div>
             )}
 
-            {/* NS Surgical Consequences (NSG_DATA) */}
             {gradesToShow.map((gs) => {
               const g = gs.grade as 1 | 2 | 3;
               if (g < 1 || g > 3) return null;
               const gd = NSG_DATA[g];
 
-              // Check zone concerns for this side
               const sideDetail = gs.isLeft || predictions.nsL === predictions.nsR ? L : R;
               const sideAlerts = gs.isLeft || predictions.nsL === predictions.nsR ? L.alerts ?? [] : R.alerts ?? [];
               let apexConcern = (sideDetail.zones?.apex ?? 0) >= 0.08;
@@ -371,8 +361,6 @@ export function PredictionPanel() {
                   <div className="mb-2 text-[9px] font-semibold uppercase tracking-wide text-primary">
                     Surgical Consequence — {gs.label}
                   </div>
-
-                  {/* Main stats */}
                   <div className="mb-3 grid grid-cols-3 gap-1.5">
                     <div className="rounded border border-border bg-muted/30 p-2 text-center">
                       <div className="text-[8px] text-muted-foreground">PSM Rate</div>
@@ -387,8 +375,6 @@ export function PredictionPanel() {
                       <div className={cn("text-sm font-bold", bcrColor(gd.bcr_psm))}>{gd.bcr_psm}%</div>
                     </div>
                   </div>
-
-                  {/* Location BCR table */}
                   <div className="text-[8px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
                     BCR by Margin Location
                   </div>
@@ -405,10 +391,7 @@ export function PredictionPanel() {
                       {locData.map((loc) => (
                         <tr
                           key={loc.name}
-                          className={cn(
-                            "border-b border-border/30",
-                            loc.concern && "bg-amber-500/5",
-                          )}
+                          className={cn("border-b border-border/30", loc.concern && "bg-amber-500/5")}
                         >
                           <td className={cn("py-0.5 pr-1", loc.concern && "font-bold")}>
                             {loc.name}{loc.concern ? " ⚠" : ""}
@@ -436,8 +419,6 @@ export function PredictionPanel() {
             <div className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-primary">
               PLND decision
             </div>
-
-            {/* Recommendation card */}
             <div
               className={cn(
                 "rounded-md border border-border border-l-4 bg-muted/30 p-3 text-[11px] leading-relaxed mb-3",
@@ -447,8 +428,6 @@ export function PredictionPanel() {
               <div className="text-sm font-bold">{plndIcon} {plndTitle}</div>
               <p className="mt-1 text-muted-foreground">{plndDetail}</p>
             </div>
-
-            {/* Risk factor mini-cards */}
             <div className="grid grid-cols-3 gap-1.5 mb-3">
               <div className="rounded border border-border bg-muted/30 p-2 text-center">
                 <div className="text-[8px] uppercase tracking-wide text-muted-foreground">LNI Risk</div>
@@ -470,8 +449,7 @@ export function PredictionPanel() {
               </div>
             </div>
 
-            {/* PSMA LN+ station analysis */}
-            {psmaLn && Array.isArray(lymphNodes) && lymphNodes.length > 0 && (
+            {psmaLn > 0 && Array.isArray(lymphNodes) && lymphNodes.length > 0 && (
               <div>
                 <div className="mb-2 text-[9px] font-semibold uppercase tracking-wide text-primary">
                   PSMA LN+ Station Analysis
@@ -481,16 +459,13 @@ export function PredictionPanel() {
                     const loc = (ln.location ?? "").toLowerCase();
                     const suv = ln.suv ?? 0;
                     const side = ln.side === "L" ? "Left" : ln.side === "R" ? "Right" : "Bilateral";
-
                     const matchedKey = Object.keys(STATION_FP).find((k) => loc.includes(k));
                     const fpData = (matchedKey ? STATION_FP[matchedKey] : null) ?? { fp: 50, note: "Station not characterized." };
-
                     let suvLabel: string, suvCls: string;
                     if (suv > 6) { suvLabel = "Likely true positive"; suvCls = "text-red-500"; }
                     else if (suv >= 3.5) { suvLabel = "Indeterminate"; suvCls = "text-amber-500"; }
                     else if (suv > 0) { suvLabel = "Likely reactive"; suvCls = "text-emerald-500"; }
                     else { suvLabel = "No SUV data"; suvCls = "text-muted-foreground"; }
-
                     return (
                       <div key={i} className="rounded border border-border bg-muted/30 p-2 text-[10px]">
                         <div className="font-semibold capitalize">
@@ -516,6 +491,75 @@ export function PredictionPanel() {
                 </div>
               </div>
             )}
+          </div>
+          {/* Multi-case comparison */}
+          {patients.length > 1 && (
+            <details className="group">
+              <summary className="flex cursor-pointer list-none select-none items-center justify-between rounded-md px-1 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground">
+                <span>Multi-case comparison ({patients.length} cases)</span>
+                <svg className="h-3 w-3 shrink-0 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M2 3.5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </summary>
+              <div className="mt-1 overflow-x-auto rounded-lg border border-border/50 bg-muted/20">
+                <table className="w-full border-collapse text-[10px]">
+                  <thead>
+                    <tr className="border-b border-border text-left text-muted-foreground">
+                      <th className="py-1.5 pl-2 pr-1 font-medium">Case</th>
+                      <th className="px-1 py-1.5 text-center font-medium">ECE</th>
+                      <th className="px-1 py-1.5 text-center font-medium">SVI</th>
+                      <th className="px-1 py-1.5 text-center font-medium">LNI</th>
+                      <th className="px-1 py-1.5 pr-2 text-center font-medium">BCR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {patients.map((pat) => {
+                      const isActive = pat.id === activeId;
+                      const rec = { ...pat.record, lesions: pat.lesionRows };
+                      const S0 = clinicalStateFromRecord(rec);
+                      const S = deriveClinicalFromLesions(S0, lesionsFromRows(pat.lesionRows));
+                      const ece = clampEcePatient(predictEcePatient(S));
+                      const svi = predictSviPatient(S);
+                      const lni = predictLni(S);
+                      const bcr = predictBcrPreop(S);
+                      return (
+                        <tr
+                          key={pat.id}
+                          className={cn(
+                            "border-b border-border/30 last:border-0",
+                            isActive && "bg-primary/5",
+                          )}
+                        >
+                          <td className="max-w-[72px] truncate py-1.5 pl-2 pr-1">
+                            <span className={cn("font-medium", isActive && "text-primary")}>
+                              {isActive && <span className="mr-0.5">▶</span>}{pat.name}
+                            </span>
+                          </td>
+                          <td className={cn("px-1 py-1.5 text-center font-bold tabular-nums", riskCls(ece))}>
+                            {Math.round(ece * 100)}%
+                          </td>
+                          <td className={cn("px-1 py-1.5 text-center font-bold tabular-nums", svi < 0.1 ? "text-muted-foreground/40" : riskCls(svi))}>
+                            {Math.round(svi * 100)}%
+                          </td>
+                          <td className={cn("px-1 py-1.5 text-center font-bold tabular-nums", riskCls(lni))}>
+                            {Math.round(lni * 100)}%
+                          </td>
+                          <td className={cn("px-1 py-1.5 pr-2 text-center font-bold tabular-nums", riskCls(bcr))}>
+                            {Math.round(bcr * 100)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
+
+          {/* Version + disclaimer */}
+          <div className="flex items-center justify-between border-t border-border/30 pt-2 text-[8px] text-muted-foreground/35">
+            <span>COMPASS Model v2.5.1 · 90% CI shown</span>
+            <span>Preoperative estimates only</span>
           </div>
         </CardContent>
       </Card>

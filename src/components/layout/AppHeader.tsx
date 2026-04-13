@@ -1,4 +1,5 @@
 import {
+  BookMarked,
   BookOpen,
   Info,
   Moon,
@@ -18,6 +19,7 @@ export function AppHeader() {
   const setDark = useUiStore((s) => s.setDark);
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
   const setCaseLogOpen = useUiStore((s) => s.setCaseLogOpen);
+  const setReferenceOpen = useUiStore((s) => s.setReferenceOpen);
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
   const setActive = usePatientStore((s) => s.setActive);
@@ -29,13 +31,21 @@ export function AppHeader() {
   return (
     <header className="z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur-md sm:px-4 supports-[backdrop-filter]:bg-card/85">
       {/* Brand */}
-      <div className="flex shrink-0 items-baseline gap-2">
-        <span className="text-sm font-black tracking-tight text-foreground sm:text-base">
-          COMPASS
-        </span>
-        <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">
-          Prostate cancer · surgical outcomes
-        </span>
+      <div className="flex shrink-0 flex-col justify-center gap-0.5">
+        <div className="flex items-baseline gap-2">
+          <span className="text-sm font-black tracking-tight text-foreground sm:text-base">
+            COMPASS
+          </span>
+          <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">
+            Prostate cancer · surgical outcomes
+          </span>
+        </div>
+        <div className="hidden items-center gap-1.5 sm:flex">
+          <span className="rounded bg-amber-500/15 px-1 py-px text-[8px] font-bold uppercase tracking-wider text-amber-500">
+            Research Use Only
+          </span>
+          <span className="text-[8px] text-muted-foreground/50">IRB: STUDY-14-00050</span>
+        </div>
       </div>
 
       {/* Divider */}
@@ -107,6 +117,17 @@ export function AppHeader() {
           ) : (
             <Moon className="h-[15px] w-[15px] text-muted-foreground" />
           )}
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 hidden lg:inline-flex text-purple-400 hover:text-purple-300"
+          aria-label="Reference video"
+          onClick={() => setReferenceOpen(true)}
+        >
+          <BookMarked className="h-[15px] w-[15px]" />
         </Button>
 
         <Button

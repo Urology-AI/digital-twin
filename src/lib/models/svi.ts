@@ -41,6 +41,17 @@ function linearPredict(
 }
 
 /**
+ * MUS ECE logit delta for patient-level SVI.
+ * mus_ece is absent from the trained SVI patient model feature set.
+ * Coefficient ESTIMATED from the side-specific SVI model analogy;
+ * NOT formally calibrated from training data.
+ */
+function musEceSviDelta(S: ClinicalState): number {
+  if (S.mus_ece === 1) return 0.25;
+  return 0;
+}
+
+/**
  * Patient-level SVI — retrained 9-feature model (hardcoded in original HTML).
  */
 export function predictSviPatient(S: ClinicalState): number {
@@ -50,7 +61,7 @@ export function predictSviPatient(S: ClinicalState): number {
   const vals = [
     log_psad,
     S.gg,
-    S.maxcore,
+    normalizeMaxCorePct(S.maxcore),
     S.cores,
     Math.max(S.pirads, 2),
     S.mri_epe,
@@ -67,7 +78,8 @@ export function predictSviPatient(S: ClinicalState): number {
   const s = [
     0.7566, 1.1132, 28.3631, 3.8708, 0.7011, 0.4198, 0.2125, 0.1498, 0.4703,
   ];
-  const L = linearPredict(-3.189665, c, m, s, vals);
+  let L = linearPredict(-3.189665, c, m, s, vals);
+  L += musEceSviDelta(S);
   return sigmoid(L);
 }
 

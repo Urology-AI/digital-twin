@@ -151,26 +151,27 @@ export function deriveClinicalFromLesions(
   const psmaRows = lesions.filter((l) => l.source === "PSMA");
 
   if (mriRows.length > 0) {
-    next.pirads = Math.max(...mriRows.map((l) => parseInt(l.score, 10) || 2));
-    next.mri_epe = mriRows.some((l) => l.epe) ? 1 : 0;
-    next.mri_svi = mriRows.some((l) => l.svi) ? 1 : 0;
-    next.mri_size =
-      mriRows.length > 0
-        ? Math.max(...mriRows.map((l) => (l.mriSize ?? 0) / 10))
-        : 0;
+    const lesionPirads = Math.max(...mriRows.map((l) => Math.min(parseInt(l.score, 10) || 2, 5)));
+    next.pirads = Math.max(base.pirads, lesionPirads);
+    next.mri_epe = (base.mri_epe || mriRows.some((l) => l.epe)) ? 1 : 0;
+    next.mri_svi = (base.mri_svi || mriRows.some((l) => l.svi)) ? 1 : 0;
+    const lesionSizes = mriRows.map((l) => (l.mriSize ?? 0) / 10).filter((v) => v > 0);
+    if (lesionSizes.length > 0)
+      next.mri_size = Math.max(base.mri_size, Math.max(...lesionSizes));
     const abVals = mriRows
       .map((l) => l.mriAbutment)
       .filter((v): v is number => v !== undefined && v >= 0);
-    next.mri_abutment = abVals.length > 0 ? Math.max(...abVals) : -1;
+    next.mri_abutment =
+      abVals.length > 0 ? Math.max(...abVals) : (base.mri_abutment >= 0 ? base.mri_abutment : -1);
     const adcVals = mriRows
       .map((l) => l.mriAdc)
       .filter((v): v is number => v !== undefined && v > 0);
-    next.mri_adc = adcVals.length > 0 ? Math.min(...adcVals) : 0;
+    next.mri_adc = adcVals.length > 0 ? Math.min(...adcVals) : (base.mri_adc > 0 ? base.mri_adc : 0);
   }
 
   if (musRows.length > 0) {
-    next.mus_ece = musRows.some((l) => l.epe) ? 1 : 0;
-    next.mus_svi = musRows.some((l) => l.svi) ? 1 : 0;
+    next.mus_ece = (base.mus_ece || musRows.some((l) => l.epe)) ? 1 : 0;
+    next.mus_svi = (base.mus_svi || musRows.some((l) => l.svi)) ? 1 : 0;
     next.ev_n_lesions = musRows.length;
     next.ev_at_base = musRows.some((l) => l.level === "Base") ? 1 : 0;
     next.ev_size =
@@ -182,13 +183,14 @@ export function deriveClinicalFromLesions(
   }
 
   if (psmaRows.length > 0) {
-    next.suv = Math.max(...psmaRows.map((l) => parseFloat(l.score) || 0));
-    next.psma_epe = psmaRows.some((l) => l.epe) ? 1 : 0;
+    const lesionSuv = Math.max(...psmaRows.map((l) => parseFloat(l.score) || 0));
+    next.suv = Math.max(base.suv, lesionSuv);
+    next.psma_epe = (base.psma_epe || psmaRows.some((l) => l.epe)) ? 1 : 0;
     next.psma_avail = 1;
     next.psma_lesion_count = psmaRows.length;
     next.psma_multifocal = psmaRows.length > 1 ? 1 : 0;
     next.psma_at_base = psmaRows.some((l) => l.level === "Base") ? 1 : 0;
-    next.psma_svi = psmaRows.some((l) => l.svi) ? 1 : 0;
+    next.psma_svi = (base.psma_svi || psmaRows.some((l) => l.svi)) ? 1 : 0;
     const psmaL = psmaRows.some((l) => l.side === "L");
     const psmaR = psmaRows.some((l) => l.side === "R");
     next.psma_side =

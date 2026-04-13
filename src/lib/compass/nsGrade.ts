@@ -197,7 +197,7 @@ export function getNsGradeZoneAware(
       message: "PSMA + at base — 43% ECE rate, wider base dissection",
     });
   }
-  if (S.psma_svi) {
+  if (S.psma_svi && S.psma_avail) {
     alerts.push({
       type: "psma_svi",
       severity: "high",

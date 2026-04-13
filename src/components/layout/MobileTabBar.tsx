@@ -1,11 +1,12 @@
-import { ClipboardList, LayoutGrid, Scan } from "lucide-react";
+import { ClipboardList, LayoutGrid, Scan, BookMarked } from "lucide-react";
 import { useUiStore, type MobileWorkspace } from "@/store/uiStore";
 import { cn } from "@/lib/utils";
 
 const TABS: { id: MobileWorkspace; label: string; Icon: typeof Scan }[] = [
-  { id: "clinical",  label: "Data",    Icon: ClipboardList },
-  { id: "insights",  label: "Results", Icon: LayoutGrid },
-  { id: "viewer",    label: "3D",      Icon: Scan },
+  { id: "clinical",   label: "Data",      Icon: ClipboardList },
+  { id: "insights",   label: "Results",   Icon: LayoutGrid },
+  { id: "viewer",     label: "3D",        Icon: Scan },
+  { id: "reference",  label: "Reference", Icon: BookMarked },
 ];
 
 export function MobileTabBar() {

@@ -11,7 +11,7 @@ export function SidePanel() {
   return (
     <aside
       className={cn(
-        "hidden min-h-0 w-full max-w-[22rem] shrink-0 flex-col border-r border-border bg-card xl:max-w-[24rem]",
+        "hidden min-h-0 w-[700px] shrink-0 flex-col border-r border-border bg-card",
         "lg:flex",
       )}
     >
@@ -22,7 +22,7 @@ export function SidePanel() {
         </div>
         <div className="min-w-0 flex-1">
           <div className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-            Clinical Workspace
+            COMPASS Digital Twin
           </div>
           {active && (
             <div className="truncate text-[10px] text-muted-foreground/70">

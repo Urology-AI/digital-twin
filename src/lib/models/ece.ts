@@ -82,6 +82,29 @@ function mriDetailLogitDelta(S: ClinicalState): number {
   return d;
 }
 
+/**
+ * ExactVu (micro-US) abutment logit delta.
+ * ev_abutment is binary (0 = No, 1 = Yes) per ExactVu data scale.
+ * Coefficient is ESTIMATED (analogous to MRI grade-3 abutment bonus);
+ * NOT formally calibrated — no pathological ECE outcome data available.
+ */
+function musDetailLogitDelta(S: ClinicalState): number {
+  if (S.ev_abutment === 1) return 0.30;
+  return 0;
+}
+
+/**
+ * PSMA SUV logit delta for ECE.
+ * Only applied when PSMA is available, SUV > 0, and psma_epe flag is NOT
+ * already set (to avoid double-counting the strong binary EPE term).
+ * Calibrated: each SUV unit above 4.5 adds ~0.038 logit (OR ≈1.04/unit).
+ * Capped at 0.60 (~SUV 20+).
+ */
+function psmaDetailLogitDelta(S: ClinicalState): number {
+  if (!S.psma_avail || !S.suv || S.suv <= 0 || S.psma_epe) return 0;
+  return Math.min(0.60, Math.max(0, 0.038 * (S.suv - 4.5)));
+}
+
 export function predictEcePatient(S: ClinicalState): number {
   const log_psad = logPsad(S.psa, S.vol);
   const mc = normalizeMaxCorePct(S.maxcore);
@@ -115,6 +138,8 @@ export function predictEcePatient(S: ClinicalState): number {
     vals,
   );
   L += mriDetailLogitDelta(S);
+  L += musDetailLogitDelta(S);
+  L += psmaDetailLogitDelta(S);
   return sigmoid(L);
 }
 
@@ -196,6 +221,8 @@ export function predictEceSide(
     vals,
   );
   L += mriDetailLogitDelta(S);
+  L += musDetailLogitDelta(S);
+  L += psmaDetailLogitDelta(S);
   return sigmoid(L);
 }
 

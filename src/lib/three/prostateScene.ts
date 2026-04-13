@@ -24,6 +24,10 @@ import {
   ACESFilmicToneMapping,
   DoubleSide,
   Material,
+  DataTexture,
+  RGBAFormat,
+  UnsignedByteType,
+  RepeatWrapping,
 } from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { fbm3D, noise3D } from "@/lib/three/noise";
@@ -112,7 +116,7 @@ function getECERiskAtPoint(
   oz: number,
   zones: ThreeZoneRuntime[],
 ): number {
-  const level = oy > 0.12 ? "Base" : oy > -0.42 ? "Mid" : "Apex";
+  const level = oy > 0.27 ? "Base" : oy > (oz > 0 ? -0.50 : -0.95) ? "Mid" : "Apex";
   const region = oz > 0 ? "Anterior" : "Posterior";
   const side = ox < 0 ? "R" : "L";
   const phi = Math.atan2(ox, oz);
@@ -123,7 +127,7 @@ function getECERiskAtPoint(
   for (const z of zones) {
     if (
       z.level === level &&
-      z.region === region &&
+      (level === "Apex" || z.region === region) &&
       z.side === side &&
       (z.subregion === "full" || z.subregion === subregion)
     ) {
@@ -179,6 +183,146 @@ export function overlayColor(val: number, type: OverlayType): Color {
     return new Color(0.8, 0.4 - t * 0.3, 0.3 - t * 0.2);
   }
   return new Color(0.5, 0.5, 0.5);
+}
+
+/**
+ * Look up the overlay value for a zone containing the given normalised
+ * unit-sphere direction (nx=TR, ny=CC, nz=AP with +nz = anterior).
+ */
+function lookupZoneValue(
+  nx: number,
+  ny: number,
+  nz: number,
+  zones: ThreeZoneRuntime[],
+  overlay: OverlayType,
+): number {
+  // Anatomical proportions: Base ≈37% (top), Mid ≈33% (middle), Apex ≈30% (bottom).
+  // ny is normalised on the prostate CC half-dimension so ±1 = surface poles.
+  const level = ny > 0.27 ? "Base" : ny > (nz > 0 ? -0.50 : -0.95) ? "Mid" : "Apex";
+  const region = nz > 0 ? "Anterior" : "Posterior";
+  const side = nx < 0 ? "R" : "L";
+  const phi = Math.atan2(nx, nz);
+  let subregion = "full";
+  if (region === "Posterior" && level !== "Apex") {
+    subregion = Math.abs(phi) > Math.PI * 0.75 ? "medial" : "lateral";
+  }
+  for (const z of zones) {
+    if (
+      z.level === level &&
+      (level === "Apex" || z.region === region) &&
+      z.side === side &&
+      (z.subregion === "full" || z.subregion === subregion)
+    ) {
+      return overlay === "cancer"
+        ? z.cancer
+        : overlay === "ece"
+          ? z.ece
+          : overlay === "svi"
+            ? z.svi
+            : z.psm;
+    }
+  }
+  return 0.01;
+}
+
+/**
+ * Paint vertex colours on the GLB prostate meshes.
+ * When heatmapVisible is true each vertex is coloured by its zone risk;
+ * otherwise an anatomical tissue palette is used.
+ */
+function paintGlbProstate(
+  meshes: Mesh[],
+  zones: ThreeZoneRuntime[],
+  overlay: OverlayType,
+  dims: ProstateDims,
+  heatmapVisible: boolean,
+  lesionsOnly: boolean,
+): void {
+  for (const mesh of meshes) {
+    const pos = mesh.geometry.attributes.position as BufferAttribute | undefined;
+    if (!pos) continue;
+    const col = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      // Convert Three.js world coords back to normalised unit-sphere directions.
+      const nx = pos.getX(i) / dims.tr;
+      const ny = pos.getY(i) / dims.cc;
+      const nz = pos.getZ(i) / dims.ap;
+      // At the mid-gland equator, barely-posterior edge vertices are visible
+      // from the front — clamp them to anterior so posterior data doesn't bleed
+      // to the front-facing edge.  At the apex the tip curves sharply; use no
+      // clamp (0) so that edge-band vertices stay on the posterior side and
+      // anterior apex data only shows on truly anterior (nz > 0) vertices.
+      const apexClamp = ny < -0.35 ? 0 : -0.18;
+      const nzQ = nz >= apexClamp ? Math.max(nz, 0.005) : nz;
+      const val = lookupZoneValue(nx, ny, nzQ, zones, overlay);
+      let cr: number, cg: number, cb: number;
+      if (heatmapVisible && (!lesionsOnly || val >= 0.15)) {
+        const c = overlayColor(val, overlay);
+        cr = c.r; cg = c.g; cb = c.b;
+      } else {
+        // Anatomical tissue palette — lighter anterior, darker posterior.
+        cr = 0.52; cg = 0.24; cb = 0.22;
+        if (nz > 0.08)  { cr += 0.12; cg += 0.09; cb += 0.07; }
+        if (nz < -0.12) { cr -= 0.05; cg -= 0.03; cb -= 0.02; }
+        if (ny > 0.32)  { cr += 0.03; cg += 0.02; }
+        if (ny < -0.28) { cr += 0.05; cg += 0.04; cb += 0.03; }
+        cr = Math.max(0.32, Math.min(0.88, cr));
+        cg = Math.max(0.16, Math.min(0.58, cg));
+        cb = Math.max(0.14, Math.min(0.52, cb));
+      }
+      col[i * 3]     = cr;
+      col[i * 3 + 1] = cg;
+      col[i * 3 + 2] = cb;
+    }
+    mesh.geometry.setAttribute("color", new Float32BufferAttribute(col, 3));
+    (mesh.material as MeshPhysicalMaterial).vertexColors = true;
+    (mesh.material as MeshPhysicalMaterial).needsUpdate = true;
+  }
+}
+
+/**
+ * Paint vertex colours on the GLB seminal-vesicle meshes.
+ * When overlay === "svi" and heatmapVisible the SVI risk from the
+ * adjacent posterior-base zones is used; otherwise anatomical cream.
+ */
+function paintGlbSV(
+  leftMeshes: Mesh[],
+  rightMeshes: Mesh[],
+  zones: ThreeZoneRuntime[],
+  overlay: OverlayType,
+  heatmapVisible: boolean,
+): void {
+  const maxSVI = (side: "L" | "R") =>
+    zones
+      .filter(z => z.side === side && z.region === "Posterior" && z.level === "Base")
+      .reduce((mx, z) => Math.max(mx, z.svi ?? 0), 0.01);
+  const lSVI = maxSVI("L");
+  const rSVI = maxSVI("R");
+
+  const paint = (meshes: Mesh[], svi: number) => {
+    for (const mesh of meshes) {
+      const pos = mesh.geometry.attributes.position as BufferAttribute | undefined;
+      if (!pos) continue;
+      const col = new Float32Array(pos.count * 3);
+      let cr: number, cg: number, cb: number;
+      if (heatmapVisible && overlay === "svi") {
+        const c = overlayColor(svi, "svi");
+        cr = c.r; cg = c.g; cb = c.b;
+      } else {
+        // Anatomical cream — matches 0xd0c0b0
+        cr = 0.816; cg = 0.753; cb = 0.690;
+      }
+      for (let i = 0; i < pos.count; i++) {
+        col[i * 3] = cr; col[i * 3 + 1] = cg; col[i * 3 + 2] = cb;
+      }
+      mesh.geometry.setAttribute("color", new Float32BufferAttribute(col, 3));
+      (mesh.material as MeshPhysicalMaterial).vertexColors = true;
+      (mesh.material as MeshPhysicalMaterial).needsUpdate = true;
+    }
+  };
+
+  paint(leftMeshes, lSVI);
+  paint(rightMeshes, rSVI);
 }
 
 function createProstateMesh(
@@ -285,14 +429,14 @@ function createZoneMesh(
   let yMn: number;
   let yMx: number;
   if (zone.level === "Base") {
-    yMn = 0.12;
-    yMx = 1.1;
+    yMn = 0.27;
+    yMx = 0.92;   // clamped within valid sphere (avoids degenerate r=0 cap at oy>1)
   } else if (zone.level === "Mid") {
-    yMn = -0.42;
-    yMx = 0.12;
+    yMn = -0.65;
+    yMx = 0.27;
   } else {
-    yMn = -1.15;
-    yMx = -0.42;
+    yMn = -0.92;
+    yMx = -0.72;
   }
   const uS = 20;
   const vS = 16;
@@ -493,6 +637,25 @@ export function createProstateScene(
   dims: ProstateDims,
   medianLobeGrade: number,
 ): ProstateSceneHandles {
+  // ── Procedural bump texture (created once, shared across all prostate meshes) ─
+  // A tileable FBM noise map gives the surface a subtle organic bump/lump texture
+  // that resembles biological tissue without altering any vertex colours.
+  const BUMP_SIZE = 256;
+  const bumpData = new Uint8Array(BUMP_SIZE * BUMP_SIZE * 4);
+  for (let by = 0; by < BUMP_SIZE; by++) {
+    for (let bx = 0; bx < BUMP_SIZE; bx++) {
+      const nx = bx / BUMP_SIZE;
+      const ny = by / BUMP_SIZE;
+      const n = fbm3D(nx * 5, ny * 5, 0.37, 4);
+      const v = Math.round(Math.max(0, Math.min(255, (n * 0.5 + 0.5) * 255)));
+      const idx = (by * BUMP_SIZE + bx) * 4;
+      bumpData[idx] = v; bumpData[idx + 1] = v; bumpData[idx + 2] = v; bumpData[idx + 3] = 255;
+    }
+  }
+  const prostateNoiseBump = new DataTexture(bumpData, BUMP_SIZE, BUMP_SIZE, RGBAFormat, UnsignedByteType);
+  prostateNoiseBump.wrapS = prostateNoiseBump.wrapT = RepeatWrapping;
+  prostateNoiseBump.needsUpdate = true;
+
   const w = Math.max(1, container.clientWidth);
   const h = Math.max(1, container.clientHeight);
   const scene = new Scene();
@@ -559,6 +722,12 @@ export function createProstateScene(
 
   model.scale.setScalar(0.85);
 
+  // GLB prostate meshes for vertex-colour heatmap updates.
+  const glbProstateMeshes: Mesh[] = [];
+  const glbSVLeft: Mesh[] = [];
+  const glbSVRight: Mesh[] = [];
+  let glbLoaded = false;
+
   // Load the real anatomical GLB asynchronously; procedural mesh is the fallback
   // while loading (and if the file is absent).
   const glbLoader = new GLTFLoader();
@@ -585,11 +754,10 @@ export function createProstateScene(
         node.updateMatrix();
       });
 
-      // Propagate the new identity transforms so Box3.setFromObject reads
-      // vertex positions directly (without stale pre-bake matrixWorld).
+      // Propagate identity transforms so Box3.setFromObject reads baked positions.
       gltf.scene.updateMatrixWorld(true);
 
-      // Measure Prostate bbox in gltf.scene local (now world) space.
+      // Measure Prostate bbox in baked world space.
       const prostateBox = new Box3().setFromObject(prostateNode);
       const prostateCenter = new Vector3();
       const prostateSize = new Vector3();
@@ -597,100 +765,125 @@ export function createProstateScene(
       prostateBox.getSize(prostateSize);
       if (Math.max(prostateSize.x, prostateSize.y, prostateSize.z) < 1e-5) return;
 
-      // Remap GLB vertices onto the same surface as the zone overlay by
-      // applying the same transformToProstate deformation.  This guarantees
-      // the anatomy and zones are co-planar at every rotation angle.
+      // Confirmed baked axis convention from full GLB matrix-chain analysis:
+      //   baked X = TR  (transverse)
+      //   baked Y = CC  (positive = cranial / base)
+      //   baked Z = −AP (positive = posterior)
       //
-      // Steps:
-      //  1. Centre + normalise each vertex to a unit-sphere direction.
-      //  2. Correct axes from baked GLB space (X=TR, Y=AP, Z=−CC) to
-      //     zone-overlay space (X=TR, Y=CC, Z=AP).
-      //  3. Pass the corrected direction to transformToProstate at offset 0
-      //     (anatomy sits exactly on the prostate surface; zones are at 0.065).
-      const halfMax = Math.max(prostateSize.x, prostateSize.y, prostateSize.z) / 2;
+      // Map each axis to Three.js scene centimetres while preserving the
+      // purchased model's actual geometry:
+      //   new X =  (baked X − Cx) × sx        TR unchanged
+      //   new Y =  (baked Y − Cy) × sy        CC: higher = base ✓
+      //   new Z = −(baked Z − Cz) × sz        negate: baked+ = posterior → new− ✓
+      const sx = (2 * dims.tr) / prostateSize.x;
+      const sy = (2 * dims.cc) / prostateSize.y;
+      const sz = (2 * dims.ap) / prostateSize.z;
 
-      prostateNode.traverse((child) => {
+      // Apply the same linear transform to every mesh in the scene so all
+      // anatomical parts stay in the correct relative position.
+      gltf.scene.traverse((child) => {
         if (!(child instanceof Mesh) || !child.geometry) return;
         const pos = child.geometry.attributes.position;
         const arr = new Float32Array(pos.count * 3);
         for (let i = 0; i < pos.count; i++) {
-          const bx = (pos.getX(i) - prostateCenter.x) / halfMax;
-          const by = (pos.getY(i) - prostateCenter.y) / halfMax;
-          const bz = (pos.getZ(i) - prostateCenter.z) / halfMax;
-          const len = Math.sqrt(bx * bx + by * by + bz * bz) || 1;
-          // Axis correction: baked Y→AP→zone-Z, baked −Z→CC→zone-Y
-          const nx = bx / len;    // TR  (unchanged)
-          const ny = -bz / len;   // CC  (baked Z = −CC)
-          const nz = by / len;    // AP  (baked Y = AP)
-          const p = transformToProstate(nx, ny, nz, 0, dims, medianLobeGrade);
-          arr[i * 3]     = p.x;
-          arr[i * 3 + 1] = p.y;
-          arr[i * 3 + 2] = p.z;
+          arr[i * 3]     =  (pos.getX(i) - prostateCenter.x) * sx;
+          arr[i * 3 + 1] =  (pos.getY(i) - prostateCenter.y) * sy;
+          arr[i * 3 + 2] = -(pos.getZ(i) - prostateCenter.z) * sz;
         }
-        child.geometry.setAttribute(
-          "position",
-          new Float32BufferAttribute(arr, 3),
-        );
+        child.geometry.setAttribute("position", new Float32BufferAttribute(arr, 3));
         child.geometry.computeVertexNormals();
       });
 
-      // Vertices are now in model space — no additional scale/translate needed.
       gltf.scene.scale.set(1, 1, 1);
       gltf.scene.position.set(0, 0, 0);
 
-      // Apply the same linear axis-correction + scale to the GLB's own SV/VD
-      // meshes so they sit at the correct position relative to the remapped
-      // prostate.  Unlike the prostate we use a straight linear transform
-      // (not transformToProstate) so their shape is preserved.
-      //   baked X=TR → new X  (scale dims.tr / halfX)
-      //   baked Z=−CC → new Y  (scale dims.cc / halfZ, negate)
-      //   baked Y=AP  → new Z  (scale dims.ap / halfY)
-      const halfX = prostateSize.x / 2;
-      const halfY = prostateSize.y / 2;
-      const halfZ = prostateSize.z / 2;
-      const linSX = dims.tr / halfX;
-      const linSY = dims.cc / halfZ;
-      const linSZ = dims.ap / halfY;
+      // Assign materials.  Prostate gets a vertexColors physical material so
+      // the heatmap can be painted directly onto its surface.
+      prostateNode.traverse((child) => {
+        if (!(child instanceof Mesh)) return;
+        child.material = new MeshPhysicalMaterial({
+          vertexColors: true,
+          roughness: 0.52,
+          metalness: 0.18,
+          clearcoat: 0.35,
+          clearcoatRoughness: 0.5,
+          bumpMap: prostateNoiseBump,
+          bumpScale: 0.012,
+        });
+        glbProstateMeshes.push(child);
+      });
 
-      for (const name of ["Seminal_R", "Seminal_L", "Ampulla_01"]) {
+      const svNames: [string, Mesh[]][] = [
+        ["Seminal_L", glbSVLeft],
+        ["Seminal_R", glbSVRight],
+      ];
+      for (const [name, arr] of svNames) {
         const node = gltf.scene.getObjectByName(name);
         if (!node) continue;
         node.traverse((child) => {
-          if (!(child instanceof Mesh) || !child.geometry) return;
-          const pos = child.geometry.attributes.position;
-          const arr = new Float32Array(pos.count * 3);
-          for (let i = 0; i < pos.count; i++) {
-            const bx = pos.getX(i) - prostateCenter.x;
-            const by = pos.getY(i) - prostateCenter.y;
-            const bz = pos.getZ(i) - prostateCenter.z;
-            arr[i * 3]     =  bx * linSX;
-            arr[i * 3 + 1] =  bz * linSY;   // positive: SV sits at base (top)
-            arr[i * 3 + 2] =  by * linSZ;
-          }
-          child.geometry.setAttribute("position", new Float32BufferAttribute(arr, 3));
-          child.geometry.computeVertexNormals();
+          if (!(child instanceof Mesh)) return;
+          child.material = new MeshPhysicalMaterial({
+            vertexColors: true,
+            roughness: 0.55,
+            metalness: 0.05,
+          });
+          arr.push(child);
         });
       }
 
-      // Hide only the urethra; show GLB SV and VD.
-      const urethraNode = gltf.scene.getObjectByName("Urethra");
-      if (urethraNode) urethraNode.visible = false;
+      // Ampulla_01 is the bilateral vas deferens / ampullae mesh — the two thinner
+      // tubes medial to the SVs that form the 3rd and 4th structures at the base.
+      const ampullaNode = gltf.scene.getObjectByName("Ampulla_01");
+      if (ampullaNode) {
+        ampullaNode.visible = true;
+        ampullaNode.traverse((child) => {
+          if (!(child instanceof Mesh)) return;
+          child.material = new MeshPhysicalMaterial({
+            color: 0xe2d6c8,   // slightly paler/cooler than SVs (vas = firmer, whiter)
+            roughness: 0.48,
+            metalness: 0.04,
+          });
+        });
+      }
 
-      // Swap procedural mesh for the GLB anatomy.
-      // GLB has SV + ampulla but no full vas deferens tube — keep procedural vd.
-      // Hide procedural sv and prostateMesh (replaced by GLB equivalents).
+      // Show the GLB urethra.
+      const urethraNode = gltf.scene.getObjectByName("Urethra");
+      if (urethraNode) {
+        urethraNode.visible = true;
+        urethraNode.traverse((child) => {
+          if (!(child instanceof Mesh)) return;
+          child.material = new MeshPhysicalMaterial({
+            color: 0x353535,
+            roughness: 0.5,
+            metalness: 0.1,
+            transparent: true,
+            opacity: 0.5,
+            clearcoat: 0.2,
+          });
+        });
+      }
+
+      // Paint initial tissue colours onto the GLB prostate and SVs.
+      paintGlbProstate(glbProstateMeshes, zones, overlay, dims, false, false);
+      paintGlbSV(glbSVLeft, glbSVRight, zones, overlay, false);
+
+      // Swap procedural anatomy for the GLB.  Floating heatmap tiles are
+      // replaced by vertex colours; zone boundary outlines remain visible.
       model.remove(prostateMesh);
       prostateMesh.geometry.dispose();
       (prostateMesh.material as Material).dispose();
       sv.visible = false;
-      vd.visible = false;   // procedural VD tubes look like ureters — hidden
+      vd.visible = false;
       urethra.visible = false;
+      heatmapGroup.visible = false;
+      boundaryGroup.visible = false;   // shown/hidden per heatmapVisible in updateZones
 
       model.add(gltf.scene);
+      glbLoaded = true;
     },
     undefined,
     () => {
-      // GLB unavailable (file not yet copied) — procedural mesh remains as fallback
+      // GLB unavailable — procedural mesh remains as fallback.
     },
   );
 
@@ -717,23 +910,47 @@ export function createProstateScene(
       renderer.setSize(ww, hh);
     },
     updateZones: (z, ov, opts) => {
-      buildZones(z, ov);
-      for (const mesh of zoneMeshes) {
-        const zn = mesh.userData.zone as ThreeZoneRuntime;
-        const val =
-          ov === "cancer"
-            ? zn.cancer
-            : ov === "ece"
-              ? zn.ece
-              : ov === "svi"
-                ? zn.svi
-                : zn.psm;
-        (mesh.material as MeshBasicMaterial).color.copy(
-          overlayColor(val ?? 0.02, ov),
+      if (glbLoaded) {
+        // GLB mode: paint vertex colours on the real prostate surface and SVs.
+        paintGlbProstate(
+          glbProstateMeshes,
+          z,
+          ov,
+          dims,
+          opts.heatmapVisible,
+          opts.lesionsOnly,
         );
-        mesh.visible = opts.lesionsOnly ? (val ?? 0) >= 0.15 : true;
+        paintGlbSV(glbSVLeft, glbSVRight, z, ov, opts.heatmapVisible);
+        // Rebuild boundary lines so zone outlines reflect updated data.
+        buildZones(z, ov);
+        for (const mesh of zoneMeshes) {
+          const zn = mesh.userData.zone as ThreeZoneRuntime;
+          const val =
+            ov === "cancer" ? zn.cancer : ov === "ece" ? zn.ece : ov === "svi" ? zn.svi : zn.psm;
+          mesh.visible = opts.lesionsOnly ? (val ?? 0) >= 0.15 : true;
+        }
+        // Zone faces replaced by vertex colours; outlines shown when heatmap active.
+        heatmapGroup.visible = false;
+        boundaryGroup.visible = false;
+      } else {
+        buildZones(z, ov);
+        for (const mesh of zoneMeshes) {
+          const zn = mesh.userData.zone as ThreeZoneRuntime;
+          const val =
+            ov === "cancer"
+              ? zn.cancer
+              : ov === "ece"
+                ? zn.ece
+                : ov === "svi"
+                  ? zn.svi
+                  : zn.psm;
+          (mesh.material as MeshBasicMaterial).color.copy(
+            overlayColor(val ?? 0.02, ov),
+          );
+          mesh.visible = opts.lesionsOnly ? (val ?? 0) >= 0.15 : true;
+        }
+        heatmapGroup.visible = opts.heatmapVisible;
       }
-      heatmapGroup.visible = opts.heatmapVisible;
     },
   };
 }
