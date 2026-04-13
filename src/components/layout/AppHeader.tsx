@@ -5,16 +5,20 @@ import {
   Moon,
   Printer,
   Redo2,
+  Settings2,
   Sun,
   Undo2,
 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
 import { printReport } from "@/lib/compass/printReport";
 import { cn } from "@/lib/utils";
+import { ApiSettingsDialog } from "@/components/ApiSettingsDialog";
 
 export function AppHeader() {
+  const [apiSettingsOpen, setApiSettingsOpen] = useState(false);
   const dark = useUiStore((s) => s.dark);
   const setDark = useUiStore((s) => s.setDark);
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
@@ -162,7 +166,20 @@ export function AppHeader() {
         >
           <Info className="h-[15px] w-[15px]" />
         </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          aria-label="API settings"
+          onClick={() => setApiSettingsOpen(true)}
+        >
+          <Settings2 className="h-[15px] w-[15px]" />
+        </Button>
       </div>
+
+      <ApiSettingsDialog open={apiSettingsOpen} onClose={() => setApiSettingsOpen(false)} />
 
       {active && (
         <span className="sr-only" aria-live="polite">
