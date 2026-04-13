@@ -15,6 +15,7 @@ import {
 interface Props {
   open: boolean;
   onClose: () => void;
+  onSave?: () => void;
 }
 
 type TestState = "idle" | "loading" | "ok" | "error";
@@ -35,7 +36,7 @@ function StatusBadge({ state, detail }: { state: TestState; detail: string }) {
   );
 }
 
-export function ApiSettingsDialog({ open, onClose }: Props) {
+export function ApiSettingsDialog({ open, onClose, onSave }: Props) {
   const [url, setUrl] = useState(() => getApiUrl());
   const [healthPath, setHealthPathState] = useState(() => getHealthPath());
   const [copied, setCopied] = useState(false);
@@ -85,6 +86,7 @@ export function ApiSettingsDialog({ open, onClose }: Props) {
   function handleSave() {
     setApiUrl(url);
     setHealthPath(healthPath);
+    onSave?.();
     onClose();
   }
 
