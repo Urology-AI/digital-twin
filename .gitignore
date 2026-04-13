@@ -45,3 +45,12 @@ coverage/
 *.pem
 .cache/
 .eslintcache
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
