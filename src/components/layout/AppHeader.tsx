@@ -5,16 +5,22 @@ import {
   Moon,
   Printer,
   Redo2,
+  Settings2,
   Sun,
   Undo2,
 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
 import { printReport } from "@/lib/compass/printReport";
 import { cn } from "@/lib/utils";
+import { ApiSettingsDialog } from "@/components/ApiSettingsDialog";
+import { useApiStatus } from "@/hooks/useApiStatus";
 
 export function AppHeader() {
+  const [apiSettingsOpen, setApiSettingsOpen] = useState(false);
+  const { status: aiStatus, recheck: recheckAi } = useApiStatus();
   const dark = useUiStore((s) => s.dark);
   const setDark = useUiStore((s) => s.setDark);
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
@@ -162,7 +168,37 @@ export function AppHeader() {
         >
           <Info className="h-[15px] w-[15px]" />
         </Button>
+
+        {/* AI status indicator + settings */}
+        <button
+          type="button"
+          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          aria-label="API settings"
+          onClick={() => setApiSettingsOpen(true)}
+          title={
+            aiStatus === "connected"    ? "AI connected" :
+            aiStatus === "disconnected" ? "AI disconnected" :
+            "Checking AI connection…"
+          }
+        >
+          <span
+            className={cn(
+              "h-2 w-2 shrink-0 rounded-full",
+              aiStatus === "connected"    && "bg-emerald-400 shadow-[0_0_6px_1px_rgba(52,211,153,0.6)]",
+              aiStatus === "disconnected" && "bg-red-500 shadow-[0_0_6px_1px_rgba(239,68,68,0.5)]",
+              aiStatus === "checking"     && "animate-pulse bg-yellow-400",
+            )}
+          />
+          <span className="hidden text-[10px] font-medium sm:inline">AI</span>
+          <Settings2 className="h-[14px] w-[14px]" />
+        </button>
       </div>
+
+      <ApiSettingsDialog
+        open={apiSettingsOpen}
+        onClose={() => setApiSettingsOpen(false)}
+        onSave={recheckAi}
+      />
 
       {active && (
         <span className="sr-only" aria-live="polite">
