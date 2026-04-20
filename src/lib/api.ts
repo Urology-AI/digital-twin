@@ -79,9 +79,17 @@ export interface ChatResponse {
   reply: string;
 }
 
+export interface ChatAttachment {
+  name: string;
+  mime: string;
+  data_url?: string;
+  text?: string;
+}
+
 export async function chatWithAssistant(
   messages: ChatMessage[],
   clinical?: Record<string, unknown>,
+  attachments?: ChatAttachment[],
 ): Promise<ChatResponse> {
-  return post<ChatResponse>("/api/chat", { messages, clinical });
+  return post<ChatResponse>("/api/chat", { messages, clinical, attachments });
 }

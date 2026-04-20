@@ -13,6 +13,7 @@ interface UiState {
   infoOpen: boolean;
   caseLogOpen: boolean;
   referenceOpen: boolean;
+  chatOpen: boolean;
   explainKey: string | null;
   targetRot: { x: number; y: number };
   /** Below lg breakpoint: which full-screen panel is shown */
@@ -25,6 +26,7 @@ interface UiState {
   setInfoOpen: (v: boolean) => void;
   setCaseLogOpen: (v: boolean) => void;
   setReferenceOpen: (v: boolean) => void;
+  setChatOpen: (v: boolean) => void;
   setExplainKey: (k: string | null) => void;
   setView: (name: keyof typeof VIEWS) => void;
   setMobileWorkspace: (w: MobileWorkspace) => void;
@@ -39,6 +41,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   infoOpen: false,
   caseLogOpen: false,
   referenceOpen: false,
+  chatOpen: false,
   explainKey: null,
   targetRot: { x: 0, y: 0 },
   mobileWorkspace: "clinical",
@@ -53,6 +56,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setInfoOpen: (v) => set({ infoOpen: v }),
   setCaseLogOpen: (v) => set({ caseLogOpen: v }),
   setReferenceOpen: (v) => set({ referenceOpen: v }),
+  setChatOpen: (v) => set({ chatOpen: v }),
   setExplainKey: (k) => set({ explainKey: k }),
   setView: (name) => {
     const v = VIEWS[name];

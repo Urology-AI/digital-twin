@@ -9,6 +9,7 @@ import { SidePanel } from "@/components/SidePanel";
 import { ThreeCanvas } from "@/components/ThreeCanvas";
 import { ZoneLabelsOverlay } from "@/components/ZoneLabelsOverlay";
 import { CaseLog } from "@/components/CaseLog";
+import { ChatWidget } from "@/components/ChatWidget";
 import { InfoPanel } from "@/components/InfoPanel";
 import { ReferencePanel } from "@/components/ReferencePanel";
 import { FunctionalOutcomesWorkspace } from "@/components/FunctionalOutcomesWorkspace";
@@ -178,6 +179,8 @@ export default function App() {
       </div>
 
       <MobileTabBar />
+
+      <ChatWidget />
 
       {infoOpen && (
         <InfoPanel onClose={() => setInfoOpen(false)} />

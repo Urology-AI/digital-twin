@@ -662,7 +662,7 @@ export function createProstateScene(
   scene.background = new Color(0x1e1e24);
   const camera = new PerspectiveCamera(40, w / h, 0.1, 100);
   camera.position.set(0, 0.3, 4.5);
-  const renderer = new WebGLRenderer({ antialias: true });
+  const renderer = new WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setSize(w, h);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.toneMapping = ACESFilmicToneMapping;

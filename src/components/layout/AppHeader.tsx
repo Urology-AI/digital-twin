@@ -2,25 +2,55 @@ import {
   BookMarked,
   BookOpen,
   Info,
+  MessageCircle,
   Moon,
   Printer,
   Redo2,
-  Settings2,
   Sun,
   Undo2,
 } from "lucide-react";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
 import { printReport } from "@/lib/compass/printReport";
 import { cn } from "@/lib/utils";
-import { ApiSettingsDialog } from "@/components/ApiSettingsDialog";
 import { useApiStatus } from "@/hooks/useApiStatus";
+import { useToast } from "@/components/ui/toast";
+import { getApiUrl, testLlmEndpoint } from "@/lib/api";
 
 export function AppHeader() {
-  const [apiSettingsOpen, setApiSettingsOpen] = useState(false);
   const { status: aiStatus, recheck: recheckAi } = useApiStatus();
+  const chatOpen = useUiStore((s) => s.chatOpen);
+  const setChatOpen = useUiStore((s) => s.setChatOpen);
+  const toast = useToast();
+
+  async function handleTestAi() {
+    if (!getApiUrl()) {
+      toast.show({ kind: "error", message: "Backend URL not set — open settings to configure." });
+      return;
+    }
+    const id = toast.show({ kind: "loading", message: "Testing AI connection…", duration: 0 });
+    try {
+      const r = await testLlmEndpoint();
+      if (r.ok) {
+        toast.update(id, { kind: "success", message: "AI connection successful", duration: 2500 });
+      } else {
+        toast.update(id, {
+          kind: "error",
+          message: r.error ? `AI test failed: ${r.error}` : "AI endpoint not reachable",
+          duration: 4000,
+        });
+      }
+    } catch (e) {
+      toast.update(id, {
+        kind: "error",
+        message: e instanceof Error ? e.message : String(e),
+        duration: 4000,
+      });
+    } finally {
+      recheckAi();
+    }
+  }
   const dark = useUiStore((s) => s.dark);
   const setDark = useUiStore((s) => s.setDark);
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
@@ -174,15 +204,15 @@ export function AppHeader() {
           <Info className="h-[15px] w-[15px]" />
         </Button>
 
-        {/* AI status indicator + settings */}
+        {/* AI status indicator — click to test */}
         <button
           type="button"
           className="flex items-center gap-1.5 rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-          aria-label="API settings"
-          onClick={() => setApiSettingsOpen(true)}
+          aria-label="Test AI connection"
+          onClick={handleTestAi}
           title={
-            aiStatus === "connected"    ? "AI connected" :
-            aiStatus === "disconnected" ? "AI disconnected" :
+            aiStatus === "connected"    ? "AI connected · click to re-test" :
+            aiStatus === "disconnected" ? "AI disconnected · click to re-test" :
             "Checking AI connection…"
           }
         >
@@ -195,15 +225,22 @@ export function AppHeader() {
             )}
           />
           <span className="hidden text-[10px] font-medium sm:inline">AI</span>
-          <Settings2 className="h-[14px] w-[14px]" />
+        </button>
+
+        {/* Chat assistant */}
+        <button
+          type="button"
+          className={cn(
+            "flex items-center rounded-md px-1.5 py-1 transition-colors hover:bg-muted/60 hover:text-foreground",
+            chatOpen ? "text-primary" : "text-muted-foreground",
+          )}
+          aria-label="Open chat assistant"
+          onClick={() => setChatOpen(!chatOpen)}
+          title="Ask the assistant"
+        >
+          <MessageCircle className="h-[15px] w-[15px]" />
         </button>
       </div>
-
-      <ApiSettingsDialog
-        open={apiSettingsOpen}
-        onClose={() => setApiSettingsOpen(false)}
-        onSave={recheckAi}
-      />
 
       {active && (
         <span className="sr-only" aria-live="polite">
