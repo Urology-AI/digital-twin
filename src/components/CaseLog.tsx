@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { usePatientStore } from "@/store/patientStore";
+import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary } from "@/store/patientStore";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { cn } from "@/lib/utils";
@@ -82,6 +83,33 @@ function parsePathValue(val: string): number | null {
   return isNaN(n) ? null : n;
 }
 
+function parseCsv(text: string): CaseRecord[] {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headers = lines[0]!.split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+  return lines.slice(1).map((line) => {
+    // Handle quoted fields containing commas
+    const values: string[] = [];
+    let cur = "";
+    let inQuote = false;
+    for (const ch of line) {
+      if (ch === '"') { inQuote = !inQuote; continue; }
+      if (ch === "," && !inQuote) { values.push(cur); cur = ""; continue; }
+      cur += ch;
+    }
+    values.push(cur);
+    const row: Record<string, unknown> = {};
+    headers.forEach((h, i) => {
+      const v = (values[i] ?? "").trim();
+      row[h] = v === "" ? (h.startsWith("path_") || h === "notes" ? null : 0) : isNaN(Number(v)) ? v : Number(v);
+    });
+    // Ensure required string fields
+    if (!row["id"]) row["id"] = "C" + Date.now();
+    if (!row["notes"]) row["notes"] = "";
+    return row as unknown as CaseRecord;
+  });
+}
+
 function riskCls(v: number) {
   if (v < 15) return "text-emerald-500";
   if (v < 30) return "text-amber-500";
@@ -92,8 +120,41 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
   const predictions = usePatientStore((s) => s.predictions);
+  const importJsonFile = usePatientStore((s) => s.importJsonFile);
+  const setActive = usePatientStore((s) => s.setActive);
+  const setPatientName = usePatientStore((s) => s.setPatientName);
 
   const [cases, setCases] = useState<CaseRecord[]>([]);
+  const importRef = useRef<HTMLInputElement>(null);
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      try {
+        if (file.name.toLowerCase().endsWith(".csv")) {
+          // Import as CaseLog entries
+          const imported = parseCsv(text);
+          if (!imported.length) { alert("No valid rows found in CSV."); return; }
+          const existing = getCases();
+          const existingIds = new Set(existing.map((c) => c.id));
+          const newOnes = imported.filter((c) => !existingIds.has(c.id));
+          const merged = [...newOnes, ...existing];
+          saveCases(merged);
+          setCases(merged);
+        } else {
+          // Import as full patient record (JSON)
+          importJsonFile(text, file.name.replace(/\.json$/i, ""));
+        }
+      } catch {
+        alert("Could not import file. Check that it is a valid COMPASS JSON or exported CSV.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   const reload = useCallback(() => setCases(getCases()), []);
 
@@ -168,6 +229,15 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
     const updated = [c, ...getCases()];
     saveCases(updated);
     setCases(updated);
+
+    // Also save the full patient record to the library so it can be reloaded.
+    // Name defaults to date+clinical summary; updated to notes when user loads.
+    savePatientToLibrary({
+      id: c.id,
+      name: c.notes.trim() || `${c.date} — GG${c.gg} PSA ${c.psa}`,
+      record: entry.record,
+      lesionRows: entry.lesionRows,
+    });
   };
 
   const updatePath = (idx: number, field: keyof CaseRecord, raw: string) => {
@@ -260,14 +330,16 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       className="fixed inset-0 z-[200] overflow-y-auto bg-background/97 p-4 sm:p-8"
       style={{ backdropFilter: "blur(4px)" }}
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={onClose}
-        className="fixed right-5 top-4 z-[201] text-2xl text-muted-foreground hover:text-foreground"
-        aria-label="Close"
+        className="fixed right-4 top-3 z-[201] h-8 w-8 text-muted-foreground hover:text-foreground"
+        aria-label="Close case log"
       >
-        ×
-      </button>
+        <X className="h-4 w-4" />
+      </Button>
 
       <div className="mx-auto max-w-4xl">
         <h2 className="mb-1 text-lg font-semibold text-primary">Prospective Case Log</h2>
@@ -278,6 +350,10 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
         <div className="mb-4 flex flex-wrap gap-2">
           <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={saveCurrentCase}>
             + Save Current Case
+          </Button>
+          <input ref={importRef} type="file" accept=".json,.csv" className="sr-only" onChange={handleImport} aria-hidden />
+          <Button size="sm" variant="outline" onClick={() => importRef.current?.click()}>
+            Import Case
           </Button>
           <Button size="sm" variant="outline" onClick={exportCSV}>
             Export CSV
@@ -329,13 +405,31 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
                       GG{c.gg} | PSA {c.psa} | PIRADS {c.pirads} | {c.laterality}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => deleteCase(i)}
-                    className="text-xs text-red-500 hover:underline"
-                  >
-                    delete
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const name = c.notes.trim() || `${c.date} — GG${c.gg} PSA ${c.psa}`;
+                        // Try library first (full record), otherwise use the
+                        // case log snapshot already loaded into the store on startup.
+                        if (!loadPatientFromLibrary(c.id, name)) {
+                          setPatientName(c.id, name);
+                          setActive(c.id);
+                        }
+                        onClose();
+                      }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      load
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteCase(i)}
+                      className="text-xs text-red-500 hover:underline"
+                    >
+                      delete
+                    </button>
+                  </div>
                 </div>
 
                 {/* Predictions */}

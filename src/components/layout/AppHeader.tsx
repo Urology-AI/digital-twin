@@ -28,6 +28,7 @@ export function AppHeader() {
   const setReferenceOpen = useUiStore((s) => s.setReferenceOpen);
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
+  const loading = usePatientStore((s) => s.loading);
   const setActive = usePatientStore((s) => s.setActive);
   const undo = usePatientStore((s) => s.undo);
   const redo = usePatientStore((s) => s.redo);
@@ -66,11 +67,15 @@ export function AppHeader() {
             "h-8 min-w-0 flex-1 cursor-pointer truncate rounded-lg border border-input/80 bg-muted/50 px-2.5 text-xs font-medium text-foreground shadow-none transition-colors",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
             "hover:bg-muted/80 sm:text-sm",
+            (loading || patients.length === 0) && "opacity-60",
           )}
           value={activeId ?? ""}
+          disabled={loading}
           onChange={(e) => setActive(e.target.value)}
         >
-          {patients.length === 0 ? (
+          {loading ? (
+            <option value="">Loading cases…</option>
+          ) : patients.length === 0 ? (
             <option value="">No patients loaded</option>
           ) : (
             patients.map((p) => (

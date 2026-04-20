@@ -11,6 +11,7 @@ import { ZoneLabelsOverlay } from "@/components/ZoneLabelsOverlay";
 import { CaseLog } from "@/components/CaseLog";
 import { InfoPanel } from "@/components/InfoPanel";
 import { ReferencePanel } from "@/components/ReferencePanel";
+import { FunctionalOutcomesWorkspace } from "@/components/FunctionalOutcomesWorkspace";
 import { PREDICTION_EXPLANATIONS } from "@/lib/compass/explainPrediction";
 import {
   deriveClinicalFromLesions,
@@ -20,6 +21,8 @@ import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import patientsCatalog from "@/data/patients.json";
 import {
   hydrateFromLocalStorage,
+  hydratePatientsFromCaseLog,
+  hydratePatientLibrary,
   usePatientStore,
 } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
@@ -94,6 +97,9 @@ export default function App() {
       st.recompute();
       usePatientStore.setState({ loading: false });
     }
+    // Load saved library entries (full records) then fall back to case log snapshots.
+    hydratePatientLibrary();
+    hydratePatientsFromCaseLog();
   }, [bootstrapFromJson]);
 
   return (
@@ -143,6 +149,18 @@ export default function App() {
             )}
           >
             <ClinicalWorkspace compact />
+          </div>
+
+          {/* Outcomes tab — mobile only */}
+          <div
+            className={cn(
+              "relative z-10 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-muted/20 app-scroll dark:bg-background",
+              "max-lg:absolute max-lg:inset-0",
+              mobileWorkspace === "outcomes" ? "max-lg:flex max-lg:flex-col" : "max-lg:hidden",
+              "lg:hidden",
+            )}
+          >
+            <FunctionalOutcomesWorkspace />
           </div>
 
           {/* Reference tab — mobile only */}

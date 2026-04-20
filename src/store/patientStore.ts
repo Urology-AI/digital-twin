@@ -18,6 +18,10 @@ const STORAGE_KEY = "compass-digital-twin-state";
 // localStorage data from previous sessions gets discarded automatically.
 const STORAGE_VERSION = 3;
 const HISTORY_LIMIT = 40;
+// Separate key for cases saved via the CaseLog, so they persist in the dropdown.
+const PATIENT_LIBRARY_KEY = "compass-patient-library";
+// Same key used by CaseLog.tsx to persist prediction snapshots.
+const CASE_LOG_KEY = "compass_cases";
 
 export interface PatientEntry {
   id: string;
@@ -60,6 +64,7 @@ interface PatientState {
   historyIndex: number;
   bootstrapFromJson: (rows: { id: string; name: string; record: Prostate3DInputV1 }[]) => void;
   setActive: (id: string) => void;
+  setPatientName: (id: string, name: string) => void;
   removePatient: (id: string) => void;
   updateLesionRows: (rows: LesionRow[]) => void;
   addLesion: () => void;
@@ -158,11 +163,15 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       try {
         localStorage.setItem(
           STORAGE_KEY,
-          JSON.stringify({ patients, activeId: first }),
+          JSON.stringify({ patients, activeId: first, _v: STORAGE_VERSION }),
         );
       } catch {
         /* private mode */
       }
+    },
+
+    setPatientName: (id, name) => {
+      set({ patients: get().patients.map((p) => (p.id === id ? { ...p, name } : p)) });
     },
 
     setActive: (id) => {
@@ -391,3 +400,147 @@ export function autosavePatients(): void {
 }
 
 usePatientStore.subscribe(autosavePatients);
+
+/** Save a PatientEntry to the persistent library (used by CaseLog saves). */
+export function savePatientToLibrary(entry: PatientEntry): void {
+  try {
+    const existing = JSON.parse(
+      localStorage.getItem(PATIENT_LIBRARY_KEY) || "[]",
+    ) as PatientEntry[];
+    // Replace if same id exists, otherwise prepend
+    const without = existing.filter((e) => e.id !== entry.id);
+    localStorage.setItem(
+      PATIENT_LIBRARY_KEY,
+      JSON.stringify([entry, ...without]),
+    );
+  } catch {
+    /* noop */
+  }
+}
+
+/**
+ * Load a single library patient into the store by id, setting it as active.
+ * Uses displayName (e.g. the case notes) as the name shown in the dropdown.
+ * Returns true if the library entry was found.
+ */
+export function loadPatientFromLibrary(id: string, displayName: string): boolean {
+  try {
+    const library = JSON.parse(
+      localStorage.getItem(PATIENT_LIBRARY_KEY) || "[]",
+    ) as PatientEntry[];
+    const entry = library.find((e) => e.id === id);
+    if (!entry) return false;
+    const named: PatientEntry = {
+      ...entry,
+      name: displayName,
+      record: { ...entry.record, zones: mergeZones(entry.record.zones || {}) },
+      lesionRows: ensureLesionIds(entry.lesionRows || []),
+    };
+    const { patients } = usePatientStore.getState();
+    const existing = patients.find((p) => p.id === id);
+    if (existing) {
+      // Update name in place and switch to it
+      usePatientStore.setState({
+        patients: patients.map((p) => (p.id === id ? { ...p, name: displayName } : p)),
+        activeId: id,
+      });
+    } else {
+      usePatientStore.setState({ patients: [...patients, named], activeId: id });
+    }
+    usePatientStore.getState().recompute();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Read all case log entries and add them to the store as patients so they
+ * appear in the header dropdown. Uses the notes field as the display name.
+ * Skips entries already present by id.
+ */
+export function hydratePatientsFromCaseLog(): void {
+  try {
+    const raw = localStorage.getItem(CASE_LOG_KEY);
+    if (!raw) return;
+    const cases = JSON.parse(raw) as Array<{
+      id: string; date: string; notes?: string;
+      psa: number; vol: number; gg: number; cores: number;
+      maxcore: number; linear: number; pirads: number; laterality: string;
+      gg_left: number; gg_right: number; mri_epe: number; mri_svi: number;
+      mri_size: number; mri_abutment: number; mri_adc: number;
+      mus_ece: number; mus_svi: number; suv: number;
+      psma_ln: number; psma_svi: number;
+    }>;
+    if (!cases.length) return;
+    const { patients } = usePatientStore.getState();
+    const existingIds = new Set(patients.map((p) => p.id));
+    const newOnes: PatientEntry[] = cases
+      .filter((c) => !existingIds.has(c.id))
+      .map((c) => {
+        const name = (c.notes || "").trim() || `${c.date} — GG${c.gg} PSA ${c.psa}`;
+        const zones = createDefaultZones();
+        const record: Prostate3DInputV1 = {
+          _schema: "prostate-3d-input-v1",
+          patient: {
+            age: null, psa: c.psa, psa_density: null, bmi: null,
+            shim: null, ipss: null, dm: false, htn: false, cad: false,
+            statin: false, smoking: "never", exercise: "moderate", pde5: false,
+          },
+          prostate: { volume_cc: c.vol, dimensions_cm: null, median_lobe_grade: null },
+          biopsy: {
+            max_grade_group: c.gg, total_positive_cores: c.cores, total_cores: null,
+            max_core_involvement_pct: c.maxcore, max_linear_extent_mm: c.linear,
+            max_pct_pattern45: null, has_cribriform: null, has_idc: null, has_pni: null,
+            laterality: (c.laterality || "bilateral") as "right" | "left" | "bilateral",
+            gg_left: c.gg_left, gg_right: c.gg_right,
+            cores_left: null, cores_right: null, mc_left: null, mc_right: null,
+            linear_left: null, linear_right: null, decipher_score: null,
+          },
+          staging: {
+            epe: !!c.mri_epe, svi: !!c.mri_svi, max_pirads: c.pirads,
+            max_suv: c.suv || null,
+            lesion_size_cm: c.mri_size > 0 ? c.mri_size : null,
+            abutment: c.mri_abutment >= 0 ? c.mri_abutment : null,
+            adc_mean: c.mri_adc > 0 ? c.mri_adc : null,
+            epe_mus: !!c.mus_ece, svi_mus: !!c.mus_svi,
+            psma_epe: false, psma_svi: !!c.psma_svi,
+            lymph_nodes_psma: c.psma_ln ? "positive" : undefined,
+          },
+          zones,
+          lesions: [],
+        };
+        return { id: c.id, name, record, lesionRows: [] };
+      });
+    if (newOnes.length) {
+      usePatientStore.setState({ patients: [...patients, ...newOnes] });
+    }
+  } catch {
+    /* noop */
+  }
+}
+
+/** Load library patients into the store (patients not already present by id). */
+export function hydratePatientLibrary(): void {
+  try {
+    const raw = localStorage.getItem(PATIENT_LIBRARY_KEY);
+    if (!raw) return;
+    const library = JSON.parse(raw) as PatientEntry[];
+    if (!library.length) return;
+    const { patients } = usePatientStore.getState();
+    const existingIds = new Set(patients.map((p) => p.id));
+    const newOnes = library
+      .filter((e) => !existingIds.has(e.id))
+      .map((e) => ({
+        ...e,
+        record: { ...e.record, zones: mergeZones(e.record.zones || {}) },
+        lesionRows: ensureLesionIds(e.lesionRows || []),
+      }));
+    if (newOnes.length) {
+      usePatientStore.setState({ patients: [...patients, ...newOnes] });
+      usePatientStore.getState().recompute();
+    }
+  } catch {
+    /* noop */
+  }
+}

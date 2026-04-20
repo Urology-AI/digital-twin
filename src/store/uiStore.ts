@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { OverlayType } from "@/types/prediction";
 import { VIEWS } from "@/lib/three/prostateScene";
 
-export type MobileWorkspace = "viewer" | "insights" | "clinical" | "reference";
+export type MobileWorkspace = "viewer" | "insights" | "clinical" | "reference" | "outcomes";
 
 interface UiState {
   dark: boolean;
