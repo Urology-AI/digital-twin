@@ -25,7 +25,7 @@ interface InfoPanelProps {
 export function InfoPanel({ onClose }: InfoPanelProps) {
   return (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-background/95 p-4 sm:p-6 backdrop-blur"
+      className="fixed inset-0 z-50 overflow-y-auto bg-background p-4 sm:p-6"
       role="dialog"
       aria-modal="true"
     >

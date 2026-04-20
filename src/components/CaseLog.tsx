@@ -327,8 +327,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-[200] overflow-y-auto bg-background/97 p-4 sm:p-8"
-      style={{ backdropFilter: "blur(4px)" }}
+      className="fixed inset-0 z-[200] overflow-y-auto bg-background p-4 sm:p-8"
     >
       <Button
         type="button"
