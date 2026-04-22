@@ -1,14 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X } from "lucide-react";
+import { X, CloudUpload, CloudDownload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary } from "@/store/patientStore";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { cn } from "@/lib/utils";
+import { pushCases, pullCases } from "@/lib/turso";
 
 const CASE_LOG_KEY = "compass_cases";
+const TURSO_ENABLED = !!(
+  import.meta.env.VITE_TURSO_URL && import.meta.env.VITE_TURSO_AUTH_TOKEN
+);
 
-interface CaseRecord {
+export interface CaseRecord {
   id: string;
   date: string;
   // inputs
@@ -125,7 +129,49 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
   const setPatientName = usePatientStore((s) => s.setPatientName);
 
   const [cases, setCases] = useState<CaseRecord[]>([]);
+  const [syncStatus, setSyncStatus] = useState<string>("");
+  const [syncing, setSyncing] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
+
+  const handlePush = async () => {
+    setSyncing(true);
+    setSyncStatus("Pushing…");
+    try {
+      const all = getCases();
+      const n = await pushCases(all);
+      setSyncStatus(`Pushed ${n} case${n !== 1 ? "s" : ""} ✓`);
+    } catch (err) {
+      setSyncStatus(`Push failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handlePull = async () => {
+    setSyncing(true);
+    setSyncStatus("Pulling…");
+    try {
+      const local = getCases();
+      const pulled = await pullCases(local);
+      // Merge: cloud is authoritative for clinical/prediction/path fields;
+      // local notes are preserved inside pullCases(). New cloud-only cases are added.
+      const localIds = new Set(local.map((c) => c.id));
+      const newFromCloud = pulled.filter((c) => !localIds.has(c.id));
+      // Update existing local records' path fields from cloud
+      const updated = local.map((lc) => {
+        const remote = pulled.find((rc) => rc.id === lc.id);
+        return remote ? { ...remote, notes: lc.notes } : lc;
+      });
+      const merged = [...newFromCloud, ...updated];
+      saveCases(merged);
+      setCases(merged);
+      setSyncStatus(`Pulled ${pulled.length} case${pulled.length !== 1 ? "s" : ""} ✓`);
+    } catch (err) {
+      setSyncStatus(`Pull failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -343,7 +389,8 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       <div className="mx-auto max-w-4xl">
         <h2 className="mb-1 text-lg font-semibold text-primary">Prospective Case Log</h2>
         <p className="mb-4 text-xs text-muted-foreground">
-          Save COMPASS predictions per case. Enter pathology results when available. Data stored in browser localStorage.
+          Save COMPASS predictions per case. Enter pathology results when available. Data stored locally;
+          cloud sync de-identifies records (ID hashed, notes never uploaded).
         </p>
 
         <div className="mb-4 flex flex-wrap gap-2">
@@ -357,10 +404,43 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
           <Button size="sm" variant="outline" onClick={exportCSV}>
             Export CSV
           </Button>
+          {TURSO_ENABLED && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1 text-sky-500 border-sky-500/40 hover:bg-sky-500/10"
+                onClick={handlePush}
+                disabled={syncing}
+              >
+                <CloudUpload className="h-3.5 w-3.5" />
+                Push
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1 text-indigo-500 border-indigo-500/40 hover:bg-indigo-500/10"
+                onClick={handlePull}
+                disabled={syncing}
+              >
+                <CloudDownload className="h-3.5 w-3.5" />
+                Pull
+              </Button>
+            </>
+          )}
           <Button size="sm" variant="outline" className="text-red-500 border-red-500/40 hover:bg-red-500/10" onClick={clearAll}>
             Clear All
           </Button>
         </div>
+
+        {TURSO_ENABLED && syncStatus && (
+          <p className="mb-3 text-[11px] text-muted-foreground">{syncStatus}</p>
+        )}
+        {!TURSO_ENABLED && (
+          <p className="mb-3 rounded border border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-[10px] text-amber-500">
+            Cloud sync disabled — set VITE_TURSO_URL and VITE_TURSO_AUTH_TOKEN to enable.
+          </p>
+        )}
 
         {/* Stats row */}
         <div className="mb-4 flex flex-wrap gap-3">
