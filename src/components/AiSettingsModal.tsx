@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, Settings2, Wifi, WifiOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { setLlmConfig, testLlmEndpoint } from "@/lib/api";
@@ -39,7 +40,7 @@ export function AiSettingsModal({ status, onRecheck, onClose }: Props) {
     onClose();
   }
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4"
       role="dialog"
@@ -123,6 +124,7 @@ export function AiSettingsModal({ status, onRecheck, onClose }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

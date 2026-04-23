@@ -21,6 +21,8 @@ def _normalize_endpoint(url: str) -> str:
         return ""
     if url.endswith("/chat/completions"):
         return url
+    if url.endswith("/v1/models"):
+        return url[: -len("/v1/models")] + "/v1/chat/completions"
     if url.endswith("/v1"):
         return url + "/chat/completions"
     return url + "/v1/chat/completions"
