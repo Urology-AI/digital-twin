@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getApiUrl, testLlmEndpoint } from "@/lib/api";
+import { getLlmUrl, testLlmEndpoint } from "@/lib/api";
 
 export type ApiStatus = "checking" | "connected" | "disconnected";
 
@@ -7,8 +7,7 @@ export function useApiStatus() {
   const [status, setStatus] = useState<ApiStatus>("checking");
 
   const recheck = useCallback(async () => {
-    if (!getApiUrl()) {
-      // No URL configured — can't check
+    if (!getLlmUrl()) {
       setStatus("disconnected");
       return;
     }
@@ -21,7 +20,6 @@ export function useApiStatus() {
     }
   }, []);
 
-  // Check once on mount
   useEffect(() => { recheck(); }, [recheck]);
 
   return { status, recheck };

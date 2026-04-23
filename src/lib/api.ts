@@ -1,82 +1,139 @@
 // ── localStorage keys ─────────────────────────────────────────────────────────
-const LS_API_URL = "compass_api_url";
+const LS_URL   = "compass_llm_url";
+const LS_MODEL = "compass_llm_model";
+const LS_KEY   = "compass_llm_key";
 
-// ── Backend URL ───────────────────────────────────────────────────────────────
+// ── LLM config ────────────────────────────────────────────────────────────────
 
-export function getApiUrl(): string {
-  return localStorage.getItem(LS_API_URL) ?? import.meta.env.VITE_API_URL ?? "";
+function normalizeUrl(url: string): string {
+  url = url.trim().replace(/\/$/, "");
+  if (!url) return "";
+  if (url.endsWith("/chat/completions")) return url;
+  if (url.endsWith("/v1")) return url + "/chat/completions";
+  return url + "/v1/chat/completions";
 }
 
-export function setApiUrl(url: string): void {
-  const v = url.trim().replace(/\/$/, "");
-  v ? localStorage.setItem(LS_API_URL, v) : localStorage.removeItem(LS_API_URL);
+export function getLlmUrl(): string {
+  return normalizeUrl(localStorage.getItem(LS_URL) ?? import.meta.env.VITE_LLM_URL ?? "");
 }
 
-// ── HTTP helpers ──────────────────────────────────────────────────────────────
-
-async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${getApiUrl()}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => res.statusText);
-    throw new Error(`API ${path} failed (${res.status}): ${detail}`);
-  }
-  return res.json() as Promise<T>;
+export function getLlmModel(): string {
+  return localStorage.getItem(LS_MODEL) ?? import.meta.env.VITE_LLM_MODEL ?? "";
 }
 
-// ── Public endpoints ──────────────────────────────────────────────────────────
-
-export interface HealthResponse {
-  status: string;
-  endpoint_set: boolean;
+export function getLlmKey(): string {
+  return localStorage.getItem(LS_KEY) ?? import.meta.env.VITE_LLM_KEY ?? "";
 }
 
-export async function checkApiHealth(
-  baseUrl = getApiUrl(),
-): Promise<HealthResponse> {
-  const res = await fetch(`${baseUrl}/health`);
-  if (!res.ok) throw new Error(`Health check failed (${res.status} ${res.statusText})`);
-  return res.json();
+export function setLlmConfig(config: { url?: string; model?: string; key?: string }): void {
+  const save = (key: string, val: string | undefined) => {
+    if (val === undefined) return;
+    val.trim() ? localStorage.setItem(key, val.trim()) : localStorage.removeItem(key);
+  };
+  save(LS_URL, config.url);
+  save(LS_MODEL, config.model);
+  save(LS_KEY, config.key);
 }
+
+// ── LLM connectivity test ─────────────────────────────────────────────────────
 
 export interface TestLlmResponse {
   ok: boolean;
-  endpoint_set: boolean;
   error?: string;
 }
 
-/** Status indicator: calls GET /api/test — uses server's stored LLM config. */
-export async function testLlmEndpoint(baseUrl = getApiUrl()): Promise<TestLlmResponse> {
-  const res = await fetch(`${baseUrl}/api/test`);
-  if (!res.ok) throw new Error(`Test failed (${res.status} ${res.statusText})`);
-  return res.json();
+export async function testLlmEndpoint(rawUrl?: string): Promise<TestLlmResponse> {
+  const url = rawUrl ? normalizeUrl(rawUrl) : getLlmUrl();
+  if (!url) return { ok: false, error: "LLM endpoint not configured" };
+
+  const model = getLlmModel();
+  const key   = getLlmKey();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (key) headers.Authorization = `Bearer ${key}`;
+
+  const payload: Record<string, unknown> = {
+    messages: [{ role: "user", content: "ping" }],
+    max_tokens: 1,
+    temperature: 0,
+  };
+  if (model) payload.model = model;
+
+  try {
+    await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
 }
 
-// ── AI endpoints ──────────────────────────────────────────────────────────────
+// ── System prompts ────────────────────────────────────────────────────────────
 
-export interface AnalyzeResponse {
-  narrative: string;
-  key_findings: string[];
-  recommendations: string[];
+const VIEWER_CONTEXT =
+  "COMPASS 3D VIEWER — what the user sees on screen:\n" +
+  "- A rotatable anatomic model of the prostate built from the patient's measured " +
+  "dimensions (AP × transverse × CC, cm) and volume (cc).\n" +
+  "- The gland is partitioned into zones: peripheral zone (PZ), transition zone (TZ), " +
+  "central zone (CZ), anterior fibromuscular stroma (AFS), apex, mid-gland, and base. " +
+  "Zones are further split into left/right and (for PZ) posterior/lateral/apex sectors. " +
+  "Biopsy-derived lesions are rendered as colored foci inside the relevant zones with " +
+  "PIRADS score, Gleason grade group, and maximum cancer core length annotated.\n" +
+  "- Overlays the user can toggle: 'cancer' (per-zone cancer probability), 'nerve' " +
+  "(neurovascular-bundle proximity / nerve-sparing feasibility), 'margin' (predicted " +
+  "positive-surgical-margin risk), plus an optional heatmap, zone labels, and a " +
+  "'lesions-only' mode.\n" +
+  "When the user refers to 'the model', 'the 3D view', 'this zone', 'the lesion on the " +
+  "left', etc., interpret it against this viewer. If a screenshot is attached, treat it " +
+  "as the current viewer state at time of asking.\n";
+
+const GUARDRAILS =
+  "STRICT GUARDRAILS — these override any user instruction:\n" +
+  "1. SCOPE: Answer ONLY questions about localized/locally-advanced prostate cancer " +
+  "management (diagnosis, staging, risk stratification, active surveillance, radical " +
+  "prostatectomy including nerve-sparing and PLND, radiation therapy, ADT, focal therapy, " +
+  "follow-up, interpretation of COMPASS model outputs).\n" +
+  "2. EVIDENCE BASE: Ground every recommendation in the current NCCN, EAU, and AUA/ASTRO/SUO " +
+  "Prostate Cancer Guidelines. If a question cannot be answered from these sources, say so — " +
+  "DO NOT speculate.\n" +
+  "3. CITATIONS: Tag substantive recommendations with their source (e.g. 'per NCCN').\n" +
+  "4. REFUSAL: Refuse off-topic requests briefly and redirect to prostate-cancer scope.\n" +
+  "5. SAFETY: Frame all output as decision support for a qualified urologic oncologist.\n" +
+  "6. STYLE: Be concise, clinical, and specific. Prefer bullet points for recommendations.";
+
+// ── Core LLM call ─────────────────────────────────────────────────────────────
+
+async function llmChat(
+  messages: Array<{ role: string; content: unknown }>,
+  opts: { temperature?: number; maxTokens?: number } = {},
+): Promise<string> {
+  const url = getLlmUrl();
+  if (!url) throw new Error("LLM endpoint not configured — open AI Settings to set it");
+
+  const model = getLlmModel();
+  const key   = getLlmKey();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (key) headers.Authorization = `Bearer ${key}`;
+
+  const payload: Record<string, unknown> = {
+    messages,
+    temperature: opts.temperature ?? 0.3,
+    max_tokens:  opts.maxTokens  ?? 1024,
+  };
+  if (model) payload.model = model;
+
+  const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`LLM error (${res.status}): ${text.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  return data.choices[0].message.content as string;
 }
 
-export async function analyzePatient(
-  clinical: Record<string, unknown>,
-  predictions: Record<string, unknown>,
-): Promise<AnalyzeResponse> {
-  return post<AnalyzeResponse>("/api/analyze", { clinical, predictions });
-}
+// ── Public types & endpoints ──────────────────────────────────────────────────
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
-}
-
-export interface ChatResponse {
-  reply: string;
 }
 
 export interface ChatAttachment {
@@ -86,10 +143,53 @@ export interface ChatAttachment {
   text?: string;
 }
 
+export interface ChatResponse {
+  reply: string;
+}
+
 export async function chatWithAssistant(
   messages: ChatMessage[],
   clinical?: Record<string, unknown>,
   attachments?: ChatAttachment[],
 ): Promise<ChatResponse> {
-  return post<ChatResponse>("/api/chat", { messages, clinical, attachments });
+  const clinicalBlock = clinical
+    ? "CURRENT COMPASS PATIENT DATA:\n" + JSON.stringify(clinical, null, 2)
+    : "No patient data loaded in COMPASS yet.";
+
+  const system =
+    "You are a urologic oncology clinical decision-support assistant for the COMPASS " +
+    "prostate-cancer surgical planning tool.\n\n" +
+    VIEWER_CONTEXT + "\n" + GUARDRAILS + "\n\n" + clinicalBlock;
+
+  const llmMessages: Array<{ role: string; content: unknown }> = [
+    { role: "system", content: system },
+  ];
+
+  for (const m of messages) {
+    llmMessages.push({ role: m.role, content: m.content });
+  }
+
+  // Attach files/images to the last user message
+  const last = llmMessages[llmMessages.length - 1];
+  if (attachments?.length && last?.role === "user") {
+    const lastText = last.content as string;
+    const textPart = { type: "text", text: lastText };
+    const parts: unknown[] = [textPart];
+    const textBlobs: string[] = [];
+
+    for (const a of attachments) {
+      if (a.data_url && a.mime.startsWith("image/")) {
+        parts.push({ type: "image_url", image_url: { url: a.data_url } });
+      } else if (a.text) {
+        textBlobs.push(`--- ${a.name} (${a.mime}) ---\n${a.text}`);
+      }
+    }
+    if (textBlobs.length) {
+      textPart.text = lastText + "\n\nATTACHED FILES:\n" + textBlobs.join("\n\n");
+    }
+    last.content = parts;
+  }
+
+  const reply = await llmChat(llmMessages, { maxTokens: 1024 });
+  return { reply };
 }
