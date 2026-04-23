@@ -97,7 +97,18 @@ const GUARDRAILS =
   "3. CITATIONS: Tag substantive recommendations with their source (e.g. 'per NCCN').\n" +
   "4. REFUSAL: Refuse off-topic requests briefly and redirect to prostate-cancer scope.\n" +
   "5. SAFETY: Frame all output as decision support for a qualified urologic oncologist.\n" +
-  "6. STYLE: Be concise, clinical, and specific. Prefer bullet points for recommendations.";
+  "6. STYLE: Be concise, clinical, and specific. Prefer bullet points for recommendations.\n" +
+  "7. PARSING: When the user asks you to extract, parse, or load clinical data from a report " +
+  "or text, extract all identifiable values and append a JSON code block at the END of your " +
+  "response using EXACTLY these field names (omit fields you cannot find):\n" +
+  "  psa (ng/mL), age (years), vol (cc), gg (grade group 1-5), cores (positive core count),\n" +
+  "  maxcore (max core % 0-100), linear_mm (max linear extent mm), pirads (1-5),\n" +
+  "  mri_epe (0/1), mri_svi (0/1), mri_size (lesion cm), mri_abutment (0-1),\n" +
+  "  mri_adc (ADC value), laterality (\"left\"/\"right\"/\"bilateral\"),\n" +
+  "  gg_left (grade group), gg_right (grade group), cores_left, cores_right,\n" +
+  "  suv (PSMA SUV), psma_ln (0/1), psma_svi (0/1), mus_ece (0/1), mus_svi (0/1),\n" +
+  "  psma_lesion_count (integer).\n" +
+  "Example: ```json\n{\"psa\": 8.2, \"gg\": 3, \"pirads\": 4, \"laterality\": \"right\"}\n```";
 
 // ── Core LLM call ─────────────────────────────────────────────────────────────
 
@@ -145,6 +156,63 @@ export interface ChatAttachment {
 
 export interface ChatResponse {
   reply: string;
+}
+
+export interface ParsedClinicalFields {
+  psa?: number;
+  age?: number;
+  vol?: number;
+  gg?: number;
+  cores?: number;
+  maxcore?: number;
+  linear_mm?: number;
+  pirads?: number;
+  mri_epe?: number;
+  mri_svi?: number;
+  mri_size?: number;
+  mri_abutment?: number;
+  mri_adc?: number;
+  laterality?: "left" | "right" | "bilateral";
+  gg_left?: number;
+  gg_right?: number;
+  cores_left?: number;
+  cores_right?: number;
+  suv?: number;
+  psma_ln?: number;
+  psma_svi?: number;
+  mus_ece?: number;
+  mus_svi?: number;
+  psma_lesion_count?: number;
+}
+
+const PARSE_SYSTEM =
+  "You are a clinical data extractor for the COMPASS prostate cancer planning tool. " +
+  "Extract numerical clinical values from the provided text and return ONLY a JSON object — no prose. " +
+  "Use only these field names (omit any you cannot find with confidence):\n" +
+  "psa (ng/mL), age (years), vol (prostate volume cc), gg (max Gleason grade group 1-5), " +
+  "cores (positive core count), maxcore (max core involvement % 0-100), linear_mm (max linear extent mm), " +
+  "pirads (1-5), mri_epe (0 or 1), mri_svi (0 or 1), mri_size (lesion size cm), " +
+  "mri_abutment (0-1 fraction or 0/1), mri_adc (ADC value), " +
+  "laterality (\"left\", \"right\", or \"bilateral\"), gg_left, gg_right, cores_left, cores_right, " +
+  "suv (max PSMA SUV), psma_ln (0 or 1), psma_svi (0 or 1), mus_ece (0 or 1), mus_svi (0 or 1), " +
+  "psma_lesion_count (integer).\n" +
+  "Return only a JSON object. Do not guess values not present in the text.";
+
+export async function parseClinicalText(text: string): Promise<ParsedClinicalFields> {
+  const reply = await llmChat(
+    [
+      { role: "system", content: PARSE_SYSTEM },
+      { role: "user", content: text },
+    ],
+    { temperature: 0, maxTokens: 512 },
+  );
+  const match = reply.match(/\{[\s\S]*\}/);
+  if (!match) return {};
+  try {
+    return JSON.parse(match[0]) as ParsedClinicalFields;
+  } catch {
+    return {};
+  }
 }
 
 export async function chatWithAssistant(

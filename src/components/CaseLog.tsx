@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, CloudUpload, CloudDownload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary } from "@/store/patientStore";
+import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydratePatientsFromCaseLog } from "@/store/patientStore";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { cn } from "@/lib/utils";
@@ -165,6 +165,8 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       const merged = [...newFromCloud, ...updated];
       saveCases(merged);
       setCases(merged);
+      // Add newly pulled cases to the patient store so they can be loaded.
+      hydratePatientsFromCaseLog();
       setSyncStatus(`Pulled ${pulled.length} case${pulled.length !== 1 ? "s" : ""} ✓`);
     } catch (err) {
       setSyncStatus(`Pull failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -468,19 +470,30 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <div className="space-y-3">
-            {cases.map((c, i) => (
+            {cases.map((c, i) => {
+              const isActive = c.id === activeId;
+              return (
               <div
                 key={c.id}
                 className={cn(
                   "rounded-lg border bg-card p-3",
-                  c.path_ece !== null ? "border-emerald-500/40" : "border-border/70",
+                  isActive
+                    ? "border-primary ring-1 ring-primary/30"
+                    : c.path_ece !== null
+                      ? "border-emerald-500/40"
+                      : "border-border/70",
                 )}
               >
                 {/* Header */}
                 <div className="mb-2 flex items-start justify-between">
-                  <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {isActive && (
+                      <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary tracking-wide">
+                        Current
+                      </span>
+                    )}
                     <span className="font-semibold text-primary text-sm">{c.date}</span>
-                    <span className="ml-2 text-[11px] text-muted-foreground">
+                    <span className="text-[11px] text-muted-foreground">
                       GG{c.gg} | PSA {c.psa} | PIRADS {c.pirads} | {c.laterality}
                     </span>
                   </div>
@@ -584,7 +597,8 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
                   className="w-full rounded border border-border/60 bg-background px-2 py-1 text-[10px] text-foreground"
                 />
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

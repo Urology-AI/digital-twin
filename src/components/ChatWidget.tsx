@@ -1,17 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Camera,
+  CheckCircle,
   Loader2,
   MessageCircle,
   Paperclip,
   Send,
+  Wand2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   chatWithAssistant,
+  parseClinicalText,
   type ChatAttachment,
   type ChatMessage,
+  type ParsedClinicalFields,
 } from "@/lib/api";
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
@@ -53,6 +57,34 @@ function captureCanvas(): ChatAttachment | null {
   }
 }
 
+const CLINICAL_PATTERNS = [
+  /\bpsa\b/i,
+  /\bgleason\b/i,
+  /\bgrade\s*group\b/i,
+  /\bpi.?rads?\b/i,
+  /\bgi?g\s*[1-5]\b/i,
+  /\bcores?\b/i,
+  /\bbiopsy\b/i,
+  /\bng\s*\/\s*m[lL]\b/,
+  /\b\d+\s*cc\b/i,
+  /\bsvi\b/i,
+  /\bece\b/i,
+  /\bepe\b/i,
+  /\bsuv\b/i,
+  /\bpsma\b/i,
+  /\bprostate\s+volume\b/i,
+  /\badc\b/i,
+  /\bseminal\s+vesicle\b/i,
+  /\bneurovascular\b/i,
+  /\bdecipher\b/i,
+];
+
+function hasClinicalData(text: string): boolean {
+  if (text.length < 20) return false;
+  const hits = CLINICAL_PATTERNS.filter((p) => p.test(text));
+  return hits.length >= 2;
+}
+
 export function ChatWidget() {
   const open = useUiStore((s) => s.chatOpen);
   const setOpen = useUiStore((s) => s.setChatOpen);
@@ -60,12 +92,17 @@ export function ChatWidget() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [busy, setBusy] = useState(false);
+  const [parseBusy, setParseBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [parsedFields, setParsedFields] = useState<ParsedClinicalFields | null>(null);
+  const [applyDone, setApplyDone] = useState(false);
+  const [clinicalDetected, setClinicalDetected] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
+  const updateClinicalForm = usePatientStore((s) => s.updateClinicalForm);
   const activeEntry = patients.find((p) => p.id === activeId);
 
   useEffect(() => {
@@ -120,6 +157,52 @@ export function ChatWidget() {
     setAttachments((xs) => xs.filter((_, idx) => idx !== i));
   }
 
+  async function handleParse() {
+    const text = input.trim();
+    if (!text || parseBusy) return;
+    setParseBusy(true);
+    setError(null);
+    setParsedFields(null);
+    setApplyDone(false);
+    try {
+      const fields = await parseClinicalText(text);
+      if (Object.keys(fields).length === 0) {
+        setError("No clinical values found in the text.");
+      } else {
+        setParsedFields(fields);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setParseBusy(false);
+    }
+  }
+
+  function applyParsedFields() {
+    if (!parsedFields || !activeId) return;
+    updateClinicalForm(parsedFields as Parameters<typeof updateClinicalForm>[0]);
+    setApplyDone(true);
+    setParsedFields(null);
+  }
+
+  function extractJsonFromReply(reply: string): ParsedClinicalFields | null {
+    const match = reply.match(/```json\s*([\s\S]*?)```/);
+    if (!match) return null;
+    try {
+      const obj = JSON.parse(match[1]!) as ParsedClinicalFields;
+      if (typeof obj !== "object" || Array.isArray(obj)) return null;
+      const knownKeys = new Set([
+        "psa","age","vol","gg","cores","maxcore","linear_mm","pirads","mri_epe",
+        "mri_svi","mri_size","mri_abutment","mri_adc","laterality","gg_left","gg_right",
+        "cores_left","cores_right","suv","psma_ln","psma_svi","mus_ece","mus_svi","psma_lesion_count",
+      ]);
+      const hasKnown = Object.keys(obj).some((k) => knownKeys.has(k));
+      return hasKnown ? obj : null;
+    } catch {
+      return null;
+    }
+  }
+
   async function send() {
     const text = input.trim();
     if ((!text && attachments.length === 0) || busy) return;
@@ -127,6 +210,7 @@ export function ChatWidget() {
     const next: ChatMessage[] = [...messages, { role: "user", content: userMsg }];
     setMessages(next);
     setInput("");
+    setClinicalDetected(false);
     const sentAttachments = attachments;
     setAttachments([]);
     setBusy(true);
@@ -154,6 +238,11 @@ export function ChatWidget() {
         : ({ viewer } as Record<string, unknown>);
       const { reply } = await chatWithAssistant(next, clinical, sentAttachments);
       setMessages([...next, { role: "assistant", content: reply }]);
+      const extracted = extractJsonFromReply(reply);
+      if (extracted) {
+        setParsedFields(extracted);
+        setApplyDone(false);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -204,8 +293,9 @@ export function ChatWidget() {
         {messages.length === 0 && (
           <p className="text-xs text-muted-foreground">
             Ask about the current patient, predictions, or prostate cancer
-            management. Responses are constrained to NCCN / EAU / AUA
-            guidelines.{" "}
+            management. Paste a clinical report and click{" "}
+            <Wand2 className="inline h-3 w-3" /> to extract and apply values.
+            Responses are constrained to NCCN / EAU / AUA guidelines.{" "}
             {activeEntry ? `Context: ${activeEntry.name}.` : ""}
           </p>
         )}
@@ -225,6 +315,46 @@ export function ChatWidget() {
         {busy && (
           <div className="mr-6 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-muted-foreground">
             <Loader2 className="h-3 w-3 animate-spin" /> Thinking…
+          </div>
+        )}
+        {parseBusy && (
+          <div className="mr-6 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-muted-foreground">
+            <Loader2 className="h-3 w-3 animate-spin" /> Parsing clinical data…
+          </div>
+        )}
+        {parsedFields && !applyDone && (
+          <div className="rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs">
+            <div className="mb-1.5 font-semibold text-sky-400">Extracted clinical values</div>
+            <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-muted-foreground mb-2">
+              {Object.entries(parsedFields).map(([k, v]) => (
+                <span key={k}>
+                  <span className="text-foreground">{k}</span>: {String(v)}
+                </span>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                className="h-6 px-2 text-[10px] bg-sky-600 hover:bg-sky-700 text-white"
+                onClick={applyParsedFields}
+                disabled={!activeId}
+              >
+                Apply to patient
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-[10px] text-muted-foreground"
+                onClick={() => setParsedFields(null)}
+              >
+                Dismiss
+              </Button>
+            </div>
+          </div>
+        )}
+        {applyDone && (
+          <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-400">
+            <CheckCircle className="h-3.5 w-3.5" /> Values applied to current patient.
           </div>
         )}
         {error && (
@@ -268,6 +398,12 @@ export function ChatWidget() {
       )}
 
       <div className="safe-bottom border-t border-border p-2">
+        {clinicalDetected && !parsedFields && (
+          <div className="mb-1.5 flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[10px] text-amber-400">
+            <Wand2 className="h-3 w-3 shrink-0" />
+            Clinical data detected — click <Wand2 className="inline h-3 w-3 mx-0.5" /> to extract &amp; apply values.
+          </div>
+        )}
         <div className="flex items-end gap-2">
           <div className="flex flex-col gap-1">
             <button
@@ -288,6 +424,16 @@ export function ChatWidget() {
             >
               <Camera className="h-4 w-4" />
             </button>
+            <button
+              type="button"
+              onClick={() => void handleParse()}
+              disabled={parseBusy || !input.trim()}
+              className="rounded-md p-1.5 text-sky-400 hover:bg-muted hover:text-sky-300 disabled:opacity-40"
+              title="Parse clinical text and extract values"
+              aria-label="Parse clinical text"
+            >
+              <Wand2 className="h-4 w-4" />
+            </button>
           </div>
           <input
             ref={fileInputRef}
@@ -298,7 +444,10 @@ export function ChatWidget() {
           />
           <textarea
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setClinicalDetected(hasClinicalData(e.target.value));
+            }}
             onKeyDown={onKeyDown}
             rows={1}
             placeholder="Ask a question…"
