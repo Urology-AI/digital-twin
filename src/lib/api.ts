@@ -9,6 +9,7 @@ function normalizeUrl(url: string): string {
   url = url.trim().replace(/\/$/, "");
   if (!url) return "";
   if (url.endsWith("/chat/completions")) return url;
+  if (url.endsWith("/v1/models")) return url.slice(0, -"/v1/models".length) + "/v1/chat/completions";
   if (url.endsWith("/v1")) return url + "/chat/completions";
   return url + "/v1/chat/completions";
 }
