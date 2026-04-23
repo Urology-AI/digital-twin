@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Loader2, Settings2, Wifi, WifiOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getLlmModel, getLlmKey, setLlmConfig, testLlmEndpoint } from "@/lib/api";
+import { setLlmConfig, testLlmEndpoint } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { ApiStatus } from "@/hooks/useApiStatus";
 
@@ -12,10 +12,8 @@ interface Props {
 }
 
 export function AiSettingsModal({ status, onRecheck, onClose }: Props) {
-  const [url, setUrl]     = useState(() => localStorage.getItem("compass_llm_url") ?? "");
-  const [model, setModel] = useState(getLlmModel);
-  const [apiKey, setApiKey] = useState(getLlmKey);
-  const [testing, setTesting]   = useState(false);
+  const [url, setUrl] = useState(() => localStorage.getItem("compass_llm_url") ?? "");
+  const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
 
   async function handleTest() {
@@ -36,7 +34,7 @@ export function AiSettingsModal({ status, onRecheck, onClose }: Props) {
   }
 
   function handleSave() {
-    setLlmConfig({ url, model, key: apiKey });
+    setLlmConfig({ url, model: "", key: "" });
     onRecheck();
     onClose();
   }
@@ -93,43 +91,13 @@ export function AiSettingsModal({ status, onRecheck, onClose }: Props) {
 
           {/* LLM Endpoint */}
           <div className="space-y-2">
-            <label htmlFor="llm-url" className="text-xs font-medium text-muted-foreground">LLM Endpoint</label>
+            <label htmlFor="llm-url" className="text-xs font-medium text-muted-foreground">vLLM Endpoint</label>
             <input
               id="llm-url"
               type="url"
               value={url}
               onChange={(e) => { setUrl(e.target.value); setTestResult(null); }}
               placeholder="http://your-vllm-host:8000/v1/chat/completions"
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-
-          {/* Model */}
-          <div className="space-y-2">
-            <label htmlFor="llm-model" className="text-xs font-medium text-muted-foreground">
-              Model <span className="text-muted-foreground/50">(optional)</span>
-            </label>
-            <input
-              id="llm-model"
-              type="text"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder="gemma4"
-              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-
-          {/* API Key */}
-          <div className="space-y-2">
-            <label htmlFor="llm-key" className="text-xs font-medium text-muted-foreground">
-              API Key <span className="text-muted-foreground/50">(optional)</span>
-            </label>
-            <input
-              id="llm-key"
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-••••••••"
               className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
