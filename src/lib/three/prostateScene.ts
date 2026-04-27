@@ -165,13 +165,19 @@ export function overlayColor(val: number, type: OverlayType): Color {
     return new Color(0.95, 0.35 - t * 0.3, 0.06);
   }
   if (type === "svi") {
-    if (val < 0.1) return new Color(0.25, 0.35, 0.65);
+    // Green → amber → red, matching the csPCa/ECE visual language.
+    // Thresholds: <15% low, 15–30% moderate, >30% high.
+    if (val < 0.15) return new Color(0.18, 0.78, 0.44);
     if (val < 0.3) {
-      const t = (val - 0.1) / 0.2;
-      return new Color(0.25 + t * 0.45, 0.35 + t * 0.2, 0.65 - t * 0.25);
+      const t = (val - 0.15) / 0.15;
+      return new Color(0.18 + t * 0.72, 0.78 - t * 0.28, 0.44 - t * 0.34);
     }
-    const t = Math.min(1, (val - 0.3) / 0.4);
-    return new Color(0.7, 0.55 - t * 0.4, 0.4 - t * 0.3);
+    if (val < 0.55) {
+      const t = (val - 0.3) / 0.25;
+      return new Color(0.9, 0.5 - t * 0.15, 0.1);
+    }
+    const t = Math.min(1, (val - 0.55) / 0.3);
+    return new Color(0.95, 0.35 - t * 0.3, 0.06);
   }
   if (type === "psm") {
     if (val < 0.15) return new Color(0.2, 0.5, 0.75);
@@ -256,7 +262,9 @@ function paintGlbProstate(
       const nzQ = nz >= apexClamp ? Math.max(nz, 0.005) : nz;
       const val = lookupZoneValue(nx, ny, nzQ, zones, overlay);
       let cr: number, cg: number, cb: number;
-      if (heatmapVisible && (!lesionsOnly || val >= 0.15)) {
+      // SVI is visualised on the SV meshes directly; keep the prostate body
+      // in anatomical colour so it doesn't compete with the SV highlight.
+      if (heatmapVisible && overlay !== "svi" && (!lesionsOnly || val >= 0.15)) {
         const c = overlayColor(val, overlay);
         cr = c.r; cg = c.g; cb = c.b;
       } else {
@@ -321,8 +329,11 @@ function paintGlbSV(
     }
   };
 
-  paint(leftMeshes, lSVI);
-  paint(rightMeshes, rSVI);
+  // "Seminal_L" in the GLB sits on the patient's anatomical RIGHT (the model's
+  // local "left" from the viewer's perspective), so swap the side assignments
+  // to match the prostate zone convention (nx < 0 → "R").
+  paint(leftMeshes, rSVI);
+  paint(rightMeshes, lSVI);
 }
 
 function createProstateMesh(
