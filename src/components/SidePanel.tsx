@@ -29,7 +29,7 @@ export function SidePanel() {
   return (
     <aside
       className={cn(
-        "hidden min-h-0 w-[700px] shrink-0 flex-col border-r border-border bg-card",
+        "hidden min-h-0 w-[820px] shrink-0 flex-col border-r border-border bg-card",
         "lg:flex",
       )}
     >

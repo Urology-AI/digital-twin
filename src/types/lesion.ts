@@ -19,6 +19,10 @@ export interface LesionRow {
   pirads?: number;
   primus?: number;
   suv?: number;
+  cribriform?: boolean;
+  idc?: boolean;
+  pni?: boolean;
+  psmaLn?: boolean;
 }
 
 export function emptyLesion(id: string): LesionRow {
