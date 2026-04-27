@@ -58,11 +58,17 @@ interface ZoneModality {
 
   // PSMA PET
   suv?: number;
+  psmaEpe?: boolean;   // EPE on PSMA PET
+  psmaSvi?: boolean;   // SVI on PSMA PET
+  psmaLn?: boolean;    // LN+ on PSMA PET (patient-level, shown per-zone)
 
   // Biopsy
   gg?: number;
   corePct?: number;
   linearMm?: number;   // max linear core length mm — used per zone in model
+  cribriform?: boolean;
+  idc?: boolean;
+  pni?: boolean;
 }
 type ZoneDataMap = Record<string, ZoneModality>;
 
@@ -95,6 +101,9 @@ function rowsToZoneData(rows: LesionRow[]): ZoneDataMap {
     } else if (row.source === "PSMA") {
       const s = row.suv ?? parseFloat(row.score);
       if (s > 0) d.suv = Math.max(d.suv ?? 0, s) || undefined;
+      if (row.epe) d.psmaEpe = true;
+      if (row.svi) d.psmaSvi = true;
+      if (row.psmaLn) d.psmaLn = true;
     } else if (row.source === "MUS" || row.source === "ExactVu") {
       const p = row.primus ?? parseInt(row.score, 10);
       if (p > 0) d.primus = Math.max(d.primus ?? 0, p) || undefined;
@@ -105,6 +114,9 @@ function rowsToZoneData(rows: LesionRow[]): ZoneDataMap {
       if (g > 0) d.gg = Math.max(d.gg ?? 0, g) || undefined;
       if (row.corePct > 0) d.corePct = Math.max(d.corePct ?? 0, row.corePct) || undefined;
       if (row.linear > 0) d.linearMm = Math.max(d.linearMm ?? 0, row.linear) || undefined;
+      if (row.cribriform) d.cribriform = true;
+      if (row.idc) d.idc = true;
+      if (row.pni) d.pni = true;
     }
     map[zone.id] = d;
   }
@@ -142,6 +154,9 @@ function zoneDataToRows(zoneData: ZoneDataMap): LesionRow[] {
         zone: zone.pos,
         score: String(d.suv),
         suv: d.suv,
+        epe: d.psmaEpe ?? false,
+        svi: d.psmaSvi ?? false,
+        psmaLn: d.psmaLn ?? false,
       });
     }
     if (d.primus && d.primus > 0) {
@@ -167,6 +182,9 @@ function zoneDataToRows(zoneData: ZoneDataMap): LesionRow[] {
         score: String(d.gg),
         corePct: d.corePct ?? 0,
         linear: d.linearMm ?? 0,
+        cribriform: d.cribriform ?? false,
+        idc: d.idc ?? false,
+        pni: d.pni ?? false,
       });
     }
   }
@@ -567,6 +585,38 @@ function ZoneDetail({
               }}
             />
           </div>
+
+          {(data.suv ?? 0) > 0 && (
+            <div className="flex items-center gap-4 pl-[4.5rem]">
+              <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 rounded accent-primary"
+                  checked={data.psmaEpe ?? false}
+                  onChange={(e) => onUpdate({ psmaEpe: e.target.checked })}
+                />
+                EPE
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 rounded accent-primary"
+                  checked={data.psmaSvi ?? false}
+                  onChange={(e) => onUpdate({ psmaSvi: e.target.checked })}
+                />
+                SVI
+              </label>
+              <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+                <input
+                  type="checkbox"
+                  className="h-3.5 w-3.5 rounded accent-primary"
+                  checked={data.psmaLn ?? false}
+                  onChange={(e) => onUpdate({ psmaLn: e.target.checked })}
+                />
+                LN+
+              </label>
+            </div>
+          )}
         </div>
 
         {/* ── Biopsy ── */}
@@ -618,6 +668,27 @@ function ZoneDetail({
                 />
                 <span className="text-[10px] text-muted-foreground">mm</span>
               </div>
+
+              <div className="flex items-center gap-4 pl-[4.5rem]">
+                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+                  <input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary"
+                    checked={data.cribriform ?? false}
+                    onChange={(e) => onUpdate({ cribriform: e.target.checked })} />
+                  Cribriform
+                </label>
+                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+                  <input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary"
+                    checked={data.idc ?? false}
+                    onChange={(e) => onUpdate({ idc: e.target.checked })} />
+                  IDC
+                </label>
+                <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground">
+                  <input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary"
+                    checked={data.pni ?? false}
+                    onChange={(e) => onUpdate({ pni: e.target.checked })} />
+                  PNI
+                </label>
+              </div>
             </>
           )}
         </div>
@@ -631,20 +702,22 @@ function Step1({
   age, setAge,
   psa, setPsa,
   vol, setVol,
-  psadt, setPsadt,
+  decipher, setDecipher,
+  shim, setShim,
+  ipss, setIpss,
   onNext,
 }: {
   age: string; setAge: (v: string) => void;
   psa: string; setPsa: (v: string) => void;
   vol: string; setVol: (v: string) => void;
-  psadt: string; setPsadt: (v: string) => void;
+  decipher: string; setDecipher: (v: string) => void;
+  shim: string; setShim: (v: string) => void;
+  ipss: string; setIpss: (v: string) => void;
   onNext: () => void;
 }) {
   const psaNum = parseFloat(psa);
   const volNum = parseFloat(vol);
-  const psadtNum = parseFloat(psadt);
   const psad = volNum > 0 && !isNaN(psaNum) ? (psaNum / volNum).toFixed(3) : "—";
-  const psadNum = parseFloat(psad);
 
   const psaWarn = !isNaN(psaNum) && psaNum > 0 && (psaNum > 100 || psaNum < 0.1);
   const volWarn = !isNaN(volNum) && volNum > 0 && (volNum < 10 || volNum > 250);
@@ -729,51 +802,43 @@ function Step1({
       )}
 
       {/* PSAD */}
-      <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
-        <span className="text-[11px] font-medium text-muted-foreground">PSAD (calculated)</span>
-        <span className="ml-auto font-mono text-sm font-bold text-foreground">{psad} ng/mL/cc</span>
-        {psad !== "—" && psadNum >= 0.15 && (
-          <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
-            ↑ elevated
-          </span>
-        )}
-        {psad !== "—" && psadNum >= 0.08 && psadNum < 0.15 && (
-          <span className="rounded bg-yellow-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-400">
-            borderline
-          </span>
-        )}
+      <div className="space-y-2">
+        <label className="text-xs font-medium text-foreground">
+          PSAD <span className="font-normal text-muted-foreground">(ng/mL/cc)</span>
+        </label>
+        <Input
+          type="text"
+          readOnly
+          value={psad === "—" ? "" : psad}
+          placeholder="—"
+          className="bg-muted/30 text-muted-foreground cursor-default"
+        />
       </div>
 
-      {/* PSADT */}
-      <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[11px] font-medium text-muted-foreground">PSA Doubling Time</span>
-          <span className="text-[9px] text-muted-foreground/50">optional — kinetics indicator</span>
+
+      {/* Decipher / SHIM / IPSS */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-foreground" htmlFor="wiz-dec">
+            Decipher <span className="font-normal text-muted-foreground">(0–1)</span>
+          </label>
+          <Input id="wiz-dec" type="text" inputMode="decimal" placeholder="e.g. 0.52" className="h-8 text-xs"
+            value={decipher} onChange={(e) => setDecipher(e.target.value)} />
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <Input
-            type="number"
-            step="0.5"
-            min={0}
-            placeholder="months"
-            className="h-7 w-20 px-2 text-xs"
-            value={psadt}
-            onChange={(e) => setPsadt(e.target.value)}
-          />
-          <span className="text-[10px] text-muted-foreground">mo</span>
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-foreground" htmlFor="wiz-shim">
+            SHIM <span className="font-normal text-muted-foreground">(0–25)</span>
+          </label>
+          <Input id="wiz-shim" type="number" min={0} max={25} inputMode="numeric" placeholder="e.g. 21" className="h-8 text-xs"
+            value={shim} onChange={(e) => setShim(e.target.value)} />
         </div>
-        {psadtNum > 0 && (
-          <span className={cn(
-            "rounded px-1.5 py-0.5 text-[9px] font-semibold",
-            psadtNum < 6
-              ? "bg-red-500/15 text-red-400"
-              : psadtNum < 12
-                ? "bg-amber-500/15 text-amber-400"
-                : "bg-emerald-500/15 text-emerald-400",
-          )}>
-            {psadtNum < 6 ? "Rapid" : psadtNum < 12 ? "Moderate" : "Slow"}
-          </span>
-        )}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-foreground" htmlFor="wiz-ipss">
+            IPSS <span className="font-normal text-muted-foreground">(0–35)</span>
+          </label>
+          <Input id="wiz-ipss" type="number" min={0} max={35} inputMode="numeric" placeholder="e.g. 8" className="h-8 text-xs"
+            value={ipss} onChange={(e) => setIpss(e.target.value)} />
+        </div>
       </div>
 
       <div className="flex justify-end pt-1">
@@ -984,216 +1049,6 @@ function Step2({
           ← Demographics
         </Button>
         <Button type="button" size="sm" onClick={onNext}>
-          Next: Supplemental →
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-// ── Step 3: Supplemental ──────────────────────────────────────────────────────
-interface SupplState {
-  mriEpe: boolean; mriSvi: boolean;
-  musEce: boolean; musSvi: boolean;
-  psmaEpe: boolean; psmaSvi: boolean; psmaLn: boolean;
-  decipher: string;
-  shim: string; ipss: string;
-  cribriform: boolean; idc: boolean; pni: boolean;
-  maxcore: string; cores: string; linearMm: string;
-}
-
-function FlagChip({
-  id, label, hint, checked, onChange,
-}: {
-  id: string; label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      type="button"
-      id={id}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "flex w-full cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-all",
-        checked
-          ? "border-primary/60 bg-primary/[0.07] text-foreground"
-          : "border-border/60 bg-card text-muted-foreground hover:border-border hover:bg-muted/20",
-      )}
-    >
-      {/* Custom checkbox */}
-      <div
-        className={cn(
-          "mt-0.5 flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-sm border transition-all",
-          checked
-            ? "border-primary bg-primary"
-            : "border-border/70 bg-transparent",
-        )}
-      >
-        {checked && (
-          <svg className="h-2 w-2 text-primary-foreground" fill="none" viewBox="0 0 10 10">
-            <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        )}
-      </div>
-      <div>
-        <span className="block text-[11px] font-semibold leading-snug">{label}</span>
-        {hint && <span className="block text-[10px] leading-snug text-muted-foreground">{hint}</span>}
-      </div>
-    </button>
-  );
-}
-
-function Step3({
-  state,
-  setState,
-  onBack,
-  onApply,
-}: {
-  state: SupplState;
-  setState: (patch: Partial<SupplState>) => void;
-  onBack: () => void;
-  onApply: () => void;
-}) {
-  const s = <K extends keyof SupplState>(k: K, v: SupplState[K]) =>
-    setState({ [k]: v } as Partial<SupplState>);
-
-  return (
-    <div className="space-y-4">
-      <p className="text-xs leading-relaxed text-muted-foreground">
-        Supplemental flags not derivable from zone entries. EPE/SVI fields
-        auto-populate from zone data — override here if your report differs.
-      </p>
-
-      {/* ECE / SVI flags — two collapsible categories */}
-      <div className="rounded-xl border border-border bg-muted/10 overflow-hidden">
-        <div className="px-4 pt-3 pb-2 flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">ECE / SVI by modality</span>
-          <span className="rounded bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-medium text-sky-400">auto-populated from zones above</span>
-        </div>
-
-        {/* ECE category */}
-        <details className="group border-t border-border/50">
-          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2.5 hover:bg-muted/20 transition-colors">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-foreground">ECE — Extracapsular Extension</span>
-              {(state.mriEpe || state.musEce || state.psmaEpe) && (
-                <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-500">
-                  {[state.mriEpe, state.musEce, state.psmaEpe].filter(Boolean).length} active
-                </span>
-              )}
-            </div>
-            <svg className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </summary>
-          <div className="grid grid-cols-3 gap-2 px-4 pb-3 pt-1">
-            <FlagChip id="s3-mri-epe" label="MRI EPE" hint="Extraprostatic extension"
-              checked={state.mriEpe} onChange={(v) => s("mriEpe", v)} />
-            <FlagChip id="s3-mus-ece" label="MUS ECE" hint="Micro-US ECE"
-              checked={state.musEce} onChange={(v) => s("musEce", v)} />
-            <FlagChip id="s3-psma-epe" label="PSMA EPE" hint="PET extracapsular"
-              checked={state.psmaEpe} onChange={(v) => s("psmaEpe", v)} />
-          </div>
-        </details>
-
-        {/* SVI category */}
-        <details className="group border-t border-border/50">
-          <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-2.5 hover:bg-muted/20 transition-colors">
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-foreground">SVI — Seminal Vesicle Invasion</span>
-              {(state.mriSvi || state.musSvi || state.psmaSvi || state.psmaLn) && (
-                <span className="rounded-full bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold text-red-500">
-                  {[state.mriSvi, state.musSvi, state.psmaSvi, state.psmaLn].filter(Boolean).length} active
-                </span>
-              )}
-            </div>
-            <svg className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-          </summary>
-          <div className="grid grid-cols-2 gap-2 px-4 pb-3 pt-1 sm:grid-cols-4">
-            <FlagChip id="s3-mri-svi" label="MRI SVI" hint="Seminal vesicle invasion"
-              checked={state.mriSvi} onChange={(v) => s("mriSvi", v)} />
-            <FlagChip id="s3-mus-svi" label="MUS SVI" hint="Micro-US SVI"
-              checked={state.musSvi} onChange={(v) => s("musSvi", v)} />
-            <FlagChip id="s3-psma-svi" label="PSMA SVI" hint="PET seminal vesicle"
-              checked={state.psmaSvi} onChange={(v) => s("psmaSvi", v)} />
-            <FlagChip id="s3-psma-ln" label="PSMA LN+" hint="Positive lymph nodes"
-              checked={state.psmaLn} onChange={(v) => s("psmaLn", v)} />
-          </div>
-        </details>
-      </div>
-
-      {/* Biopsy aggregate */}
-      <div className="space-y-3 rounded-xl border border-border bg-muted/10 p-4">
-        <h5 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-          Biopsy aggregate
-        </h5>
-        <div className="grid grid-cols-3 gap-3">
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-foreground" htmlFor="s3-cores">Positive cores</label>
-            <Input id="s3-cores" type="number" min={0} inputMode="numeric" className="h-8 text-xs"
-              value={state.cores} onChange={(e) => s("cores", e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-foreground" htmlFor="s3-maxcore">
-              Max core % <span className="text-muted-foreground font-normal">(%)</span>
-            </label>
-            <Input id="s3-maxcore" type="number" min={0} max={100} inputMode="numeric" className="h-8 text-xs"
-              value={state.maxcore} onChange={(e) => s("maxcore", e.target.value)} placeholder="%" />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-foreground" htmlFor="s3-lin">
-              Max linear <span className="text-muted-foreground font-normal">(mm)</span>
-            </label>
-            <Input id="s3-lin" type="number" min={0} step="0.5" inputMode="decimal" className="h-8 text-xs"
-              value={state.linearMm} onChange={(e) => s("linearMm", e.target.value)} placeholder="mm" />
-          </div>
-        </div>
-      </div>
-
-      {/* Histology */}
-      <div className="space-y-2.5 rounded-xl border border-border bg-muted/10 p-4">
-        <h5 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Histology</h5>
-        <div className="grid grid-cols-3 gap-2">
-          <FlagChip id="s3-crib" label="Cribriform" hint="Any cribriform pattern"
-            checked={state.cribriform} onChange={(v) => s("cribriform", v)} />
-          <FlagChip id="s3-idc" label="IDC" hint="Intraductal carcinoma"
-            checked={state.idc} onChange={(v) => s("idc", v)} />
-          <FlagChip id="s3-pni" label="PNI" hint="Perineural invasion"
-            checked={state.pni} onChange={(v) => s("pni", v)} />
-        </div>
-      </div>
-
-      {/* Genomic + functional */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-foreground" htmlFor="s3-dec">
-            Decipher <span className="font-normal text-muted-foreground">(0–1)</span>
-          </label>
-          <Input id="s3-dec" type="text" inputMode="decimal" placeholder="e.g. 0.52" className="h-8 text-xs"
-            value={state.decipher} onChange={(e) => s("decipher", e.target.value)} />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-foreground" htmlFor="s3-shim">
-            SHIM <span className="font-normal text-muted-foreground">(0–25)</span>
-          </label>
-          <Input id="s3-shim" type="number" min={0} max={25} inputMode="numeric" placeholder="e.g. 21" className="h-8 text-xs"
-            value={state.shim} onChange={(e) => s("shim", e.target.value)} />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-foreground" htmlFor="s3-ipss">
-            IPSS <span className="font-normal text-muted-foreground">(0–35)</span>
-          </label>
-          <Input id="s3-ipss" type="number" min={0} max={35} inputMode="numeric" placeholder="e.g. 8" className="h-8 text-xs"
-            value={state.ipss} onChange={(e) => s("ipss", e.target.value)} />
-        </div>
-      </div>
-
-      <div className="flex justify-between pt-1">
-        <Button type="button" variant="ghost" size="sm" onClick={onBack}>
-          ← Zone Locations
-        </Button>
-        <Button type="button" size="sm" onClick={onApply}>
           Apply &amp; Update Model
         </Button>
       </div>
@@ -1219,22 +1074,14 @@ export function ZoneInputWizard() {
   const [age, setAge] = useState("");
   const [psa, setPsa] = useState("");
   const [vol, setVol] = useState("");
-  const [psadt, setPsadt] = useState("");
 
   // Step 2
   const [zoneData, setZoneData] = useState<ZoneDataMap>({});
 
-  // Step 3
-  const [suppl, setSupplRaw] = useState<SupplState>({
-    mriEpe: false, mriSvi: false,
-    musEce: false, musSvi: false,
-    psmaEpe: false, psmaSvi: false, psmaLn: false,
-    decipher: "", shim: "", ipss: "",
-    cribriform: false, idc: false, pni: false,
-    maxcore: "", cores: "", linearMm: "",
-  });
-  const setSuppl = (patch: Partial<SupplState>) =>
-    setSupplRaw((prev) => ({ ...prev, ...patch }));
+  // Genomic + functional (shown in Step 1)
+  const [decipher, setDecipher] = useState("");
+  const [shim, setShim] = useState("");
+  const [ipss, setIpss] = useState("");
 
   // Initialise from patient record
   useEffect(() => {
@@ -1249,41 +1096,15 @@ export function ZoneInputWizard() {
     setVol(volVal != null && volVal > 0 ? String(volVal) : "");
     setZoneData(rowsToZoneData(entry.lesionRows));
 
-    const mriRows  = entry.lesionRows.filter((l) => l.source === "MRI");
-    const musRows  = entry.lesionRows.filter((l) => l.source === "MUS" || l.source === "ExactVu");
-    const psmaRows = entry.lesionRows.filter((l) => l.source === "PSMA");
-    const lnRaw    = rec.staging.lymph_nodes_psma;
-
-    setSupplRaw({
-      mriEpe: mriRows.some((l) => l.epe) || !!rec.staging.epe,
-      mriSvi: mriRows.some((l) => l.svi) || !!rec.staging.svi,
-      musEce: musRows.some((l) => l.epe) || !!rec.staging.epe_mus,
-      musSvi: musRows.some((l) => l.svi) || !!rec.staging.svi_mus,
-      psmaEpe: psmaRows.some((l) => l.epe) || !!rec.staging.psma_epe,
-      psmaSvi: psmaRows.some((l) => l.svi) || !!rec.staging.psma_svi,
-      psmaLn: lnRaw === 1 || lnRaw === true || lnRaw === "positive",
-      decipher:
-        rec.biopsy.decipher_score !== null && rec.biopsy.decipher_score !== undefined
-          ? String(rec.biopsy.decipher_score)
-          : "",
-      shim: String(rec.patient.shim ?? ""),
-      ipss: String(rec.patient.ipss ?? ""),
-      cribriform: !!rec.biopsy.has_cribriform,
-      idc: !!rec.biopsy.has_idc,
-      pni: !!rec.biopsy.has_pni,
-      maxcore: String(rec.biopsy.max_core_involvement_pct ?? ""),
-      cores:   String(rec.biopsy.total_positive_cores ?? ""),
-      linearMm: String(rec.biopsy.max_linear_extent_mm ?? ""),
-    });
+    setDecipher(
+      rec.biopsy.decipher_score !== null && rec.biopsy.decipher_score !== undefined
+        ? String(rec.biopsy.decipher_score)
+        : "",
+    );
+    setShim(String(rec.patient.shim ?? ""));
+    setIpss(String(rec.patient.ipss ?? ""));
   }, [entry?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-propagate MRI EPE/SVI from zone data to step-3 state whenever zones change
-  useEffect(() => {
-    const mriEpe = Object.values(zoneData).some((d) => d.mriEpe);
-    const mriSvi = Object.values(zoneData).some((d) => d.mriSvi);
-    const musEce = Object.values(zoneData).some((d) => d.musEce);
-    setSuppl({ mriEpe, mriSvi, musEce });
-  }, [zoneData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateZone = useCallback(
     (zoneId: string, patch: Partial<ZoneModality>) => {
@@ -1309,33 +1130,28 @@ export function ZoneInputWizard() {
     [updateLesionRows],
   );
 
-  const applyStep1 = () => {
+  const applyAll = (currentZoneData = zoneData) => {
+    const dec = parseFloat(decipher);
+    const zones = Object.values(currentZoneData);
     updateClinicalForm({
       age: parseInt(age) || undefined,
       psa: parseFloat(psa) || 0,
       vol: parseFloat(vol) || 45,
-    });
-  };
-
-  const applyStep3 = () => {
-    const dec = parseFloat(suppl.decipher);
-    updateClinicalForm({
-      mri_epe:  suppl.mriEpe  ? 1 : 0,
-      mri_svi:  suppl.mriSvi  ? 1 : 0,
-      mus_ece:  suppl.musEce  ? 1 : 0,
-      mus_svi:  suppl.musSvi  ? 1 : 0,
-      psma_epe: suppl.psmaEpe ? 1 : 0,
-      psma_svi: suppl.psmaSvi ? 1 : 0,
-      psma_ln:  suppl.psmaLn  ? 1 : 0,
-      dec: suppl.decipher === "" || isNaN(dec) ? null : dec,
-      shim:     parseInt(suppl.shim)    || undefined,
-      ipss:     parseInt(suppl.ipss)    || undefined,
-      cribriform_bx: suppl.cribriform ? 1 : 0,
-      idc_bx:        suppl.idc        ? 1 : 0,
-      pni_bx:        suppl.pni        ? 1 : 0,
-      cores:    parseFloat(suppl.cores)    || 0,
-      maxcore:  parseFloat(suppl.maxcore)  || 0,
-      linear_mm: parseFloat(suppl.linearMm) || undefined,
+      mri_epe:  zones.some((d) => d.mriEpe)  ? 1 : 0,
+      mri_svi:  zones.some((d) => d.mriSvi)  ? 1 : 0,
+      mus_ece:  zones.some((d) => d.musEce)  ? 1 : 0,
+      mus_svi:  0,
+      psma_epe: zones.some((d) => d.psmaEpe) ? 1 : 0,
+      psma_svi: zones.some((d) => d.psmaSvi) ? 1 : 0,
+      psma_ln:  zones.some((d) => d.psmaLn)  ? 1 : 0,
+      dec: decipher === "" || isNaN(dec) ? null : dec,
+      shim: parseInt(shim) || undefined,
+      ipss: parseInt(ipss) || undefined,
+      cribriform_bx: zones.some((d) => d.cribriform) ? 1 : 0,
+      idc_bx:        zones.some((d) => d.idc)        ? 1 : 0,
+      pni_bx:        zones.some((d) => d.pni)        ? 1 : 0,
+      maxcore: Math.max(0, ...zones.map((d) => d.corePct ?? 0)),
+      linear_mm: Math.max(0, ...zones.map((d) => d.linearMm ?? 0)) || undefined,
     });
     pushHistory();
   };
@@ -1347,7 +1163,6 @@ export function ZoneInputWizard() {
   const STEPS = [
     { n: 1, label: "Demographics" },
     { n: 2, label: "Zone Locations", badge: totalFilled > 0 ? totalFilled : undefined },
-    { n: 3, label: "Supplemental" },
   ];
 
   return (
@@ -1359,7 +1174,7 @@ export function ZoneInputWizard() {
             key={st.n}
             type="button"
             onClick={() => {
-              if (st.n > step && step === 1) applyStep1();
+              if (st.n > step && step === 1) applyAll();
               setStep(st.n);
               setSelectedZone(null);
             }}
@@ -1398,8 +1213,10 @@ export function ZoneInputWizard() {
             age={age} setAge={setAge}
             psa={psa} setPsa={setPsa}
             vol={vol} setVol={setVol}
-            psadt={psadt} setPsadt={setPsadt}
-            onNext={() => { applyStep1(); setStep(2); }}
+            decipher={decipher} setDecipher={setDecipher}
+            shim={shim} setShim={setShim}
+            ipss={ipss} setIpss={setIpss}
+            onNext={() => { applyAll(); setStep(2); }}
           />
         )}
         {step === 2 && (
@@ -1411,15 +1228,7 @@ export function ZoneInputWizard() {
             updateZone={updateZone}
             clearZone={clearZone}
             onBack={() => setStep(1)}
-            onNext={() => setStep(3)}
-          />
-        )}
-        {step === 3 && (
-          <Step3
-            state={suppl}
-            setState={setSuppl}
-            onBack={() => setStep(2)}
-            onApply={applyStep3}
+            onNext={() => applyAll()}
           />
         )}
       </div>
