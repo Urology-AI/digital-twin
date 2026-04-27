@@ -128,4 +128,20 @@ export function mapZoneDataToThree(
       }
     }
   }
+
+  // Distribute side-level SVI predictions into zones so paintGlbSV and the
+  // prostate heatmap both reflect the actual model output instead of the raw
+  // zone-level default (0.01).  SVI risk is anatomically concentrated at the
+  // posterior base (where SVs attach), attenuated at the posterior midgland,
+  // and not meaningful elsewhere.
+  for (const z of threeZones) {
+    const sideRisk = z.side === "L" ? pred.sviL : pred.sviR;
+    if (z.level === "Base" && z.region === "Posterior") {
+      z.svi = sideRisk;
+    } else if (z.level === "Mid" && z.region === "Posterior") {
+      z.svi = sideRisk * 0.35;
+    } else {
+      z.svi = 0.01;
+    }
+  }
 }
