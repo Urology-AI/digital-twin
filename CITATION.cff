@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+title: "COMPASS: Comprehensive Multi-Modal Prostate Analysis & Surgical Strategy"
+message: "If you use COMPASS in your research, please cite as below."
+type: software
+authors:
+  - family-names: "Ajabshir"
+    given-names: "Daniel"
+    affiliation: "Department of Urology, Icahn School of Medicine at Mount Sinai"
+  - family-names: "Tewari"
+    given-names: "Ashutosh K."
+    affiliation: "Department of Urology, Icahn School of Medicine at Mount Sinai"
+    email: "ash.tewari@mountsinai.org"
+repository-code: "https://github.com/Urology-AI/digital-twin"
+url: "https://urology-ai.github.io/digital-twin/"
+abstract: >
+  COMPASS is a preoperative decision-support platform that integrates clinical
+  data with three imaging modalities (MRI, micro-ultrasound, PSMA PET/CT) plus
+  optional Decipher genomic classifier results to predict surgical outcomes,
+  side-specific nerve-sparing recommendations, and zone-level risk for patients
+  undergoing robot-assisted radical prostatectomy. Developed and validated on a
+  cohort of 5,352 consecutive patients with independent validation on 815
+  trimodal imaging patients at Mount Sinai Health System.
+keywords:
+  - prostate cancer
+  - radical prostatectomy
+  - surgical planning
+  - prediction model
+  - PSMA PET
+  - micro-ultrasound
+  - MRI
+  - digital twin
+  - nerve sparing
+license: MIT
+version: "2.5.1"
+date-released: "2026-03"
+preferred-citation:
+  type: article
+  title: "COMPASS: A Trimodal Imaging-Integrated Surgical Planning Platform for Radical Prostatectomy — Development, Dual-Cohort Validation in 5,352 Patients, and Independent Trimodal Validation on 815 Consecutive Patients"
+  authors:
+    - family-names: "Ajabshir"
+      given-names: "Daniel"
+    - family-names: "Tewari"
+      given-names: "Ashutosh K."
+  status: "in-preparation"
+  notes: "Manuscript in preparation. This entry will be updated upon acceptance with journal, year, volume, and DOI."

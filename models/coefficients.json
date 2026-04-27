@@ -1,0 +1,270 @@
+{
+  "_meta": {
+    "schema_version": "1.0",
+    "model_build": "v22",
+    "production_version": "2.5.1",
+    "release_date": "2026-03",
+    "description": "COMPASS prediction model coefficients in standardized form. All coefficients are reported as standardized betas (β) from L2-regularized logistic regression (C=1.0) trained with 5-fold grouped cross-validation on the Mount Sinai RARP cohort (N=5,352). Inputs are standardized via StandardScaler before coefficient application.",
+    "training_cohort": {
+      "n_total": 5352,
+      "n_independent_validation": 815,
+      "n_independent_complete_data": 663,
+      "institution": "Mount Sinai Health System",
+      "irb": "STUDY-14-00050"
+    },
+    "usage": "These coefficients are intended for external validation and replication. To apply: standardize each input feature using the cohort mean and SD from the training data, multiply by the corresponding β, sum, add the intercept, and apply the logistic function. For categorical features expressed as multiple coefficients (e.g., grade_group_2, grade_group_3, grade_group_4_5), encode as one-hot with reference level grade_group_1.",
+    "imputation": "Missing optional inputs are mean-imputed and an availability flag is set to 0; the corresponding 'available' coefficient applies."
+  },
+
+  "ece_patient_level": {
+    "endpoint": "Extracapsular extension on final pathology",
+    "auc_cv": 0.800,
+    "auc_independent": 0.761,
+    "n_features": 13,
+    "coefficients": {
+      "grade_group_3": 0.53,
+      "log_psad": 0.52,
+      "grade_group_4_5": 0.46,
+      "mri_svi": 0.45,
+      "grade_group_2": 0.35,
+      "decipher_available": 0.32,
+      "pirads": 0.25,
+      "max_core_pct": 0.23,
+      "decipher_score_imputed": 0.21,
+      "ece_concordance_0_3": 0.12,
+      "mus_ece": 0.09,
+      "psma_epe": 0.07,
+      "mri_epe": 0.07
+    }
+  },
+
+  "ece_side_specific": {
+    "endpoint": "Lateralized ECE per side",
+    "auc_cv": 0.80,
+    "auc_independent_left": 0.71,
+    "auc_independent_right": 0.77,
+    "n_features": 12,
+    "note": "Imaging features (PI-RADS, MRI EPE, MUS ECE, PSMA EPE) are applied only to the side where the lesion is located (ipsilateral). Contralateral side receives baseline imaging values.",
+    "coefficients": {
+      "grade_group_4_5_ipsi": 0.38,
+      "log_psad": 0.38,
+      "grade_group_3_ipsi": 0.36,
+      "grade_group_2_ipsi": 0.26,
+      "mri_svi": 0.20,
+      "pirads_ipsi": 0.19,
+      "positive_cores_ipsi": 0.17,
+      "ece_concordance_ipsi_0_3": 0.15,
+      "max_core_pct_ipsi": 0.14,
+      "mus_ece_ipsi": 0.11,
+      "imaging_ipsi_any": 0.10,
+      "psma_epe_ipsi": -0.02
+    }
+  },
+
+  "focal_vs_extensive_ece": {
+    "endpoint": "Given ECE present, focal (<2 HPF) vs extensive",
+    "auc": 0.70,
+    "n_patients": 227,
+    "n_features": 7,
+    "note": "Applied only when ECE is predicted positive. Negative coefficients on MRI EPE and Linear Extent reflect detection bias and a paradoxical inverse relationship in low-grade large tumors.",
+    "coefficients": {
+      "log_psad": 0.37,
+      "mus_ece": 0.34,
+      "bilateral_disease": 0.25,
+      "mri_svi": 0.24,
+      "max_core_pct": 0.11,
+      "mri_epe": -0.07,
+      "linear_extent": -0.30
+    }
+  },
+
+  "svi_patient_level": {
+    "endpoint": "Seminal vesicle invasion",
+    "auc_cv": 0.863,
+    "auc_independent": 0.874,
+    "n_features": 9,
+    "coefficients": {
+      "mri_svi": 0.59,
+      "max_core_pct": 0.48,
+      "pirads": 0.48,
+      "grade_group": 0.43,
+      "decipher_available": 0.40,
+      "log_psad": 0.32,
+      "positive_cores": 0.11,
+      "decipher_score_imputed": 0.09,
+      "mri_epe": -0.08
+    }
+  },
+
+  "svi_side_specific": {
+    "endpoint": "Lateralized SVI per side",
+    "auc_cv": 0.81,
+    "n_features": 10,
+    "note": "Imaging features applied to ipsilateral side only.",
+    "coefficients": {
+      "max_core_pct_ipsi": 0.42,
+      "log_psad": 0.42,
+      "positive_cores_ipsi": 0.36,
+      "grade_group_ipsi": 0.14,
+      "mri_svi_ipsi": 0.11,
+      "pirads_ipsi": 0.11,
+      "mus_ece_ipsi": 0.07,
+      "bilateral_disease": 0.06,
+      "mri_epe_ipsi": 0.06,
+      "psma_svi_ipsi": 0.06
+    }
+  },
+
+  "upgrade": {
+    "endpoint": "Pathologic grade group higher than biopsy",
+    "auc_cv": 0.804,
+    "auc_independent": 0.830,
+    "n_features": 14,
+    "note": "Negative coefficient on biopsy grade group reflects ceiling effect — patients with high biopsy GG cannot be upgraded further.",
+    "coefficients": {
+      "biopsy_grade_group": -1.89,
+      "pni": -0.60,
+      "positive_cores": -0.35,
+      "pirads": 0.37,
+      "psma_suvmax": 0.31,
+      "cribriform": -0.27,
+      "bilateral_disease": 0.20,
+      "mri_svi": 0.20,
+      "mus_ece": 0.19,
+      "psma_epe": 0.11,
+      "psad": 0.12,
+      "psma_ln_positive": 0.11,
+      "psma_suv_x_psma_epe": 0.11,
+      "decipher_score_imputed": 0.11
+    }
+  },
+
+  "lni": {
+    "endpoint": "Lymph node invasion at extended PLND",
+    "auc_cv": 0.879,
+    "auc_independent": 0.794,
+    "n_validated_eplnd": 644,
+    "n_features": 4,
+    "coefficients": {
+      "psma_ln_positive": 0.53,
+      "log_psa_plus_1": 0.46,
+      "biopsy_grade_group": 0.44,
+      "prostate_volume": -0.34
+    }
+  },
+
+  "bcr": {
+    "endpoint": "Biochemical recurrence (PSA ≥0.2 ng/mL on two consecutive measures ≥6 weeks apart)",
+    "auc_cv": 0.733,
+    "auc_independent": 0.733,
+    "n_features": 10,
+    "coefficients": {
+      "grade_group_4_5": 0.39,
+      "decipher_available": 0.37,
+      "grade_group_3": 0.29,
+      "grade_group_2": 0.23,
+      "decipher_score_imputed": 0.23,
+      "log_psad": 0.21,
+      "pirads": 0.17,
+      "ece_concordance_0_3": 0.13,
+      "mri_svi": 0.10,
+      "positive_cores": 0.06
+    }
+  },
+
+  "psm": {
+    "endpoint": "Positive surgical margin",
+    "auc_cv": 0.62,
+    "auc_independent": 0.586,
+    "n_features": 10,
+    "note": "Modest AUC reflects that PSM is heavily influenced by intraoperative factors not captured preoperatively. PSM is reframed in COMPASS as a consequence within the nerve-sparing decision rather than an independent prediction endpoint.",
+    "coefficients": {
+      "bilateral_disease": 0.34,
+      "log_psad": 0.28,
+      "max_core_pct": 0.12,
+      "pirads": 0.12,
+      "grade_group_2": 0.09,
+      "grade_group_3": 0.04,
+      "positive_cores": 0.09,
+      "mri_svi": -0.06,
+      "mri_epe": -0.04,
+      "prostate_volume": -0.04
+    }
+  },
+
+  "nerve_sparing_algorithm": {
+    "description": "Side-specific NS grade derived from lateralized ECE prediction with zone-level distribution.",
+    "zones_per_side": ["posterolateral", "base", "apex", "anterior", "bladder_neck"],
+    "grade_thresholds": {
+      "grade_3_triggers": {
+        "posterolateral_ece_pct": 30,
+        "base_ece_pct": 35
+      },
+      "grade_2_triggers": {
+        "posterolateral_ece_pct": 10,
+        "base_ece_pct": 10
+      },
+      "alert_only_zones": ["apex", "anterior", "bladder_neck"]
+    },
+    "calibration_source": "Location-specific BCR data on 442 PSM-positive patients with BCR follow-up."
+  },
+
+  "plnd_decision_module": {
+    "description": "Asymmetric PLND decision rule from N=664 RARP+PLND+PSMA cohort.",
+    "scenarios": [
+      {"clinical_risk": "non_high_risk", "psma_ln": "negative", "lni_rate_pct": 0.0, "recommendation": "consider_omit_plnd"},
+      {"clinical_risk": "non_high_risk", "psma_ln": "positive", "lni_rate_pct": null, "recommendation": "limited_plnd", "note": "Low PPV; most are false positives"},
+      {"clinical_risk": "high_risk", "psma_ln": "negative", "lni_rate_pct": 12.0, "recommendation": "always_eplnd"},
+      {"clinical_risk": "high_risk", "psma_ln": "positive", "lni_rate_pct": null, "recommendation": "always_eplnd_high_priority"}
+    ],
+    "high_risk_definition": "NCCN High-Risk: biopsy grade group ≥ 4 OR PSA > 20 ng/mL",
+    "false_negatives_in_full_cohort": "All 20 false negatives were NCCN high-risk patients."
+  },
+
+  "decipher_integration": {
+    "n_with_decipher": 1845,
+    "cohort_mean_decipher_score": 0.521,
+    "imputation_method": "Mean imputation (0.521) + binary availability flag",
+    "categories": {
+      "low": {"threshold": "< 0.45"},
+      "intermediate": {"threshold": "0.45–0.60"},
+      "high": {"threshold": "≥ 0.60"}
+    },
+    "univariable_aucs": {
+      "ece": 0.689,
+      "svi": 0.725,
+      "lni": 0.780,
+      "bcr": 0.677
+    }
+  },
+
+  "supplemental_imaging_variables": {
+    "description": "Three additional MRI-derived variables that adjust ECE prediction when available.",
+    "variables": [
+      {
+        "name": "mri_lesion_size_cm",
+        "univariable_auc_ece": 0.691,
+        "n_available": 3335,
+        "coefficient": 0.636,
+        "unit": "per cm",
+        "dose_response": "12.7% ECE at ≤9mm; 45.7% ECE at >18mm"
+      },
+      {
+        "name": "mri_capsular_abutment_grade",
+        "univariable_auc_ece": 0.647,
+        "n_available": 1781,
+        "coefficient": 0.171,
+        "unit": "per grade (0-4 scale)",
+        "dose_response": "12.2% ECE at no contact; 40.4% ECE at bulge beyond capsule"
+      },
+      {
+        "name": "mri_adc_mean",
+        "univariable_auc_ece": 0.634,
+        "n_available": 1894,
+        "coefficient": -0.00023,
+        "unit": "per unit ADC",
+        "dose_response": "33.9% ECE at lowest ADC quartile; 12.6% at highest (inverse)"
+      }
+    ]
+  }
+}
