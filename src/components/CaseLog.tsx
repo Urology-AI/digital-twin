@@ -1,13 +1,18 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { X, CloudUpload, CloudDownload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { usePatientStore } from "@/store/patientStore";
+import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydratePatientsFromCaseLog } from "@/store/patientStore";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { cn } from "@/lib/utils";
+import { pushCases, pullCases } from "@/lib/turso";
 
 const CASE_LOG_KEY = "compass_cases";
+const TURSO_ENABLED = !!(
+  import.meta.env.VITE_TURSO_URL && import.meta.env.VITE_TURSO_AUTH_TOKEN
+);
 
-interface CaseRecord {
+export interface CaseRecord {
   id: string;
   date: string;
   // inputs
@@ -82,6 +87,33 @@ function parsePathValue(val: string): number | null {
   return isNaN(n) ? null : n;
 }
 
+function parseCsv(text: string): CaseRecord[] {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headers = lines[0]!.split(",").map((h) => h.trim().replace(/^"|"$/g, ""));
+  return lines.slice(1).map((line) => {
+    // Handle quoted fields containing commas
+    const values: string[] = [];
+    let cur = "";
+    let inQuote = false;
+    for (const ch of line) {
+      if (ch === '"') { inQuote = !inQuote; continue; }
+      if (ch === "," && !inQuote) { values.push(cur); cur = ""; continue; }
+      cur += ch;
+    }
+    values.push(cur);
+    const row: Record<string, unknown> = {};
+    headers.forEach((h, i) => {
+      const v = (values[i] ?? "").trim();
+      row[h] = v === "" ? (h.startsWith("path_") || h === "notes" ? null : 0) : isNaN(Number(v)) ? v : Number(v);
+    });
+    // Ensure required string fields
+    if (!row["id"]) row["id"] = "C" + Date.now();
+    if (!row["notes"]) row["notes"] = "";
+    return row as unknown as CaseRecord;
+  });
+}
+
 function riskCls(v: number) {
   if (v < 15) return "text-emerald-500";
   if (v < 30) return "text-amber-500";
@@ -92,8 +124,85 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
   const predictions = usePatientStore((s) => s.predictions);
+  const importJsonFile = usePatientStore((s) => s.importJsonFile);
+  const setActive = usePatientStore((s) => s.setActive);
+  const setPatientName = usePatientStore((s) => s.setPatientName);
 
   const [cases, setCases] = useState<CaseRecord[]>([]);
+  const [syncStatus, setSyncStatus] = useState<string>("");
+  const [syncing, setSyncing] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
+
+  const handlePush = async () => {
+    setSyncing(true);
+    setSyncStatus("Pushing…");
+    try {
+      const all = getCases();
+      const n = await pushCases(all);
+      setSyncStatus(`Pushed ${n} case${n !== 1 ? "s" : ""} ✓`);
+    } catch (err) {
+      setSyncStatus(`Push failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handlePull = async () => {
+    setSyncing(true);
+    setSyncStatus("Pulling…");
+    try {
+      const local = getCases();
+      const pulled = await pullCases(local);
+      // Merge: cloud is authoritative for clinical/prediction/path fields;
+      // local notes are preserved inside pullCases(). New cloud-only cases are added.
+      const localIds = new Set(local.map((c) => c.id));
+      const newFromCloud = pulled.filter((c) => !localIds.has(c.id));
+      // Update existing local records' path fields from cloud
+      const updated = local.map((lc) => {
+        const remote = pulled.find((rc) => rc.id === lc.id);
+        return remote ? { ...remote, notes: lc.notes } : lc;
+      });
+      const merged = [...newFromCloud, ...updated];
+      saveCases(merged);
+      setCases(merged);
+      // Add newly pulled cases to the patient store so they can be loaded.
+      hydratePatientsFromCaseLog();
+      setSyncStatus(`Pulled ${pulled.length} case${pulled.length !== 1 ? "s" : ""} ✓`);
+    } catch (err) {
+      setSyncStatus(`Pull failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      try {
+        if (file.name.toLowerCase().endsWith(".csv")) {
+          // Import as CaseLog entries
+          const imported = parseCsv(text);
+          if (!imported.length) { alert("No valid rows found in CSV."); return; }
+          const existing = getCases();
+          const existingIds = new Set(existing.map((c) => c.id));
+          const newOnes = imported.filter((c) => !existingIds.has(c.id));
+          const merged = [...newOnes, ...existing];
+          saveCases(merged);
+          setCases(merged);
+        } else {
+          // Import as full patient record (JSON)
+          importJsonFile(text, file.name.replace(/\.json$/i, ""));
+        }
+      } catch {
+        alert("Could not import file. Check that it is a valid COMPASS JSON or exported CSV.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
 
   const reload = useCallback(() => setCases(getCases()), []);
 
@@ -168,6 +277,15 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
     const updated = [c, ...getCases()];
     saveCases(updated);
     setCases(updated);
+
+    // Also save the full patient record to the library so it can be reloaded.
+    // Name defaults to date+clinical summary; updated to notes when user loads.
+    savePatientToLibrary({
+      id: c.id,
+      name: c.notes.trim() || `${c.date} — GG${c.gg} PSA ${c.psa}`,
+      record: entry.record,
+      lesionRows: entry.lesionRows,
+    });
   };
 
   const updatePath = (idx: number, field: keyof CaseRecord, raw: string) => {
@@ -257,35 +375,74 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-[200] overflow-y-auto bg-background/97 p-4 sm:p-8"
-      style={{ backdropFilter: "blur(4px)" }}
+      className="fixed inset-0 z-[200] overflow-y-auto bg-background p-4 sm:p-8"
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={onClose}
-        className="fixed right-5 top-4 z-[201] text-2xl text-muted-foreground hover:text-foreground"
-        aria-label="Close"
+        className="fixed right-4 top-3 z-[201] h-8 w-8 text-muted-foreground hover:text-foreground"
+        aria-label="Close case log"
       >
-        ×
-      </button>
+        <X className="h-4 w-4" />
+      </Button>
 
       <div className="mx-auto max-w-4xl">
         <h2 className="mb-1 text-lg font-semibold text-primary">Prospective Case Log</h2>
         <p className="mb-4 text-xs text-muted-foreground">
-          Save COMPASS predictions per case. Enter pathology results when available. Data stored in browser localStorage.
+          Save COMPASS predictions per case. Enter pathology results when available. Data stored locally;
+          cloud sync de-identifies records (ID hashed, notes never uploaded).
         </p>
 
         <div className="mb-4 flex flex-wrap gap-2">
           <Button size="sm" className="bg-emerald-600 text-white hover:bg-emerald-700" onClick={saveCurrentCase}>
             + Save Current Case
           </Button>
+          <input ref={importRef} type="file" accept=".json,.csv" className="sr-only" onChange={handleImport} aria-hidden />
+          <Button size="sm" variant="outline" onClick={() => importRef.current?.click()}>
+            Import Case
+          </Button>
           <Button size="sm" variant="outline" onClick={exportCSV}>
             Export CSV
           </Button>
+          {TURSO_ENABLED && (
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1 text-sky-500 border-sky-500/40 hover:bg-sky-500/10"
+                onClick={handlePush}
+                disabled={syncing}
+              >
+                <CloudUpload className="h-3.5 w-3.5" />
+                Push
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1 text-indigo-500 border-indigo-500/40 hover:bg-indigo-500/10"
+                onClick={handlePull}
+                disabled={syncing}
+              >
+                <CloudDownload className="h-3.5 w-3.5" />
+                Pull
+              </Button>
+            </>
+          )}
           <Button size="sm" variant="outline" className="text-red-500 border-red-500/40 hover:bg-red-500/10" onClick={clearAll}>
             Clear All
           </Button>
         </div>
+
+        {TURSO_ENABLED && syncStatus && (
+          <p className="mb-3 text-[11px] text-muted-foreground">{syncStatus}</p>
+        )}
+        {!TURSO_ENABLED && (
+          <p className="mb-3 rounded border border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-[10px] text-amber-500">
+            Cloud sync disabled — set VITE_TURSO_URL and VITE_TURSO_AUTH_TOKEN to enable.
+          </p>
+        )}
 
         {/* Stats row */}
         <div className="mb-4 flex flex-wrap gap-3">
@@ -313,29 +470,58 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
           </div>
         ) : (
           <div className="space-y-3">
-            {cases.map((c, i) => (
+            {cases.map((c, i) => {
+              const isActive = c.id === activeId;
+              return (
               <div
                 key={c.id}
                 className={cn(
                   "rounded-lg border bg-card p-3",
-                  c.path_ece !== null ? "border-emerald-500/40" : "border-border/70",
+                  isActive
+                    ? "border-primary ring-1 ring-primary/30"
+                    : c.path_ece !== null
+                      ? "border-emerald-500/40"
+                      : "border-border/70",
                 )}
               >
                 {/* Header */}
                 <div className="mb-2 flex items-start justify-between">
-                  <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {isActive && (
+                      <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary tracking-wide">
+                        Current
+                      </span>
+                    )}
                     <span className="font-semibold text-primary text-sm">{c.date}</span>
-                    <span className="ml-2 text-[11px] text-muted-foreground">
+                    <span className="text-[11px] text-muted-foreground">
                       GG{c.gg} | PSA {c.psa} | PIRADS {c.pirads} | {c.laterality}
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => deleteCase(i)}
-                    className="text-xs text-red-500 hover:underline"
-                  >
-                    delete
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const name = c.notes.trim() || `${c.date} — GG${c.gg} PSA ${c.psa}`;
+                        // Try library first (full record), otherwise use the
+                        // case log snapshot already loaded into the store on startup.
+                        if (!loadPatientFromLibrary(c.id, name)) {
+                          setPatientName(c.id, name);
+                          setActive(c.id);
+                        }
+                        onClose();
+                      }}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      load
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteCase(i)}
+                      className="text-xs text-red-500 hover:underline"
+                    >
+                      delete
+                    </button>
+                  </div>
                 </div>
 
                 {/* Predictions */}
@@ -411,7 +597,8 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
                   className="w-full rounded border border-border/60 bg-background px-2 py-1 text-[10px] text-foreground"
                 />
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

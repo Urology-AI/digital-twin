@@ -1,7 +1,9 @@
+import { useState } from "react";
 import {
   BookMarked,
   BookOpen,
   Info,
+  MessageCircle,
   Moon,
   Printer,
   Redo2,
@@ -13,8 +15,15 @@ import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
 import { printReport } from "@/lib/compass/printReport";
 import { cn } from "@/lib/utils";
+import { useApiStatus } from "@/hooks/useApiStatus";
+import { AiSettingsModal } from "@/components/AiSettingsModal";
 
 export function AppHeader() {
+  const { status: aiStatus, recheck: recheckAi } = useApiStatus();
+  const chatOpen = useUiStore((s) => s.chatOpen);
+  const setChatOpen = useUiStore((s) => s.setChatOpen);
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+
   const dark = useUiStore((s) => s.dark);
   const setDark = useUiStore((s) => s.setDark);
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
@@ -22,6 +31,7 @@ export function AppHeader() {
   const setReferenceOpen = useUiStore((s) => s.setReferenceOpen);
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
+  const loading = usePatientStore((s) => s.loading);
   const setActive = usePatientStore((s) => s.setActive);
   const undo = usePatientStore((s) => s.undo);
   const redo = usePatientStore((s) => s.redo);
@@ -60,11 +70,15 @@ export function AppHeader() {
             "h-8 min-w-0 flex-1 cursor-pointer truncate rounded-lg border border-input/80 bg-muted/50 px-2.5 text-xs font-medium text-foreground shadow-none transition-colors",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
             "hover:bg-muted/80 sm:text-sm",
+            (loading || patients.length === 0) && "opacity-60",
           )}
           value={activeId ?? ""}
+          disabled={loading}
           onChange={(e) => setActive(e.target.value)}
         >
-          {patients.length === 0 ? (
+          {loading ? (
+            <option value="">Loading cases…</option>
+          ) : patients.length === 0 ? (
             <option value="">No patients loaded</option>
           ) : (
             patients.map((p) => (
@@ -162,12 +176,53 @@ export function AppHeader() {
         >
           <Info className="h-[15px] w-[15px]" />
         </Button>
+
+        {/* AI status indicator — click to open settings */}
+        <button
+          type="button"
+          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          aria-label="AI settings"
+          onClick={() => setAiSettingsOpen(true)}
+          title="AI settings"
+        >
+          <span
+            className={cn(
+              "h-2 w-2 shrink-0 rounded-full",
+              aiStatus === "connected"    && "bg-emerald-400 shadow-[0_0_6px_1px_rgba(52,211,153,0.6)]",
+              aiStatus === "disconnected" && "bg-red-500 shadow-[0_0_6px_1px_rgba(239,68,68,0.5)]",
+              aiStatus === "checking"     && "animate-pulse bg-yellow-400",
+            )}
+          />
+          <span className="hidden text-[10px] font-medium sm:inline">AI</span>
+        </button>
+
+        {/* Chat assistant */}
+        <button
+          type="button"
+          className={cn(
+            "flex items-center rounded-md px-1.5 py-1 transition-colors hover:bg-muted/60 hover:text-foreground",
+            chatOpen ? "text-primary" : "text-muted-foreground",
+          )}
+          aria-label="Open chat assistant"
+          onClick={() => setChatOpen(!chatOpen)}
+          title="Ask the assistant"
+        >
+          <MessageCircle className="h-[15px] w-[15px]" />
+        </button>
       </div>
 
       {active && (
         <span className="sr-only" aria-live="polite">
           Active case: {active.name}
         </span>
+      )}
+
+      {aiSettingsOpen && (
+        <AiSettingsModal
+          status={aiStatus}
+          onRecheck={recheckAi}
+          onClose={() => setAiSettingsOpen(false)}
+        />
       )}
     </header>
   );

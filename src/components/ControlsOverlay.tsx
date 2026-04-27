@@ -29,30 +29,34 @@ const OVERLAYS: { id: OverlayType; label: string; activeColor: string }[] = [
   { id: "psm", label: "PSM", activeColor: "text-sky-400 border-sky-500/60 bg-sky-500/10" },
 ];
 
-const LEGEND: Record<OverlayType, { title: string; gradient: string; low: string; high: string }> = {
+const LEGEND: Record<OverlayType, { title: string; gradient: string; low: string; high: string; note: string }> = {
   cancer: {
     title: "csPCa risk",
     gradient: "linear-gradient(to right,#22c55e,#eab308,#ef4444)",
     low: "Low",
     high: "High",
+    note: "Green <10% · Amber 10–25% · Red >25%",
   },
   ece: {
     title: "ECE risk",
     gradient: "linear-gradient(to right,#22c55e,#f59e0b,#ef4444)",
     low: "Low",
     high: "High",
+    note: "Green <10% · Amber 10–25% · Red >25%",
   },
   svi: {
     title: "SVI risk",
-    gradient: "linear-gradient(to right,#4060a0,#a855f7,#ef4444)",
+    gradient: "linear-gradient(to right,#22c55e,#f59e0b,#ef4444)",
     low: "Low",
     high: "High",
+    note: "Green <15% · Amber 15–30% · Red >30%",
   },
   psm: {
     title: "PSM risk",
     gradient: "linear-gradient(to right,#3080c0,#60a0e0,#ef4444)",
     low: "Low",
     high: "High",
+    note: "Blue <15% · Amber 15–35% · Red >35%",
   },
 };
 
@@ -210,7 +214,7 @@ export function ControlsOverlay() {
               <span>{leg.high}</span>
             </div>
             <p className="mt-1.5 whitespace-nowrap text-[9px] leading-snug text-muted-foreground/80">
-              Green &lt;10% · Amber 10–30% · Red &gt;30%
+              {leg.note}
             </p>
           </div>
         )}
