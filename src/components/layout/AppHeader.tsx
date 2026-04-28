@@ -1,7 +1,10 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
+  Activity,
   BookMarked,
   BookOpen,
+  Box,
+  ClipboardList,
   Info,
   MessageCircle,
   Moon,
@@ -12,11 +15,17 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePatientStore } from "@/store/patientStore";
-import { useUiStore } from "@/store/uiStore";
+import { useUiStore, type DesktopTab } from "@/store/uiStore";
 import { printReport } from "@/lib/compass/printReport";
 import { cn } from "@/lib/utils";
 import { useApiStatus } from "@/hooks/useApiStatus";
 import { AiSettingsModal } from "@/components/AiSettingsModal";
+
+const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[] = [
+  { id: "input",       label: "Input",       Icon: ClipboardList },
+  { id: "viewer",      label: "3D Model",    Icon: Box },
+  { id: "predictions", label: "Predictions", Icon: Activity },
+];
 
 export function AppHeader() {
   const { status: aiStatus, recheck: recheckAi } = useApiStatus();
@@ -26,6 +35,8 @@ export function AppHeader() {
 
   const dark = useUiStore((s) => s.dark);
   const setDark = useUiStore((s) => s.setDark);
+  const desktopTab = useUiStore((s) => s.desktopTab);
+  const setDesktopTab = useUiStore((s) => s.setDesktopTab);
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
   const setCaseLogOpen = useUiStore((s) => s.setCaseLogOpen);
   const setReferenceOpen = useUiStore((s) => s.setReferenceOpen);
@@ -90,8 +101,31 @@ export function AppHeader() {
         </select>
       </div>
 
+      {/* Desktop tab switcher */}
+      <div className="hidden lg:flex items-center gap-0.5 rounded-lg bg-muted/60 p-0.5 mx-auto">
+        {DESKTOP_TABS.map(({ id, label, Icon }) => {
+          const active = desktopTab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setDesktopTab(id)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all",
+                active
+                  ? "bg-card shadow-sm text-foreground ring-1 ring-black/[0.06] dark:ring-white/[0.08]"
+                  : "text-muted-foreground hover:bg-background/50",
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" aria-hidden />
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* Right actions */}
-      <div className="ml-auto flex shrink-0 items-center gap-0.5">
+      <div className="ml-auto lg:ml-0 flex shrink-0 items-center gap-0.5">
         {/* Undo/Redo */}
         <div className="flex items-center">
           <Button
