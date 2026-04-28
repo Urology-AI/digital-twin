@@ -55,7 +55,10 @@ export interface Prostate3DInputV1 {
     statin?: boolean;
     smoking?: string;
     exercise?: string;
+    pfmt?: string;
+    alcohol?: string;
     pde5?: boolean;
+    pde5_plan?: string;
   };
   prostate: {
     volume_cc: number | null;

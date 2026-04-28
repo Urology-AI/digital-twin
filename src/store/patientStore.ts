@@ -252,6 +252,17 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       if (patch.psa !== undefined) record.patient.psa = patch.psa;
       if (patch.age !== undefined) record.patient.age = patch.age;
       if (patch.bmi !== undefined) record.patient.bmi = patch.bmi;
+      if (patch.dm !== undefined) record.patient.dm = patch.dm;
+      if (patch.htn !== undefined) record.patient.htn = patch.htn;
+      if (patch.cad !== undefined) record.patient.cad = patch.cad;
+      if (patch.smoking !== undefined) record.patient.smoking = patch.smoking;
+      if (patch.exercise !== undefined) record.patient.exercise = patch.exercise;
+      if (patch.pfmt !== undefined) record.patient.pfmt = patch.pfmt;
+      if (patch.alcohol !== undefined) record.patient.alcohol = patch.alcohol;
+      if (patch.pde5 !== undefined) {
+        record.patient.pde5_plan = patch.pde5;
+        record.patient.pde5 = patch.pde5 !== "none";
+      }
       if (patch.shim !== undefined) record.patient.shim = patch.shim;
       if (patch.ipss !== undefined) record.patient.ipss = patch.ipss;
       // ── Prostate anatomy ─────────────────────────────────────────────────

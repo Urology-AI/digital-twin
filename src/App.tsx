@@ -5,7 +5,6 @@ import { ControlsOverlay } from "@/components/ControlsOverlay";
 import { InsightsWorkspace } from "@/components/InsightsWorkspace";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
-import { SidePanel } from "@/components/SidePanel";
 import { ThreeCanvas } from "@/components/ThreeCanvas";
 import { ZoneLabelsOverlay } from "@/components/ZoneLabelsOverlay";
 import { CaseLog } from "@/components/CaseLog";
@@ -13,6 +12,9 @@ import { ChatWidget } from "@/components/ChatWidget";
 import { InfoPanel } from "@/components/InfoPanel";
 import { ReferencePanel } from "@/components/ReferencePanel";
 import { FunctionalOutcomesWorkspace } from "@/components/FunctionalOutcomesWorkspace";
+import { FunctionalOutcomesPanel } from "@/components/FunctionalOutcomesPanel";
+import { PredictionPanel } from "@/components/PredictionPanel";
+import { ZoneInputWizard } from "@/components/ZoneInputWizard";
 import { PREDICTION_EXPLANATIONS } from "@/lib/compass/explainPrediction";
 import {
   deriveClinicalFromLesions,
@@ -78,6 +80,7 @@ export default function App() {
   const setExplainKey = useUiStore((s) => s.setExplainKey);
   const dark = useUiStore((s) => s.dark);
   const mobileWorkspace = useUiStore((s) => s.mobileWorkspace);
+  const desktopTab = useUiStore((s) => s.desktopTab);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -107,75 +110,75 @@ export default function App() {
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
       <AppHeader />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <SidePanel />
+      {/*
+        Single content area — ThreeCanvas mounted once here so the WebGL context
+        is never destroyed when switching tabs or workspaces.
+      */}
+      <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
 
-        <main className="relative flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
-          {/*
-            Viewer stays mounted with real dimensions on small screens (absolute fill)
-            so WebGL resize/orbit/zoom keep working when switching Data / Results / 3D tabs.
-          */}
-          <div
-            className={cn(
-              "relative z-0 min-h-0 min-w-0 w-full flex-1 bg-muted/20",
-              "max-lg:absolute max-lg:inset-0",
-              "lg:relative lg:flex lg:min-h-0",
-            )}
-          >
-            <div className="absolute inset-0 min-h-0 min-w-0">
-              <ThreeCanvas />
-            </div>
+        {/* ── ThreeCanvas background (always mounted, z-0) ──────────────── */}
+        <div className="absolute inset-0 z-0 bg-muted/20">
+          <div className="absolute inset-0 min-h-0 min-w-0">
+            <ThreeCanvas />
+          </div>
+          {/* Controls/labels: on desktop show only for viewer tab; on mobile always visible */}
+          <div className={cn(desktopTab !== "viewer" && "lg:hidden")}>
             <ControlsOverlay />
             <ZoneLabelsOverlay />
             <DimOverlay />
           </div>
+        </div>
 
-          <div
-            className={cn(
-              "relative z-10 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-muted/20 app-scroll dark:bg-background",
-              "max-lg:absolute max-lg:inset-0",
-              mobileWorkspace === "insights" ? "max-lg:flex max-lg:flex-col" : "max-lg:hidden",
-              "lg:hidden",
-            )}
-          >
-            <InsightsWorkspace />
-          </div>
+        {/* ── Desktop: Input tab (lg+) ──────────────────────────────────── */}
+        <div className={cn(
+          "absolute inset-0 z-10 hidden overflow-hidden bg-background",
+          desktopTab === "input" && "lg:flex lg:flex-col",
+        )}>
+          <ZoneInputWizard />
+        </div>
 
-          <div
-            className={cn(
-              "relative z-10 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-muted/20 app-scroll dark:bg-background",
-              "max-lg:absolute max-lg:inset-0",
-              mobileWorkspace === "clinical" ? "max-lg:flex max-lg:flex-col" : "max-lg:hidden",
-              "lg:hidden",
-            )}
-          >
-            <ClinicalWorkspace compact />
+        {/* ── Desktop: Predictions tab (lg+) ───────────────────────────── */}
+        <div className={cn(
+          "absolute inset-0 z-10 hidden overflow-hidden bg-background",
+          desktopTab === "predictions" && "lg:flex",
+        )}>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain app-scroll border-r border-border px-5 py-5">
+            <PredictionPanel />
           </div>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain app-scroll px-5 py-5">
+            <FunctionalOutcomesPanel />
+          </div>
+        </div>
 
-          {/* Outcomes tab — mobile only */}
-          <div
-            className={cn(
-              "relative z-10 min-h-0 w-full flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-muted/20 app-scroll dark:bg-background",
-              "max-lg:absolute max-lg:inset-0",
-              mobileWorkspace === "outcomes" ? "max-lg:flex max-lg:flex-col" : "max-lg:hidden",
-              "lg:hidden",
-            )}
-          >
-            <FunctionalOutcomesWorkspace />
-          </div>
+        {/* ── Mobile: workspace overlays (max-lg only) ─────────────────── */}
+        <div className={cn(
+          "absolute inset-0 z-10 overflow-y-auto overflow-x-hidden overscroll-contain bg-background app-scroll lg:hidden",
+          mobileWorkspace !== "insights" && "hidden",
+        )}>
+          <InsightsWorkspace />
+        </div>
 
-          {/* Reference tab — mobile only */}
-          <div
-            className={cn(
-              "relative z-10 min-h-0 w-full flex-1",
-              "max-lg:absolute max-lg:inset-0",
-              mobileWorkspace === "reference" ? "max-lg:flex max-lg:flex-col" : "max-lg:hidden",
-              "lg:hidden",
-            )}
-          >
-            {mobileWorkspace === "reference" && <ReferencePanel />}
-          </div>
-        </main>
+        <div className={cn(
+          "absolute inset-0 z-10 overflow-y-auto overflow-x-hidden overscroll-contain bg-background app-scroll lg:hidden",
+          mobileWorkspace !== "clinical" && "hidden",
+        )}>
+          <ClinicalWorkspace compact />
+        </div>
+
+        <div className={cn(
+          "absolute inset-0 z-10 overflow-y-auto overflow-x-hidden overscroll-contain bg-background app-scroll lg:hidden",
+          mobileWorkspace !== "outcomes" && "hidden",
+        )}>
+          <FunctionalOutcomesWorkspace />
+        </div>
+
+        <div className={cn(
+          "absolute inset-0 z-10 lg:hidden",
+          mobileWorkspace !== "reference" && "hidden",
+        )}>
+          {mobileWorkspace === "reference" && <ReferencePanel />}
+        </div>
+
       </div>
 
       <MobileTabBar />

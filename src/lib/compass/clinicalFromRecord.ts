@@ -109,7 +109,10 @@ export function clinicalStateFromRecord(
   if (pat.statin === true) S.statin = true;
   if (pat.smoking) S.smoking = pat.smoking;
   if (pat.exercise) S.exercise = pat.exercise;
-  if (pat.pde5 === true) S.pde5 = "daily";
+  if (pat.pfmt) S.pfmt = pat.pfmt;
+  if (pat.alcohol) S.alcohol = pat.alcohol;
+  if (pat.pde5_plan) S.pde5 = pat.pde5_plan;
+  else if (pat.pde5 === true) S.pde5 = "daily";
   S.laterality = bx.laterality || "bilateral";
 
   if (bx.gg_left !== undefined && bx.gg_left !== null) S.gg_left = bx.gg_left;
