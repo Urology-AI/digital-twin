@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
-    "@libsql/client": "^0.17.2",
+    "@libsql/client": "^0.17.3",
     "@radix-ui/react-label": "^2.1.0",
     "@radix-ui/react-scroll-area": "^1.2.0",
     "@radix-ui/react-separator": "^1.1.0",
