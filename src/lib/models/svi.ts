@@ -5,12 +5,13 @@ import {
   type CollectedLesion,
 } from "@/lib/utils/normalization";
 
-/** Side-specific SVI */
+/** Side-specific SVI — locked 2026-05-03 */
 const SVI_SIDE = {
   i: -3.024,
   c: [
-    0.4152, 0.1374, 0.4236, 0.3567, 0.0038, 0.0659, 0.1108, 0.0585, 0.0572,
-    0.2541,
+    // log_psad, gg(continuous proxy), mc_side, cores_side, linear_side,
+    // bilateral, pirads_side, mri_epe_side, mri_svi_side, mus_ece_side
+    0.3139, 0.35, 0.3156, 0.0324, 0.04, 0.1443, 0.2892, 0.0614, 0.4573, 0.0924,
   ],
   m: [
     -1.634, 2.2902, 48.1988, 1.4226, 8.002, 0.2619, 2.9368, 0.0439, 0.0119,
@@ -52,35 +53,48 @@ function musEceSviDelta(S: ClinicalState): number {
 }
 
 /**
- * Patient-level SVI — retrained 9-feature model (hardcoded in original HTML).
+ * Patient-level SVI — locked 2026-05-03, 22-feature binary-GG model.
+ * Features: log_psad, gg2, gg3, gg4_5, mc, pirads, mri_epe, mri_svi,
+ *           mus_ece, psma_epe, dec_imp, dec_avail, pos_cores
  */
 export function predictSviPatient(S: ClinicalState): number {
   const log_psad = logPsad(S.psa, S.vol);
+  const gg2 = S.gg === 2 ? 1 : 0;
+  const gg3 = S.gg === 3 ? 1 : 0;
+  const gg45 = S.gg >= 4 ? 1 : 0;
   const dec_imp = S.dec !== null && S.dec >= 0 ? S.dec : 0.521;
   const dec_avail = S.dec !== null && S.dec >= 0 ? 1 : 0;
   const vals = [
     log_psad,
-    S.gg,
+    gg2,
+    gg3,
+    gg45,
     normalizeMaxCorePct(S.maxcore),
-    S.cores,
     Math.max(S.pirads, 2),
     S.mri_epe,
     S.mri_svi,
+    S.mus_ece,
+    S.psma_epe,
     dec_imp,
     dec_avail,
+    S.cores,
   ];
+  // Standardized betas — locked 2026-05-03
   const c = [
-    0.3162, 0.4338, 0.4802, 0.1082, 0.4769, -0.0755, 0.5875, 0.0879, 0.3971,
+    0.3139, 0.7981, 0.7700, 0.9954, 0.3156, 0.2892, 0.0614, 0.4573,
+    0.0924, 0.0492, 0.2707, 0.3033, 0.0324,
   ];
+  // Means from ECE/PSM cohort (N=3,454 — identical dataset)
   const m = [
-    -1.7887, 2.6698, 58.0121, 6.4766, 4.1544, 0.1654, 0.0474, 0.5418, 0.3302,
+    -1.6174, 0.397, 0.2603, 0.2389, 51.1131, 4.0824, 0.1499, 0.0428,
+    0.1071, 0.0264, 0.6446, 0.2372, 6.1908,
   ];
+  // Standard deviations
   const s = [
-    0.7566, 1.1132, 28.3631, 3.8708, 0.7011, 0.4198, 0.2125, 0.1498, 0.4703,
+    0.7068, 0.4893, 0.4388, 0.4264, 32.2602, 0.8493, 0.357, 0.2025,
+    0.3092, 0.1602, 0.1175, 0.4254, 4.2325,
   ];
-  let L = linearPredict(-3.189665, c, m, s, vals);
-  L += musEceSviDelta(S);
-  return sigmoid(L);
+  return sigmoid(linearPredict(-3.189665, c, m, s, vals));
 }
 
 export function predictSviSide(

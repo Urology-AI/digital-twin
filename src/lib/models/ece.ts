@@ -5,12 +5,14 @@ import {
   type CollectedLesion,
 } from "@/lib/utils/normalization";
 
-/** Patient-level ECE (standardized logistic) */
+/** Patient-level ECE (standardized logistic) — locked 2026-05-03 */
 const ECE_PATIENT = {
   i: -0.7423,
   c: [
-    0.5186, 0.3464, 0.5279, 0.4644, 0.2302, 0.2541, 0.0726, 0.453, 0.0936,
-    0.0732, 0.1174, 0.2069, 0.3213,
+    // log_psad, gg2, gg3, gg45, mc, pirads, mri_epe, mri_svi, mus_ece,
+    // psma_epe, ece_conc, dec_imp, dec_avail
+    0.3285, 0.4091, 0.4912, 0.5948, 0.2019, 0.3922, 0.1399, 0.2352, 0.0435,
+    0.0062, 0.04, 0.2133, 0.4180,
   ],
   m: [
     -1.6174, 0.397, 0.2603, 0.2389, 51.1131, 4.0824, 0.1499, 0.0428, 0.1071,
@@ -22,12 +24,13 @@ const ECE_PATIENT = {
   ],
 } as const;
 
-/** Side-specific ECE v2 */
+/** Side-specific ECE — locked 2026-05-03 */
 const ECE_SIDE = {
   i: -1.6557,
   c: [
-    0.381, 0.255, 0.3625, 0.3768, 0.1414, 0.1683, 0.1917, -0.028, 0.1063,
-    0.1471, 0.2045, -0.0204,
+    // log_psad, gg2, gg3, gg45, mc_side, cores_side, pirads_side,
+    // mri_epe_side(PSMA EPE proxy), mus_ece_side, ece_conc_side, mri_svi, imaging_ipsi
+    0.38, 0.26, 0.36, 0.38, 0.14, 0.17, 0.19, -0.02, 0.11, 0.15, 0.20, 0.10,
   ],
   m: [
     -1.6339, 0.2645, 0.1434, 0.1285, 37.0968, 1.4227, 2.9354, 0.0438, 0.0483,

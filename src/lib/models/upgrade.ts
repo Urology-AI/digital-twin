@@ -1,11 +1,15 @@
 import type { ClinicalState } from "@/types/patient";
 import { sigmoid } from "@/lib/utils/math";
 
+/** Grade Upgrade model — Option A locked 2026-05-03 (N=3,137, CV AUC 0.807) */
 const UPGRADE = {
   i: -3.2302,
+  // psad, gg(continuous), cores, maxcore, linear_mm, pct45, cribriform_bx,
+  // pni_bx, bilateral, pirads, mri_svi, mus_ece, suv, psma_epe
+  // Note: gg has large negative beta — GG1 patients have most upgrade headroom
   c: [
-    0.1218, -1.8943, -0.3519, 0.0554, 0.0709, 0.0575, -0.2719, -0.6007, 0.2033,
-    0.3679, 0.1962, 0.1865, 0.308, 0.1081,
+    0.1976, -1.4920, -0.1070, -0.0032, 0.0151, 0.0272, 0.0418, -0.0814,
+    0.0223, 0.2587, 0.1484, -0.2267, 0.0272, 0.0504,
   ],
   m: [
     0.3149, 2.7446, 6.1862, 15.5193, 8.5496, 0.2437, 0.0132, 0.0362, 0.4679,

@@ -25,9 +25,10 @@ export function predictBcrPreop(S: ClinicalState): number {
     dec_imp,
     dec_avail,
   ];
+  // Locked 2026-05-03 — CV AUC 0.743 (N=2,399). See BCR tab for salvage-censoring caveat.
   const c = [
-    0.2146, 0.2279, 0.2876, 0.3899, 0.0603, 0.1671, 0.0986, 0.1327, 0.2253,
-    0.3655,
+    0.2346, 0.2256, 0.3019, 0.4495, 0.0341, 0.1757, 0.1222, 0.0843, 0.2157,
+    0.4597,
   ];
   const m = [
     -1.7865, 0.4328, 0.2451, 0.2171, 6.3653, 4.1834, 0.0447, 0.1463, 0.5528,

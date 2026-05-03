@@ -1,9 +1,11 @@
 import type { ClinicalState } from "@/types/patient";
 import { logPsad, normalizeMaxCorePct, sigmoid } from "@/lib/utils/math";
 
+/** PSM model — locked 2026-05-03 (N=3,454, CV AUC 0.651 — literature ceiling) */
 const PSM = {
   i: -1.251,
-  c: [0.2791, 0.0866, 0.0445, -0.058, 0.1216, -0.0168, 0.12, -0.0341, -0.0429, 0.3391],
+  // log_psad, gg2, gg3, gg45, max_core_pct, cores, pirads, mri_epe, mri_svi, bilateral
+  c: [0.2844, 0.1812, 0.1188, 0.0400, 0.0109, 0.0521, 0.0099, -0.0287, 0.0542, 0.1002],
   m: [
     -1.6137, 0.398, 0.2566, 0.2418, 50.7988, 6.1908, 4.0773, 0.1497, 0.0428,
     0.4671,
