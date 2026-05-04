@@ -121,9 +121,11 @@ This document defines every variable used as input to or output from the COMPASS
 | `prob_ece` | numeric | 0–1 | Predicted probability of ECE |
 | `prob_ece_left` | numeric | 0–1 | Side-specific ECE probability, left side |
 | `prob_ece_right` | numeric | 0–1 | Side-specific ECE probability, right side |
-| `prob_svi` | numeric | 0–1 | Predicted probability of SVI |
+| `prob_svi` | numeric | 0–1 | Predicted probability of SVI (patient-level) |
+| `prob_svi_left` | numeric | 0–1 | Side-specific SVI probability, left side (patient-level model applied to lobe) |
+| `prob_svi_right` | numeric | 0–1 | Side-specific SVI probability, right side (patient-level model applied to lobe) |
 | `prob_upgrade` | numeric | 0–1 | Predicted probability of grade group upgrade |
-| `prob_lni` | numeric | 0–1 | Predicted probability of LNI |
+| `prob_lni` | numeric | 0–1 | Predicted probability of LNI; 4-feature parsimonious model (log PSAD, GG4–5 binary, positive cores, PSMA LN+) |
 | `prob_bcr` | numeric | 0–1 | Predicted probability of biochemical recurrence |
 | `prob_psm` | numeric | 0–1 | Predicted probability of positive surgical margin |
 | `ns_grade_left` | integer | 1/2/3 | Recommended nerve-sparing grade, left side |
@@ -140,4 +142,4 @@ The web tool accepts patient records as JSON conforming to schema `prostate-3d-i
 
 ---
 
-*Last updated: April 2026. Variable list reflects COMPASS Model build v22 (March 2026), production deployment v2.5.1.*
+*Last updated: May 2026. Variable list reflects COMPASS Model build v22, verified 2026-05-03, production deployment v2.5.1.*

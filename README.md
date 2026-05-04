@@ -64,7 +64,7 @@ If you are evaluating COMPASS for external validation, secondary research, or in
 | [`MODEL_CARD.md`](./MODEL_CARD.md) | Intended use, performance metrics, training data, limitations, ethical considerations |
 | [`DATA_DICTIONARY.md`](./DATA_DICTIONARY.md) | Every input and output variable with type, units, valid range, and clinical definition |
 | [`CITATION.cff`](./CITATION.cff) | How to cite COMPASS in your publications |
-| `models/coefficients.json` *(forthcoming)* | All model coefficients in machine-readable form for direct external implementation |
+| `models/coefficients.json` | All model coefficients in machine-readable form for direct external implementation |
 | `examples/predict_batch.py` *(forthcoming)* | Standalone script to generate predictions for a CSV of patients |
 | `examples/example_patients.csv` *(forthcoming)* | Synthetic patients showing exact input format |
 
