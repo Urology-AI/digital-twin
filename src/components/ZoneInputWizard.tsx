@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePatientStore } from "@/store/patientStore";
 import { emptyLesion, type LesionRow } from "@/types/lesion";
-import type { PfmtLevel, Pde5Regimen, AlcoholLevel, SmokingStatus, ExerciseLevel } from "@/lib/compass/functionalOutcomes";
 import { cn } from "@/lib/utils";
 
 // ── Zone definitions ──────────────────────────────────────────────────────────
@@ -334,26 +333,6 @@ function ZoneDetail({ zone, data, onUpdate, onClear, onClose }: {
   );
 }
 
-// ── Segment picker ────────────────────────────────────────────────────────────
-function SegPicker<T extends string>({ label, options, value, onChange }: {
-  label: string; options: { label: string; value: T }[]; value: T; onChange: (v: T) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="text-sm font-semibold text-foreground">{label}</div>
-      <div className="flex overflow-hidden rounded-lg border border-border divide-x divide-border">
-        {options.map((opt) => (
-          <button key={opt.value} type="button" onClick={() => onChange(opt.value)}
-            className={cn("flex-1 px-2 py-2.5 text-sm font-medium transition-colors",
-              value === opt.value ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted/60")}>
-            {opt.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // ── Main wizard ───────────────────────────────────────────────────────────────
 export function ZoneInputWizard() {
   const patients           = usePatientStore((s) => s.patients);
@@ -365,7 +344,7 @@ export function ZoneInputWizard() {
 
   const entry = patients.find((p) => p.id === activeId);
 
-  const [activeTab, setActiveTab]       = useState<1 | 2 | 3>(1);
+  const [activeTab, setActiveTab]       = useState<1 | 2>(1);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
 
   const [age,      setAge]      = useState("");
@@ -375,15 +354,6 @@ export function ZoneInputWizard() {
   const [shim,     setShim]     = useState("");
   const [ipss,     setIpss]     = useState("");
   const [zoneData, setZoneData] = useState<ZoneDataMap>({});
-  const [bmi,      setBmi]      = useState("");
-  const [pfmt,     setPfmt]     = useState<PfmtLevel>("basic");
-  const [exercise, setExercise] = useState<ExerciseLevel>("moderate");
-  const [smoking,  setSmoking]  = useState<SmokingStatus>("never");
-  const [pde5,     setPde5]     = useState<Pde5Regimen>("prn");
-  const [alcohol,  setAlcohol]  = useState<AlcoholLevel>("moderate");
-  const [dm,       setDm]       = useState(false);
-  const [htn,      setHtn]      = useState(false);
-  const [cad,      setCad]      = useState(false);
 
   useEffect(() => {
     if (!entry) return;
@@ -395,17 +365,6 @@ export function ZoneInputWizard() {
     setDecipher(rec.biopsy.decipher_score !== null && rec.biopsy.decipher_score !== undefined ? String(rec.biopsy.decipher_score) : "");
     setShim(String(rec.patient.shim ?? ""));
     setIpss(String(rec.patient.ipss ?? ""));
-    setBmi(rec.patient.bmi != null && rec.patient.bmi > 0 ? String(rec.patient.bmi) : "");
-    setSmoking((rec.patient.smoking as SmokingStatus | undefined) ?? "never");
-    setExercise((rec.patient.exercise as ExerciseLevel | undefined) ?? "moderate");
-    setPfmt((rec.patient.pfmt as PfmtLevel | undefined) ?? "basic");
-    setAlcohol((rec.patient.alcohol as AlcoholLevel | undefined) ?? "moderate");
-    if (rec.patient.pde5_plan) setPde5(rec.patient.pde5_plan as Pde5Regimen);
-    else if (rec.patient.pde5 === true) setPde5("daily");
-    else setPde5("prn");
-    setDm(rec.patient.dm ?? false);
-    setHtn(rec.patient.htn ?? false);
-    setCad(rec.patient.cad ?? false);
   }, [entry?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateZone = useCallback((zoneId: string, patch: Partial<ZoneModality>) => {
@@ -432,30 +391,18 @@ export function ZoneInputWizard() {
   const handleDecipherChange = (v: string) => { setDecipher(v); const d = parseFloat(v); updateClinicalForm({ dec: v === "" || isNaN(d) ? null : d }); };
   const handleShimChange     = (v: string) => { setShim(v);     updateClinicalForm({ shim: parseInt(v) || undefined }); };
   const handleIpssChange     = (v: string) => { setIpss(v);     updateClinicalForm({ ipss: parseInt(v) || undefined }); };
-  const handleBmiChange      = (v: string) => { setBmi(v);      const n = parseFloat(v); updateClinicalForm({ bmi: n > 0 && !isNaN(n) ? n : undefined }); };
-  const handlePfmtChange     = (v: PfmtLevel)     => { setPfmt(v);     updateClinicalForm({ pfmt: v }); };
-  const handleExerciseChange = (v: ExerciseLevel) => { setExercise(v); updateClinicalForm({ exercise: v }); };
-  const handleSmokingChange  = (v: SmokingStatus) => { setSmoking(v);  updateClinicalForm({ smoking: v }); };
-  const handlePde5Change     = (v: Pde5Regimen)   => { setPde5(v);     updateClinicalForm({ pde5: v }); };
-  const handleAlcoholChange  = (v: AlcoholLevel)  => { setAlcohol(v);  updateClinicalForm({ alcohol: v }); };
-  const handleDmChange       = (v: boolean) => { setDm(v);  updateClinicalForm({ dm: v }); };
-  const handleHtnChange      = (v: boolean) => { setHtn(v); updateClinicalForm({ htn: v }); };
-  const handleCadChange      = (v: boolean) => { setCad(v); updateClinicalForm({ cad: v }); };
 
-  const applyAll = () => {
-    const dec = parseFloat(decipher);
-    const bmiNum = parseFloat(bmi);
+  /** Apply zone-derived aggregate flags to the clinical state, then save a checkpoint. */
+  const applyZoneAggregates = () => {
     const zones = Object.values(zoneData);
     updateClinicalForm({
-      age: parseInt(age) || undefined, psa: parseFloat(psa) || 0, vol: parseFloat(vol) || 45,
-      bmi: bmiNum > 0 && !isNaN(bmiNum) ? bmiNum : undefined,
-      dm, htn, cad, smoking, exercise, pfmt, alcohol, pde5,
-      mri_epe: zones.some((d) => d.mriEpe) ? 1 : 0, mri_svi: zones.some((d) => d.mriSvi) ? 1 : 0,
-      mus_ece: zones.some((d) => d.musEce) ? 1 : 0, mus_svi: 0,
-      psma_epe: zones.some((d) => d.psmaEpe) ? 1 : 0, psma_svi: zones.some((d) => d.psmaSvi) ? 1 : 0,
+      mri_epe: zones.some((d) => d.mriEpe) ? 1 : 0,
+      mri_svi: zones.some((d) => d.mriSvi) ? 1 : 0,
+      mus_ece: zones.some((d) => d.musEce) ? 1 : 0,
+      mus_svi: 0,
+      psma_epe: zones.some((d) => d.psmaEpe) ? 1 : 0,
+      psma_svi: zones.some((d) => d.psmaSvi) ? 1 : 0,
       psma_ln: zones.some((d) => d.psmaLn) ? 1 : 0,
-      dec: decipher === "" || isNaN(dec) ? null : dec,
-      shim: parseInt(shim) || undefined, ipss: parseInt(ipss) || undefined,
       cribriform_bx: zones.some((d) => d.cribriform) ? 1 : 0,
       idc_bx: zones.some((d) => d.idc) ? 1 : 0,
       pni_bx: zones.some((d) => d.pni) ? 1 : 0,
@@ -472,9 +419,6 @@ export function ZoneInputWizard() {
   const psad    = volNum > 0 && !isNaN(psaNum) ? (psaNum / volNum).toFixed(3) : "—";
   const psaWarn = !isNaN(psaNum) && psaNum > 0 && (psaNum > 100 || psaNum < 0.1);
   const volWarn = !isNaN(volNum) && volNum > 0 && (volNum < 10 || volNum > 250);
-  const bmiNum  = parseFloat(bmi);
-  const bmiCat  = isNaN(bmiNum) || bmiNum <= 0 ? null
-    : bmiNum < 18.5 ? "Underweight" : bmiNum < 25 ? "Normal" : bmiNum < 30 ? "Overweight" : "Obese";
 
   const totalFilled = ALL_ZONES.filter((z) => hasData(zoneData[z.id])).length;
   const getCancer   = (id: string) => threeZones.find((z) => z.id === id)?.cancer ?? 0.02;
@@ -489,7 +433,6 @@ export function ZoneInputWizard() {
   const TABS = [
     { n: 1 as const, label: "Demographics" },
     { n: 2 as const, label: "Zone Locations" },
-    { n: 3 as const, label: "Modifiable Factors" },
   ];
 
   return (
@@ -665,68 +608,15 @@ export function ZoneInputWizard() {
               />
             </div>
           )}
-        </div>
-      )}
 
-      {/* ── Tab 3: Modifiable Factors ── */}
-      {activeTab === 3 && (
-        <div className="flex flex-1 overflow-hidden">
-          <div className="flex-1 overflow-y-auto border-r border-border p-7 space-y-6">
-            <h3 className="text-2xl font-bold text-foreground">Body &amp; Lifestyle</h3>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-foreground" htmlFor="wiz-bmi">BMI <span className="font-normal text-muted-foreground">(kg/m²)</span></label>
-              <div className="flex items-center gap-3">
-                <Input id="wiz-bmi" type="number" step="0.5" min={10} max={60} inputMode="decimal" placeholder="27.0" value={bmi} onChange={(e) => handleBmiChange(e.target.value)} className="h-11 w-36 text-base" />
-                {bmiCat && (
-                  <span className={cn("rounded-full px-3 py-1 text-sm font-semibold",
-                    bmiNum < 18.5 ? "bg-blue-500/10 text-blue-500" : bmiNum < 25 ? "bg-emerald-500/10 text-emerald-400" : bmiNum < 30 ? "bg-amber-500/10 text-amber-400" : "bg-red-500/10 text-red-500")}>
-                    {bmiCat}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <SegPicker<PfmtLevel> label="Pelvic Floor Training (PFMT)"
-              options={[{ label: "None", value: "none" }, { label: "Basic", value: "basic" }, { label: "Moderate", value: "moderate" }, { label: "Intensive", value: "intensive" }]}
-              value={pfmt} onChange={handlePfmtChange} />
-            <SegPicker<ExerciseLevel> label="Exercise Level"
-              options={[{ label: "Sedentary", value: "sedentary" }, { label: "Light", value: "light" }, { label: "Moderate", value: "moderate" }, { label: "Active", value: "active" }]}
-              value={exercise} onChange={handleExerciseChange} />
-            <SegPicker<SmokingStatus> label="Smoking Status"
-              options={[{ label: "Never", value: "never" }, { label: "Former", value: "former" }, { label: "Current", value: "current" }]}
-              value={smoking} onChange={handleSmokingChange} />
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-7 space-y-6">
-            <h3 className="text-2xl font-bold text-foreground">Medical Factors</h3>
-
-            <SegPicker<Pde5Regimen> label="PDE5 Inhibitor Plan"
-              options={[{ label: "None", value: "none" }, { label: "PRN", value: "prn" }, { label: "Daily", value: "daily" }]}
-              value={pde5} onChange={handlePde5Change} />
-            <SegPicker<AlcoholLevel> label="Alcohol Usage"
-              options={[{ label: "None", value: "none" }, { label: "Moderate", value: "moderate" }, { label: "Heavy", value: "heavy" }]}
-              value={alcohol} onChange={handleAlcoholChange} />
-
-            <div className="space-y-2.5">
-              <div className="text-sm font-semibold text-foreground">Comorbidities</div>
-              <div className="flex gap-3">
-                {([["Diabetes", dm, handleDmChange], ["HTN", htn, handleHtnChange], ["CAD", cad, handleCadChange]] as [string, boolean, (v: boolean) => void][]).map(([label, val, setter]) => (
-                  <button key={label} type="button" onClick={() => setter(!val)}
-                    className={cn("flex-1 rounded-lg border-2 px-3 py-3 text-sm font-bold transition-all",
-                      val ? "border-red-500 bg-red-500/10 text-red-400" : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:bg-muted/60")}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2 pt-2">
-              <Button type="button" size="lg" onClick={applyAll} className="w-full">
-                Apply &amp; Save Checkpoint
-              </Button>
-              <p className="text-xs text-muted-foreground/70">Changes update predictions live. Checkpoint saves an undo point.</p>
-            </div>
+          {/* Apply zone aggregates — fixed footer on tab 2 */}
+          <div className="absolute bottom-0 left-0 right-0 flex items-center justify-end gap-3 border-t border-border bg-card/95 px-5 py-3 backdrop-blur">
+            <p className="hidden text-xs text-muted-foreground/70 sm:block">
+              Zone edits update predictions live. Apply commits aggregate flags & saves an undo point.
+            </p>
+            <Button type="button" size="lg" onClick={applyZoneAggregates}>
+              Apply &amp; Save Checkpoint
+            </Button>
           </div>
         </div>
       )}

@@ -225,7 +225,7 @@ export function ChatWidget() {
         heatmap_visible: ui.heatmapVisible,
         labels_visible: ui.labelsVisible,
         lesions_only: ui.lesionsOnly,
-        mobile_workspace: ui.mobileWorkspace,
+        active_tab: ui.desktopTab,
       };
       const clinical = latestEntry
         ? ({

@@ -1,18 +1,16 @@
-import { ClipboardList, LayoutGrid, Scan, BookMarked, Activity, MessageCircle } from "lucide-react";
-import { useUiStore, type MobileWorkspace } from "@/store/uiStore";
+import { Activity, ClipboardList, Layers, MessageCircle } from "lucide-react";
+import { useUiStore, type DesktopTab } from "@/store/uiStore";
 import { cn } from "@/lib/utils";
 
-const TABS: { id: MobileWorkspace; label: string; Icon: typeof Scan }[] = [
-  { id: "clinical",   label: "Data",      Icon: ClipboardList },
-  { id: "insights",   label: "Results",   Icon: LayoutGrid },
-  { id: "outcomes",   label: "Outcomes",  Icon: Activity },
-  { id: "viewer",     label: "3D",        Icon: Scan },
-  { id: "reference",  label: "Reference", Icon: BookMarked },
+const TABS: { id: DesktopTab; label: string; Icon: typeof Activity }[] = [
+  { id: "input",       label: "Input",       Icon: ClipboardList },
+  { id: "predictions", label: "Predictions", Icon: Activity },
+  { id: "outcomes",    label: "Outcomes",    Icon: Layers },
 ];
 
 export function MobileTabBar() {
-  const mobileWorkspace = useUiStore((s) => s.mobileWorkspace);
-  const setMobileWorkspace = useUiStore((s) => s.setMobileWorkspace);
+  const desktopTab = useUiStore((s) => s.desktopTab);
+  const setDesktopTab = useUiStore((s) => s.setDesktopTab);
   const chatOpen = useUiStore((s) => s.chatOpen);
   const setChatOpen = useUiStore((s) => s.setChatOpen);
 
@@ -29,14 +27,14 @@ export function MobileTabBar() {
         role="tablist"
       >
         {TABS.map(({ id, label, Icon }) => {
-          const active = mobileWorkspace === id;
+          const active = desktopTab === id;
           return (
             <button
               key={id}
               type="button"
               role="tab"
               aria-selected={active}
-              onClick={() => setMobileWorkspace(id)}
+              onClick={() => setDesktopTab(id)}
               className={cn(
                 "flex min-h-[48px] flex-1 touch-manipulation flex-col items-center justify-center gap-1 rounded-xl px-2 py-1.5 transition-all active:scale-[0.97]",
                 active

@@ -1,19 +1,17 @@
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { ClinicalWorkspace } from "@/components/ClinicalWorkspace";
 import { ControlsOverlay } from "@/components/ControlsOverlay";
-import { InsightsWorkspace } from "@/components/InsightsWorkspace";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
+import { OutcomesWorkspace } from "@/components/OutcomesWorkspace";
 import { ThreeCanvas } from "@/components/ThreeCanvas";
 import { ZoneLabelsOverlay } from "@/components/ZoneLabelsOverlay";
 import { CaseLog } from "@/components/CaseLog";
 import { ChatWidget } from "@/components/ChatWidget";
 import { InfoPanel } from "@/components/InfoPanel";
 import { ReferencePanel } from "@/components/ReferencePanel";
-import { FunctionalOutcomesWorkspace } from "@/components/FunctionalOutcomesWorkspace";
-import { FunctionalOutcomesPanel } from "@/components/FunctionalOutcomesPanel";
 import { PredictionPanel } from "@/components/PredictionPanel";
+import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { ZoneInputWizard } from "@/components/ZoneInputWizard";
 import { PREDICTION_EXPLANATIONS } from "@/lib/compass/explainPrediction";
 import {
@@ -78,8 +76,8 @@ export default function App() {
   const setReferenceOpen = useUiStore((s) => s.setReferenceOpen);
   const explainKey = useUiStore((s) => s.explainKey);
   const setExplainKey = useUiStore((s) => s.setExplainKey);
+  const welcomeOpen = useUiStore((s) => s.welcomeOpen);
   const dark = useUiStore((s) => s.dark);
-  const mobileWorkspace = useUiStore((s) => s.mobileWorkspace);
   const desktopTab = useUiStore((s) => s.desktopTab);
 
   useEffect(() => {
@@ -106,77 +104,74 @@ export default function App() {
     hydratePatientsFromCaseLog();
   }, [bootstrapFromJson]);
 
+  const onPredictions = desktopTab === "predictions";
+
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
       <AppHeader />
 
       {/*
         Single content area — ThreeCanvas mounted once here so the WebGL context
-        is never destroyed when switching tabs or workspaces.
+        is never destroyed when switching tabs or workspaces. The canvas wrapper
+        resizes (instead of remounts) when the active tab changes.
       */}
       <div className="relative flex min-h-0 min-w-0 flex-1 overflow-hidden">
 
         {/* ── ThreeCanvas background (always mounted, z-0) ──────────────── */}
-        <div className="absolute inset-0 z-0 bg-muted/20">
+        {/*
+          Default: full-screen (covered by panels on input/outcomes tabs).
+          Predictions tab: half-width on desktop, top half on mobile.
+        */}
+        <div
+          className={cn(
+            "absolute z-0 bg-muted/20",
+            "inset-0",
+            onPredictions && "lg:right-1/2",
+            onPredictions && "max-lg:bottom-1/2",
+          )}
+        >
           <div className="absolute inset-0 min-h-0 min-w-0">
             <ThreeCanvas />
           </div>
-          {/* Controls/labels: on desktop show only for viewer tab; on mobile always visible */}
-          <div className={cn(desktopTab !== "viewer" && "lg:hidden")}>
+          {/* Controls/labels: visible on the predictions tab */}
+          <div className={cn(!onPredictions && "hidden")}>
             <ControlsOverlay />
             <ZoneLabelsOverlay />
             <DimOverlay />
           </div>
         </div>
 
-        {/* ── Desktop: Input tab (lg+) ──────────────────────────────────── */}
-        <div className={cn(
-          "absolute inset-0 z-10 hidden overflow-hidden bg-background",
-          desktopTab === "input" && "lg:flex lg:flex-col",
-        )}>
+        {/* ── Input tab ────────────────────────────────────────────────── */}
+        <div
+          className={cn(
+            "absolute inset-0 z-10 overflow-hidden bg-background",
+            desktopTab === "input" ? "flex flex-col" : "hidden",
+          )}
+        >
           <ZoneInputWizard />
         </div>
 
-        {/* ── Desktop: Predictions tab (lg+) ───────────────────────────── */}
-        <div className={cn(
-          "absolute inset-0 z-10 hidden overflow-hidden bg-background",
-          desktopTab === "predictions" && "lg:flex",
-        )}>
-          <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain app-scroll border-r border-border px-5 py-5">
-            <PredictionPanel />
-          </div>
-          <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain app-scroll px-5 py-5">
-            <FunctionalOutcomesPanel />
-          </div>
+        {/* ── Predictions tab: 3D (left/top) | PredictionPanel (right/bottom) */}
+        <div
+          className={cn(
+            "absolute z-10 overflow-y-auto overflow-x-hidden overscroll-contain bg-background app-scroll px-5 py-5",
+            onPredictions ? "block" : "hidden",
+            // Desktop: right half. Mobile: bottom half.
+            "lg:left-1/2 lg:right-0 lg:top-0 lg:bottom-0",
+            "max-lg:top-1/2 max-lg:bottom-0 max-lg:left-0 max-lg:right-0",
+          )}
+        >
+          <PredictionPanel />
         </div>
 
-        {/* ── Mobile: workspace overlays (max-lg only) ─────────────────── */}
-        <div className={cn(
-          "absolute inset-0 z-10 overflow-y-auto overflow-x-hidden overscroll-contain bg-background app-scroll lg:hidden",
-          mobileWorkspace !== "insights" && "hidden",
-        )}>
-          <InsightsWorkspace />
-        </div>
-
-        <div className={cn(
-          "absolute inset-0 z-10 overflow-y-auto overflow-x-hidden overscroll-contain bg-background app-scroll lg:hidden",
-          mobileWorkspace !== "clinical" && "hidden",
-        )}>
-          <ClinicalWorkspace compact />
-        </div>
-
-        <div className={cn(
-          "absolute inset-0 z-10 overflow-y-auto overflow-x-hidden overscroll-contain bg-background app-scroll lg:hidden",
-          mobileWorkspace !== "outcomes" && "hidden",
-        )}>
-          <FunctionalOutcomesWorkspace />
-        </div>
-
-        <div className={cn(
-          "absolute inset-0 z-10 lg:hidden",
-          mobileWorkspace !== "reference" && "hidden",
-        )}>
-          {mobileWorkspace === "reference" && <ReferencePanel />}
+        {/* ── Outcomes tab: full-width split workspace ──────────────────── */}
+        <div
+          className={cn(
+            "absolute inset-0 z-10 overflow-hidden bg-background",
+            desktopTab === "outcomes" ? "flex" : "hidden",
+          )}
+        >
+          <OutcomesWorkspace />
         </div>
 
       </div>
@@ -196,6 +191,8 @@ export default function App() {
       {referenceOpen && (
         <ReferencePanel modal onClose={() => setReferenceOpen(false)} />
       )}
+
+      {welcomeOpen && <WelcomeScreen />}
 
       {explainKey && (
         <div

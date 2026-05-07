@@ -3,9 +3,9 @@ import {
   Activity,
   BookMarked,
   BookOpen,
-  Box,
   ClipboardList,
   Info,
+  Layers,
   MessageCircle,
   Moon,
   Printer,
@@ -23,8 +23,8 @@ import { AiSettingsModal } from "@/components/AiSettingsModal";
 
 const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[] = [
   { id: "input",       label: "Input",       Icon: ClipboardList },
-  { id: "viewer",      label: "3D Model",    Icon: Box },
   { id: "predictions", label: "Predictions", Icon: Activity },
+  { id: "outcomes",    label: "Outcomes",    Icon: Layers },
 ];
 
 export function AppHeader() {
@@ -38,6 +38,7 @@ export function AppHeader() {
   const desktopTab = useUiStore((s) => s.desktopTab);
   const setDesktopTab = useUiStore((s) => s.setDesktopTab);
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
+  const setWelcomeOpen = useUiStore((s) => s.setWelcomeOpen);
   const setCaseLogOpen = useUiStore((s) => s.setCaseLogOpen);
   const setReferenceOpen = useUiStore((s) => s.setReferenceOpen);
   const patients = usePatientStore((s) => s.patients);
@@ -51,8 +52,13 @@ export function AppHeader() {
 
   return (
     <header className="z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur-md sm:px-4 supports-[backdrop-filter]:bg-card/85">
-      {/* Brand */}
-      <div className="flex shrink-0 flex-col justify-center gap-0.5">
+      {/* Brand — click to reopen welcome screen */}
+      <button
+        type="button"
+        onClick={() => setWelcomeOpen(true)}
+        className="flex shrink-0 flex-col justify-center gap-0.5 rounded-md text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        aria-label="Open welcome screen"
+      >
         <div className="flex items-baseline gap-2">
           <span className="text-sm font-black tracking-tight text-foreground sm:text-base">
             COMPASS
@@ -67,7 +73,7 @@ export function AppHeader() {
           </span>
           <span className="text-[8px] text-muted-foreground/50">IRB: STUDY-14-00050</span>
         </div>
-      </div>
+      </button>
 
       {/* Divider */}
       <div className="hidden h-5 w-px shrink-0 bg-border/70 sm:block" />

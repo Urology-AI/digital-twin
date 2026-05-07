@@ -7,11 +7,11 @@ import { useIsDesktop } from "@/hooks/useIsDesktop";
 import { cn } from "@/lib/utils";
 
 const DESKTOP_TABS = [
-  { id: "clinical",  label: "Data",     Icon: ClipboardList },
+  { id: "input",     label: "Data",     Icon: ClipboardList },
   { id: "outcomes",  label: "Outcomes", Icon: Activity },
 ] as const;
 
-type DesktopTab = typeof DESKTOP_TABS[number]["id"];
+type LocalTab = typeof DESKTOP_TABS[number]["id"];
 
 export function SidePanel() {
   const patients = usePatientStore((s) => s.patients);
@@ -19,12 +19,11 @@ export function SidePanel() {
   const active = patients.find((p) => p.id === activeId);
   const isDesktop = useIsDesktop();
 
-  const mobileWorkspace = useUiStore((s) => s.mobileWorkspace);
-  const setMobileWorkspace = useUiStore((s) => s.setMobileWorkspace);
+  const activeTab = useUiStore((s) => s.desktopTab);
+  const setActiveTab = useUiStore((s) => s.setDesktopTab);
 
-  // Derive active desktop tab from global workspace state; default to "clinical"
-  const desktopTab: DesktopTab =
-    mobileWorkspace === "outcomes" ? "outcomes" : "clinical";
+  const desktopTab: LocalTab =
+    activeTab === "outcomes" ? "outcomes" : "input";
 
   return (
     <aside
@@ -57,7 +56,7 @@ export function SidePanel() {
               <button
                 key={id}
                 type="button"
-                onClick={() => setMobileWorkspace(id)}
+                onClick={() => setActiveTab(id)}
                 className={cn(
                   "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all",
                   active
@@ -74,7 +73,7 @@ export function SidePanel() {
       </div>
 
       <div className="app-scroll min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain bg-muted/10 dark:bg-background/50">
-        {isDesktop && desktopTab === "clinical" && <ClinicalWorkspace />}
+        {isDesktop && desktopTab === "input" && <ClinicalWorkspace />}
         {isDesktop && desktopTab === "outcomes" && <FunctionalOutcomesWorkspace />}
       </div>
     </aside>
