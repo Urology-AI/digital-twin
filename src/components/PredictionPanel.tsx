@@ -198,20 +198,20 @@ export function PredictionPanel() {
         </CardHeader>
         <CardContent className="pt-4">
           {/* 6 prediction value cards */}
-          <div className="mb-4 grid grid-cols-3 gap-3">
+          <div className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
             {preds.map((p) => {
               const ci = computeCI(p.v);
               return (
                 <Tooltip key={p.k}>
                   <TooltipTrigger asChild>
-                    <div className="rounded-xl border border-border/70 bg-card px-3 py-3 text-center shadow-sm transition-shadow hover:shadow-md cursor-default">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{p.k}</div>
-                      <div className={cn("text-3xl font-bold tabular-nums", p.neutral ? "text-muted-foreground/50" : riskCls(p.v))}>
+                    <div className="rounded-xl border border-border/70 bg-card px-2 py-2 text-center shadow-sm transition-shadow hover:shadow-md cursor-default sm:px-3 sm:py-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">{p.k}</div>
+                      <div className={cn("text-xl font-bold tabular-nums sm:text-2xl lg:text-3xl", p.neutral ? "text-muted-foreground/50" : riskCls(p.v))}>
                         {Math.round(p.v * 100)}%
                       </div>
                       {p.neutral
-                        ? <div className="text-xs leading-tight text-muted-foreground/40">low</div>
-                        : <div className="text-xs leading-tight text-muted-foreground/35">{Math.round(ci.lo * 100)}–{Math.round(ci.hi * 100)}%</div>
+                        ? <div className="text-[10px] leading-tight text-muted-foreground/40 sm:text-xs">low</div>
+                        : <div className="text-[10px] leading-tight text-muted-foreground/35 sm:text-xs">{Math.round(ci.lo * 100)}–{Math.round(ci.hi * 100)}%</div>
                       }
                     </div>
                   </TooltipTrigger>
@@ -223,10 +223,10 @@ export function PredictionPanel() {
             })}
           </div>
 
-          {/* Two-column layout: NS (left) + PLND (right) */}
-          <div className="grid grid-cols-2 gap-5">
+          {/* Two-column layout: NS (left) + Surgical Consequence + PLND (right) — stacks on narrow */}
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
 
-            {/* Left: Nerve Sparing + Surgical Consequence */}
+            {/* Left: Nerve Sparing 5-zone */}
             <div>
               <div className="mb-2 text-sm font-semibold uppercase tracking-wide text-primary">Nerve sparing — 5-zone</div>
               <table className="w-full border-collapse text-sm">
@@ -275,13 +275,16 @@ export function PredictionPanel() {
                   </tr>
                 </tbody>
               </table>
+            </div>
 
-              {gradesToShow.map((gs) => {
+            {/* Right: Surgical Consequence + PLND Decision */}
+            <div>
+              {gradesToShow.map((gs, idx) => {
                 const g = gs.grade as 1 | 2 | 3;
                 if (g < 1 || g > 3) return null;
                 const gd = NSG_DATA[g];
                 return (
-                  <div key={gs.label} className="mt-3 border-t border-border pt-3">
+                  <div key={gs.label} className={cn(idx > 0 && "mt-3 border-t border-border pt-3")}>
                     <div className="mb-2 text-sm font-semibold uppercase tracking-wide text-primary">Surgical Consequence — {gs.label}</div>
                     <div className="grid grid-cols-3 gap-2">
                       <div className="rounded border border-border bg-muted/30 p-2 text-center">
@@ -300,11 +303,11 @@ export function PredictionPanel() {
                   </div>
                 );
               })}
-            </div>
 
-            {/* Right: PLND Decision */}
-            <div>
-              <div className="mb-2 text-sm font-semibold uppercase tracking-wide text-primary">PLND decision</div>
+              <div className={cn(
+                "mb-2 text-sm font-semibold uppercase tracking-wide text-primary",
+                gradesToShow.length > 0 && "mt-3 border-t border-border pt-3",
+              )}>PLND decision</div>
               <div className={cn("mb-3 rounded-md border border-border border-l-4 bg-muted/30 p-3", plndColor)}>
                 <div className="text-base font-bold">{plndTitle}</div>
               </div>

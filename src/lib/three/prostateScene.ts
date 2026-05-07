@@ -634,6 +634,7 @@ export interface ProstateSceneHandles {
   zoneMeshes: Mesh[];
   dispose: () => void;
   setSize: (w: number, h: number) => void;
+  setBackground: (hex: number) => void;
   updateZones: (
     zones: ThreeZoneRuntime[],
     overlay: OverlayType,
@@ -919,6 +920,9 @@ export function createProstateScene(
       camera.aspect = ww / hh;
       camera.updateProjectionMatrix();
       renderer.setSize(ww, hh);
+    },
+    setBackground: (hex: number) => {
+      scene.background = new Color(hex);
     },
     updateZones: (z, ov, opts) => {
       if (glbLoaded) {

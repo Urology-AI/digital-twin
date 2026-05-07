@@ -29,9 +29,12 @@ import {
 import { useUiStore } from "@/store/uiStore";
 import { cn } from "@/lib/utils";
 
-/** Offset above mobile tab bar (h-16) + safe area */
+/**
+ * Offset above mobile chrome (tab bar h-16 + control pills h-9 + small gap + safe area).
+ * Used so the dim/info readout doesn't collide with the bottom-anchored pill cluster.
+ */
 const MOBILE_CHROME_BOTTOM =
-  "max-lg:bottom-[calc(0.75rem+4rem+env(safe-area-inset-bottom,0px))]";
+  "max-lg:bottom-[calc(0.5rem+4rem+2.5rem+env(safe-area-inset-bottom,0px))]";
 
 function DimOverlay() {
   const patients = usePatientStore((s) => s.patients);

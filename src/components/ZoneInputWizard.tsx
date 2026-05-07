@@ -154,28 +154,42 @@ function riskBarColor(cancer: number): string {
 }
 
 // ── Chip selector ─────────────────────────────────────────────────────────────
-function ChipSelector({ value, options, onChange, label, width = "w-20" }: {
+function ChipSelector({ value, options, onChange, label }: {
   value: number | undefined;
   options: { v: number; l: string }[];
   onChange: (v: number | undefined) => void;
   label: string;
-  width?: string;
 }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <span className={cn("shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground", width)}>{label}</span>
+    <div className="space-y-1.5">
+      <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
       <div className="flex flex-wrap gap-1.5">
         {options.map((o) => (
           <button key={o.v} type="button" onClick={() => onChange(value === o.v ? undefined : o.v)}
-            className={cn("flex h-8 min-w-[2rem] items-center justify-center rounded px-2 text-sm font-semibold transition-colors",
+            className={cn("flex h-7 min-w-[1.75rem] items-center justify-center rounded px-1.5 text-xs font-semibold transition-colors",
               value === o.v ? "bg-primary text-primary-foreground" : "bg-muted/40 text-muted-foreground hover:bg-muted/70 hover:text-foreground")}
             title={o.l}>{o.v}</button>
         ))}
         {value !== undefined && (
           <button type="button" onClick={() => onChange(undefined)}
-            className="flex h-8 w-7 items-center justify-center rounded text-sm text-muted-foreground/50 hover:bg-muted/40"
+            className="flex h-7 w-6 items-center justify-center rounded text-xs text-muted-foreground/50 hover:bg-muted/40"
             title="Clear">×</button>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Labeled input row (label above, input grows to fill) ──────────────────────
+function FieldRow({
+  label, unit, children,
+}: { label: string; unit?: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <div className="min-w-0 flex-1">{children}</div>
+        {unit && <span className="shrink-0 text-[10px] text-muted-foreground">{unit}</span>}
       </div>
     </div>
   );
@@ -240,63 +254,57 @@ function ZoneDetail({ zone, data, onUpdate, onClear, onClose }: {
           <button type="button" onClick={onClose} className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground/50 hover:bg-muted/40 hover:text-foreground text-sm">×</button>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4 p-4">
+      <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 sm:gap-3 sm:p-4">
         {/* MRI */}
-        <div className="space-y-3 rounded-lg border border-blue-500/25 bg-blue-500/5 p-4">
+        <div className="space-y-2.5 rounded-lg border border-blue-500/25 bg-blue-500/5 p-3">
           <div className="flex items-center gap-2">
             <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-blue-500 text-[9px] font-bold text-white">M</span>
             <span className="text-xs font-bold uppercase tracking-wider text-blue-400">MRI</span>
           </div>
           <ChipSelector label="PI-RADS" value={data.pirads} options={PIRADS_OPTS} onChange={(v) => onUpdate({ pirads: v })} />
           {hasMri && (<>
-            <div className="flex items-center gap-2.5">
-              <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Size</span>
-              <Input type="number" step="0.5" min={0} placeholder="mm" className="h-8 w-20 px-2 text-sm" value={data.mriSize ?? ""} onChange={(e) => { const v = parseFloat(e.target.value); onUpdate({ mriSize: isNaN(v) ? undefined : v }); }} />
-              <span className="text-xs text-muted-foreground">mm</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">ADC</span>
-              <Input type="number" step="10" min={0} placeholder="µm²/s" className="h-8 w-24 px-2 text-sm" value={data.mriAdc ?? ""} onChange={(e) => { const v = parseFloat(e.target.value); onUpdate({ mriAdc: isNaN(v) ? undefined : v }); }} />
-              <span className="text-xs text-muted-foreground">µm²/s</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Abut</span>
-              <select className="h-8 flex-1 rounded border border-input/80 bg-background px-2 text-sm text-foreground" value={data.mriAbut ?? -1} onChange={(e) => { const v = parseInt(e.target.value, 10); onUpdate({ mriAbut: v === -1 ? undefined : v }); }}>
+            <FieldRow label="Size" unit="mm">
+              <Input type="number" step="0.5" min={0} placeholder="mm" className="h-8 w-full px-2 text-sm" value={data.mriSize ?? ""} onChange={(e) => { const v = parseFloat(e.target.value); onUpdate({ mriSize: isNaN(v) ? undefined : v }); }} />
+            </FieldRow>
+            <FieldRow label="ADC" unit="µm²/s">
+              <Input type="number" step="10" min={0} placeholder="ADC" className="h-8 w-full px-2 text-sm" value={data.mriAdc ?? ""} onChange={(e) => { const v = parseFloat(e.target.value); onUpdate({ mriAdc: isNaN(v) ? undefined : v }); }} />
+            </FieldRow>
+            <FieldRow label="Abutment">
+              <select className="h-8 w-full min-w-0 rounded border border-input/80 bg-background px-2 text-sm text-foreground" value={data.mriAbut ?? -1} onChange={(e) => { const v = parseInt(e.target.value, 10); onUpdate({ mriAbut: v === -1 ? undefined : v }); }}>
                 {ABUT_OPTS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
               </select>
-            </div>
-            <div className="flex items-center gap-4 pl-[5.5rem]">
+            </FieldRow>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary" checked={data.mriEpe ?? false} onChange={(e) => onUpdate({ mriEpe: e.target.checked })} />EPE</label>
               <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary" checked={data.mriSvi ?? false} onChange={(e) => onUpdate({ mriSvi: e.target.checked })} />SVI</label>
             </div>
           </>)}
         </div>
         {/* MUS */}
-        <div className="space-y-3 rounded-lg border border-teal-500/25 bg-teal-500/5 p-4">
+        <div className="space-y-2.5 rounded-lg border border-teal-500/25 bg-teal-500/5 p-3">
           <div className="flex items-center gap-2">
             <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-teal-500 text-[9px] font-bold text-white">U</span>
             <span className="text-xs font-bold uppercase tracking-wider text-teal-400">Micro-US</span>
           </div>
           <ChipSelector label="PRI-MUS" value={data.primus} options={MUS_OPTS} onChange={(v) => onUpdate({ primus: v })} />
           {(data.primus ?? 0) > 0 && (
-            <div className="flex flex-col gap-2 pl-[5.5rem]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary" checked={data.musEce ?? false} onChange={(e) => onUpdate({ musEce: e.target.checked })} />ECE on MUS</label>
               <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary" checked={data.musAbut ?? false} onChange={(e) => onUpdate({ musAbut: e.target.checked })} />Abutment</label>
             </div>
           )}
         </div>
         {/* PSMA */}
-        <div className="space-y-3 rounded-lg border border-purple-500/25 bg-purple-500/5 p-4">
+        <div className="space-y-2.5 rounded-lg border border-purple-500/25 bg-purple-500/5 p-3">
           <div className="flex items-center gap-2">
             <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-purple-500 text-[9px] font-bold text-white">P</span>
             <span className="text-xs font-bold uppercase tracking-wider text-purple-400">PSMA PET</span>
           </div>
-          <div className="flex items-center gap-2.5">
-            <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">SUVmax</span>
-            <Input type="number" step="0.1" min={0} placeholder="e.g. 12.4" className="h-8 w-28 px-2 text-sm" value={data.suv ?? ""} onChange={(e) => { const v = parseFloat(e.target.value); onUpdate({ suv: isNaN(v) ? undefined : v }); }} />
-          </div>
+          <FieldRow label="SUVmax">
+            <Input type="number" step="0.1" min={0} placeholder="e.g. 12.4" className="h-8 w-full px-2 text-sm" value={data.suv ?? ""} onChange={(e) => { const v = parseFloat(e.target.value); onUpdate({ suv: isNaN(v) ? undefined : v }); }} />
+          </FieldRow>
           {(data.suv ?? 0) > 0 && (
-            <div className="flex items-center gap-4 pl-[5.5rem]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary" checked={data.psmaEpe ?? false} onChange={(e) => onUpdate({ psmaEpe: e.target.checked })} />EPE</label>
               <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary" checked={data.psmaSvi ?? false} onChange={(e) => onUpdate({ psmaSvi: e.target.checked })} />SVI</label>
               <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary" checked={data.psmaLn ?? false} onChange={(e) => onUpdate({ psmaLn: e.target.checked })} />LN+</label>
@@ -304,24 +312,20 @@ function ZoneDetail({ zone, data, onUpdate, onClear, onClose }: {
           )}
         </div>
         {/* Biopsy */}
-        <div className="space-y-3 rounded-lg border border-amber-500/25 bg-amber-500/5 p-4">
+        <div className="space-y-2.5 rounded-lg border border-amber-500/25 bg-amber-500/5 p-3">
           <div className="flex items-center gap-2">
             <span className="inline-flex h-5 w-5 items-center justify-center rounded bg-amber-600 text-[9px] font-bold text-white">B</span>
             <span className="text-xs font-bold uppercase tracking-wider text-amber-500">Biopsy</span>
           </div>
           <ChipSelector label="Grade Grp" value={data.gg} options={GG_OPTS} onChange={(v) => onUpdate({ gg: v })} />
           {hasBx && (<>
-            <div className="flex items-center gap-2.5">
-              <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Core %</span>
-              <Input type="number" step="1" min={0} max={100} placeholder="0–100" className="h-8 w-20 px-2 text-sm" value={data.corePct ?? ""} onChange={(e) => { const v = parseFloat(e.target.value); onUpdate({ corePct: isNaN(v) ? undefined : v }); }} />
-              <span className="text-xs text-muted-foreground">%</span>
-            </div>
-            <div className="flex items-center gap-2.5">
-              <span className="w-20 shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Linear</span>
-              <Input type="number" step="0.5" min={0} placeholder="mm" className="h-8 w-20 px-2 text-sm" value={data.linearMm ?? ""} onChange={(e) => { const v = parseFloat(e.target.value); onUpdate({ linearMm: isNaN(v) ? undefined : v }); }} />
-              <span className="text-xs text-muted-foreground">mm</span>
-            </div>
-            <div className="flex items-center gap-3 pl-[5.5rem]">
+            <FieldRow label="Core %" unit="%">
+              <Input type="number" step="1" min={0} max={100} placeholder="0–100" className="h-8 w-full px-2 text-sm" value={data.corePct ?? ""} onChange={(e) => { const v = parseFloat(e.target.value); onUpdate({ corePct: isNaN(v) ? undefined : v }); }} />
+            </FieldRow>
+            <FieldRow label="Linear" unit="mm">
+              <Input type="number" step="0.5" min={0} placeholder="mm" className="h-8 w-full px-2 text-sm" value={data.linearMm ?? ""} onChange={(e) => { const v = parseFloat(e.target.value); onUpdate({ linearMm: isNaN(v) ? undefined : v }); }} />
+            </FieldRow>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary" checked={data.cribriform ?? false} onChange={(e) => onUpdate({ cribriform: e.target.checked })} />Cribriform</label>
               <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary" checked={data.idc ?? false} onChange={(e) => onUpdate({ idc: e.target.checked })} />IDC</label>
               <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"><input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary" checked={data.pni ?? false} onChange={(e) => onUpdate({ pni: e.target.checked })} />PNI</label>
@@ -531,9 +535,10 @@ export function ZoneInputWizard() {
 
       {/* ── Tab 2: Zone Locations ── */}
       {activeTab === 2 && (
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
           {/* Zone grids */}
-          <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:p-4">
             {/* Legend */}
             <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-muted-foreground/80">
               <span className="font-semibold text-muted-foreground">Click zone → enter findings · 3D updates live</span>
@@ -544,22 +549,22 @@ export function ZoneInputWizard() {
             </div>
 
             {/* Posterior grid */}
-            <div className="shrink-0 rounded-xl border border-border bg-muted/10 p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Posterior Zones</h4>
-                <span className="text-xs text-muted-foreground/50">Surgical view — patient R on right</span>
+            <div className="shrink-0 rounded-lg border border-border bg-muted/10 p-3">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground sm:tracking-widest">Posterior Zones</h4>
+                <span className="text-[10px] text-muted-foreground/50">Surgical view · R on right</span>
               </div>
-              <div className="mb-2 grid gap-2" style={{ gridTemplateColumns: "3.5rem repeat(4, 1fr)" }}>
+              <div className="mb-1.5 grid gap-1.5" style={{ gridTemplateColumns: "2.5rem repeat(4, minmax(0, 1fr))" }}>
                 <div />
                 {["R Lat", "R Med", "L Med", "L Lat"].map((h) => (
-                  <div key={h} className="text-center text-xs font-bold text-foreground/70">{h}</div>
+                  <div key={h} className="text-center text-[10px] font-bold text-foreground/70 sm:text-xs">{h}</div>
                 ))}
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {postRows.map((row) => (
-                  <div key={row.level} className="grid items-stretch gap-2" style={{ gridTemplateColumns: "3.5rem repeat(4, 1fr)" }}>
-                    <div className="flex items-center justify-end pr-1.5">
-                      <span className="text-xs font-bold text-foreground/60">{row.level}</span>
+                  <div key={row.level} className="grid items-stretch gap-1.5" style={{ gridTemplateColumns: "2.5rem repeat(4, minmax(0, 1fr))" }}>
+                    <div className="flex items-center justify-end pr-1">
+                      <span className="text-[10px] font-bold text-foreground/60 sm:text-xs">{row.level}</span>
                     </div>
                     {row.cells.map((cell) => {
                       const z = ALL_ZONES.find((zd) => zd.id === cell.id)!;
@@ -571,21 +576,21 @@ export function ZoneInputWizard() {
             </div>
 
             {/* Anterior grid */}
-            <div className="shrink-0 rounded-xl border border-border bg-muted/10 p-4">
-              <h4 className="mb-3 text-sm font-bold uppercase tracking-widest text-muted-foreground">Anterior Zones</h4>
-              <div className="mb-2 grid gap-2" style={{ gridTemplateColumns: "3.5rem 1fr 1fr" }}>
+            <div className="shrink-0 rounded-lg border border-border bg-muted/10 p-3">
+              <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground sm:tracking-widest">Anterior Zones</h4>
+              <div className="mb-1.5 grid gap-1.5" style={{ gridTemplateColumns: "2.5rem minmax(0, 1fr) minmax(0, 1fr)" }}>
                 <div />
-                <div className="text-center text-xs font-bold text-foreground/70">R</div>
-                <div className="text-center text-xs font-bold text-foreground/70">L</div>
+                <div className="text-center text-[10px] font-bold text-foreground/70 sm:text-xs">R</div>
+                <div className="text-center text-[10px] font-bold text-foreground/70 sm:text-xs">L</div>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {(["Base", "Mid", "Apex"] as const).map((level) => {
                   const rId = ANT_ZONES.find((z) => z.side === "R" && z.level === level)!.id;
                   const lId = ANT_ZONES.find((z) => z.side === "L" && z.level === level)!.id;
                   return (
-                    <div key={level} className="grid items-stretch gap-2" style={{ gridTemplateColumns: "3.5rem 1fr 1fr" }}>
-                      <div className="flex items-center justify-end pr-1.5">
-                        <span className="text-xs font-bold text-foreground/60">{level.toUpperCase()}</span>
+                    <div key={level} className="grid items-stretch gap-1.5" style={{ gridTemplateColumns: "2.5rem minmax(0, 1fr) minmax(0, 1fr)" }}>
+                      <div className="flex items-center justify-end pr-1">
+                        <span className="text-[10px] font-bold text-foreground/60 sm:text-xs">{level.toUpperCase()}</span>
                       </div>
                       <ZoneCell zone={ANT_ZONES.find((z) => z.id === rId)!} data={zoneData[rId]} cancer={getCancer(rId)} selected={selectedZone === rId} onClick={() => toggle(rId)} />
                       <ZoneCell zone={ANT_ZONES.find((z) => z.id === lId)!} data={zoneData[lId]} cancer={getCancer(lId)} selected={selectedZone === lId} onClick={() => toggle(lId)} />
@@ -596,9 +601,9 @@ export function ZoneInputWizard() {
             </div>
           </div>
 
-          {/* Zone detail — right panel when zone selected */}
+          {/* Zone detail — side panel on lg+, stacks below grids on narrower */}
           {selDef && (
-            <div className="w-[540px] shrink-0 overflow-y-auto border-l border-border p-5">
+            <div className="overflow-y-auto border-t border-border p-3 sm:p-4 lg:w-[400px] lg:max-w-[45%] lg:shrink-0 lg:border-l lg:border-t-0 xl:w-[460px] 2xl:w-[540px]">
               <ZoneDetail
                 zone={selDef}
                 data={zoneData[selDef.id] ?? {}}
@@ -608,16 +613,17 @@ export function ZoneInputWizard() {
               />
             </div>
           )}
+        </div>
 
-          {/* Apply zone aggregates — fixed footer on tab 2 */}
-          <div className="absolute bottom-0 left-0 right-0 flex items-center justify-end gap-3 border-t border-border bg-card/95 px-5 py-3 backdrop-blur">
-            <p className="hidden text-xs text-muted-foreground/70 sm:block">
-              Zone edits update predictions live. Apply commits aggregate flags & saves an undo point.
-            </p>
-            <Button type="button" size="lg" onClick={applyZoneAggregates}>
-              Apply &amp; Save Checkpoint
-            </Button>
-          </div>
+        {/* Apply zone aggregates — flex-col footer (sized in the column flow) */}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-border bg-card/95 px-4 py-2.5 backdrop-blur sm:px-5 sm:py-3">
+          <p className="hidden text-xs text-muted-foreground/70 md:block">
+            Zone edits update predictions live. Apply commits aggregate flags & saves an undo point.
+          </p>
+          <Button type="button" size="default" onClick={applyZoneAggregates}>
+            Apply &amp; Save Checkpoint
+          </Button>
+        </div>
         </div>
       )}
 

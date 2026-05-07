@@ -24,16 +24,16 @@ function SegPicker<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="space-y-2">
-      <div className="text-sm font-semibold text-foreground">{label}</div>
-      <div className="flex overflow-hidden rounded-lg border border-border divide-x divide-border">
+    <div className="space-y-1.5">
+      <div className="text-xs font-semibold text-foreground">{label}</div>
+      <div className="flex overflow-hidden rounded-md border border-border divide-x divide-border">
         {options.map((opt) => (
           <button
             key={opt.value}
             type="button"
             onClick={() => onChange(opt.value)}
             className={cn(
-              "flex-1 px-2 py-2.5 text-sm font-medium transition-colors",
+              "flex-1 px-2 py-1.5 text-xs font-medium transition-colors",
               value === opt.value
                 ? "bg-primary text-primary-foreground"
                 : "bg-card text-muted-foreground hover:bg-muted/60",
@@ -111,22 +111,22 @@ export function ModifiableFactorsPanel() {
 
   return (
     <Card className="border-border/70">
-      <CardHeader className="border-b border-border/50 bg-gradient-to-br from-muted/40 to-transparent pb-4 dark:from-muted/25">
-        <CardTitle className="text-xl font-semibold text-foreground">
+      <CardHeader className="border-b border-border/50 bg-gradient-to-br from-muted/40 to-transparent px-4 py-3 dark:from-muted/25">
+        <CardTitle className="text-base font-semibold text-foreground">
           Modifiable Factors
         </CardTitle>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[11px] text-muted-foreground">
           Lifestyle and medical inputs that drive functional-outcome predictions
         </p>
       </CardHeader>
-      <CardContent className="space-y-6 pt-5">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Body & Lifestyle</h3>
+      <CardContent className="space-y-3 px-4 py-3">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Body & Lifestyle</h3>
 
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-foreground" htmlFor="mf-bmi">
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-foreground" htmlFor="mf-bmi">
             BMI <span className="font-normal text-muted-foreground">(kg/m²)</span>
           </label>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Input
               id="mf-bmi"
               type="number"
@@ -137,12 +137,12 @@ export function ModifiableFactorsPanel() {
               placeholder="27.0"
               value={bmi}
               onChange={(e) => handleBmi(e.target.value)}
-              className="h-11 w-36 text-base"
+              className="h-8 w-28 text-sm"
             />
             {bmiCat && (
               <span
                 className={cn(
-                  "rounded-full px-3 py-1 text-sm font-semibold",
+                  "rounded-full px-2 py-0.5 text-xs font-semibold",
                   bmiNum < 18.5
                     ? "bg-blue-500/10 text-blue-500"
                     : bmiNum < 25
@@ -191,67 +191,62 @@ export function ModifiableFactorsPanel() {
           onChange={handleSmoking}
         />
 
-        <div className="border-t border-border/60 pt-5">
-          <h3 className="mb-5 text-sm font-bold uppercase tracking-wider text-muted-foreground">Medical Factors</h3>
+        <div className="space-y-3 border-t border-border/60 pt-3">
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Medical Factors</h3>
 
-          <div className="space-y-6">
-            <SegPicker<Pde5Regimen>
-              label="PDE5 Inhibitor Plan"
-              options={[
-                { label: "None", value: "none" },
-                { label: "PRN", value: "prn" },
-                { label: "Daily", value: "daily" },
-              ]}
-              value={pde5}
-              onChange={handlePde5}
-            />
-            <SegPicker<AlcoholLevel>
-              label="Alcohol Usage"
-              options={[
-                { label: "None", value: "none" },
-                { label: "Moderate", value: "moderate" },
-                { label: "Heavy", value: "heavy" },
-              ]}
-              value={alcohol}
-              onChange={handleAlcohol}
-            />
+          <SegPicker<Pde5Regimen>
+            label="PDE5 Inhibitor Plan"
+            options={[
+              { label: "None", value: "none" },
+              { label: "PRN", value: "prn" },
+              { label: "Daily", value: "daily" },
+            ]}
+            value={pde5}
+            onChange={handlePde5}
+          />
+          <SegPicker<AlcoholLevel>
+            label="Alcohol Usage"
+            options={[
+              { label: "None", value: "none" },
+              { label: "Moderate", value: "moderate" },
+              { label: "Heavy", value: "heavy" },
+            ]}
+            value={alcohol}
+            onChange={handleAlcohol}
+          />
 
-            <div className="space-y-2.5">
-              <div className="text-sm font-semibold text-foreground">Comorbidities</div>
-              <div className="flex gap-3">
-                {(
-                  [
-                    ["Diabetes", dm, handleDm],
-                    ["HTN", htn, handleHtn],
-                    ["CAD", cad, handleCad],
-                  ] as [string, boolean, (v: boolean) => void][]
-                ).map(([label, val, setter]) => (
-                  <button
-                    key={label}
-                    type="button"
-                    onClick={() => setter(!val)}
-                    className={cn(
-                      "flex-1 rounded-lg border-2 px-3 py-3 text-sm font-bold transition-all",
-                      val
-                        ? "border-red-500 bg-red-500/10 text-red-400"
-                        : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:bg-muted/60",
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+          <div className="space-y-1.5">
+            <div className="text-xs font-semibold text-foreground">Comorbidities</div>
+            <div className="flex gap-2">
+              {(
+                [
+                  ["Diabetes", dm, handleDm],
+                  ["HTN", htn, handleHtn],
+                  ["CAD", cad, handleCad],
+                ] as [string, boolean, (v: boolean) => void][]
+              ).map(([label, val, setter]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setter(!val)}
+                  className={cn(
+                    "flex-1 rounded-md border px-2 py-1.5 text-xs font-bold transition-all",
+                    val
+                      ? "border-red-500 bg-red-500/10 text-red-400"
+                      : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:bg-muted/60",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
         </div>
 
-        <div className="space-y-2 pt-2">
-          <Button type="button" size="lg" onClick={() => pushHistory()} className="w-full">
+        <div className="border-t border-border/60 pt-3">
+          <Button type="button" size="sm" onClick={() => pushHistory()} className="w-full">
             Save Checkpoint
           </Button>
-          <p className="text-xs text-muted-foreground/70">
-            Inputs update predictions live. Save Checkpoint records an undo point.
-          </p>
         </div>
       </CardContent>
     </Card>

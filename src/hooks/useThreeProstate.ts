@@ -34,6 +34,7 @@ export function useThreeProstate(
     const h = createProstateScene(el, zones, overlay, dims, medianLobeGrade);
     handlesRef.current = h;
     h.model.scale.setScalar(0.85 * volumeScale);
+    h.setBackground(useUiStore.getState().dark ? 0x1e1e24 : 0xf5f5f7);
     el.style.touchAction = "none";
 
     const applyOrbitDelta = (dx: number, dy: number) => {
@@ -216,4 +217,12 @@ export function useThreeProstate(
     if (!h) return;
     h.updateZones(zones, overlay, { heatmapVisible, lesionsOnly });
   }, [zones, overlay, heatmapVisible, lesionsOnly]);
+
+  // Sync 3D scene background with the dark/light theme.
+  const dark = useUiStore((s) => s.dark);
+  useEffect(() => {
+    const h = handlesRef.current;
+    if (!h) return;
+    h.setBackground(dark ? 0x1e1e24 : 0xf5f5f7);
+  }, [dark]);
 }

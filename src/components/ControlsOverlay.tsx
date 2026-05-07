@@ -119,7 +119,7 @@ export function ControlsOverlay() {
           "max-lg:left-2 max-lg:bottom-[calc(0.75rem+4rem+env(safe-area-inset-bottom,0px))]",
         )}
       >
-        <div className="glass flex flex-wrap items-center justify-end gap-0.5 rounded-lg p-1" style={{ maxWidth: "53vw" }}>
+        <div className="glass flex max-w-[calc(100%-1rem)] flex-wrap items-center justify-end gap-0.5 rounded-lg p-1">
           {OVERLAYS.map((o) => {
             const active = overlay === o.id;
             return (
