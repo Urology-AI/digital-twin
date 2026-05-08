@@ -3,55 +3,26 @@ import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/store/uiStore";
 
 /**
- * Mount Sinai brand mark (placeholder approximation of the official logo).
- * Layout: triangle mark on the left + "Mount" / "Sinai" serif wordmark stacked on the right.
- * The wordmark uses `currentColor` so it picks up the theme's foreground color (navy in
- * light mode, white in dark mode) — matches the official light/dark logo variants.
- * Triangles use brand colors directly so they stay vivid in both themes.
+ * Mount Sinai brand mark — uses the official asset files in /public.
+ * Both variants are rendered; CSS visibility (`block` / `hidden` paired with
+ * `dark:hidden` / `dark:block`) selects the correct one for the active theme.
  */
 function MountSinaiMark({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
-    <svg
-      viewBox="0 0 520 200"
-      className={className}
-      style={style}
-      role="img"
-      aria-label="Mount Sinai"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      {/* Triangle mark — three overlapping peaks with brand stripes */}
-      {/* Outer cyan peak */}
-      <polygon points="100,20 200,180 0,180" fill="#00AEEF" />
-      {/* Inner magenta peak (offset right) */}
-      <polygon points="140,20 240,180 40,180" fill="#D5005B" opacity="0.95" />
-      {/* Navy overlap accent at the apex */}
-      <polygon points="100,20 140,20 145,40 105,40" fill="#221F72" />
-      <polygon points="120,80 160,80 200,180 80,180" fill="#221F72" opacity="0.85" />
-
-      {/* Wordmark — stacked, serif, theme-aware via currentColor */}
-      <text
-        x="270"
-        y="92"
-        fontFamily="'Times New Roman', Georgia, serif"
-        fontSize="78"
-        fontWeight="700"
-        letterSpacing="-1"
-        fill="currentColor"
-      >
-        Mount
-      </text>
-      <text
-        x="270"
-        y="172"
-        fontFamily="'Times New Roman', Georgia, serif"
-        fontSize="78"
-        fontWeight="700"
-        letterSpacing="-1"
-        fill="currentColor"
-      >
-        Sinai
-      </text>
-    </svg>
+    <>
+      <img
+        src="/logo_light.png"
+        alt="Mount Sinai"
+        className={`block dark:hidden ${className ?? ""}`}
+        style={style}
+      />
+      <img
+        src="/logo_dark.png"
+        alt="Mount Sinai"
+        className={`hidden dark:block ${className ?? ""}`}
+        style={style}
+      />
+    </>
   );
 }
 
