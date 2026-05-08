@@ -197,8 +197,9 @@ export function PredictionPanel() {
           </div>
         </CardHeader>
         <CardContent className="pt-4">
-          {/* 6 prediction value cards */}
-          <div className="mb-4 grid grid-cols-3 gap-2 sm:gap-3">
+          {/* 6 prediction value cards — extra top margin so floating overlays
+              (e.g. CSPCA-by-zone popout from the 3D canvas) don't overlap. */}
+          <div className="mb-4 mt-4 grid grid-cols-3 gap-2 sm:gap-3">
             {preds.map((p) => {
               const ci = computeCI(p.v);
               return (
