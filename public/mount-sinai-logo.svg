@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PLACEHOLDER — approximation of the Mount Sinai brand mark.
+  Replace this file with the official Mount Sinai logo asset
+  (e.g. mount-sinai-logo.png from the brand toolkit) when available.
+  Brand colors: cyan #00AEEF, magenta #D5005B, navy #221F72.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" role="img" aria-label="Mount Sinai (placeholder)">
+  <defs>
+    <!-- Cyan striped fill (left triangle) -->
+    <pattern id="msCyanStripe" width="11" height="11" patternUnits="userSpaceOnUse" patternTransform="rotate(60)">
+      <rect width="11" height="11" fill="#FFFFFF"/>
+      <rect width="6" height="11" fill="#00AEEF"/>
+    </pattern>
+    <!-- Magenta striped fill (right triangle) -->
+    <pattern id="msMagentaStripe" width="11" height="11" patternUnits="userSpaceOnUse" patternTransform="rotate(-60)">
+      <rect width="11" height="11" fill="#FFFFFF"/>
+      <rect width="6" height="11" fill="#D5005B"/>
+    </pattern>
+    <!-- Navy striped fill (overlap zone where the two triangles cross) -->
+    <pattern id="msNavyStripe" width="11" height="11" patternUnits="userSpaceOnUse" patternTransform="rotate(-60)">
+      <rect width="11" height="11" fill="#FFFFFF"/>
+      <rect width="6" height="11" fill="#221F72"/>
+    </pattern>
+    <!-- Clip the navy fill to the intersection of the two triangles -->
+    <clipPath id="msRightTri">
+      <polygon points="220,10 320,180 120,180"/>
+    </clipPath>
+  </defs>
+  <g>
+    <!-- Left triangle (cyan stripes) -->
+    <polygon points="120,10 220,180 20,180" fill="url(#msCyanStripe)"/>
+    <!-- Right triangle (magenta stripes) -->
+    <polygon points="220,10 320,180 120,180" fill="url(#msMagentaStripe)"/>
+    <!-- Navy overlap zone — left triangle clipped to the right triangle's bounds -->
+    <g clipPath="url(#msRightTri)">
+      <polygon points="120,10 220,180 20,180" fill="url(#msNavyStripe)"/>
+    </g>
+  </g>
+  <text x="200" y="232" text-anchor="middle"
+        font-family="'Times New Roman', Georgia, serif"
+        font-size="38" font-weight="700" fill="currentColor">Mount Sinai</text>
+</svg>

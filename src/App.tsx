@@ -123,14 +123,14 @@ export default function App() {
         {/* ── ThreeCanvas background (always mounted, z-0) ──────────────── */}
         {/*
           Default: full-screen (covered by panels on input/outcomes tabs).
-          Predictions tab: half-width on desktop, top half on mobile.
+          Predictions tab: occupies the right half on desktop, bottom half on mobile.
         */}
         <div
           className={cn(
             "absolute z-0 bg-muted/20",
             "inset-0",
-            onPredictions && "lg:right-1/2",
-            onPredictions && "max-lg:bottom-1/2",
+            onPredictions && "lg:left-1/2",
+            onPredictions && "max-lg:top-1/2",
           )}
         >
           <div className="absolute inset-0 min-h-0 min-w-0">
@@ -154,14 +154,14 @@ export default function App() {
           <ZoneInputWizard />
         </div>
 
-        {/* ── Predictions tab: 3D (left/top) | PredictionPanel (right/bottom) */}
+        {/* ── Predictions tab: PredictionPanel (left/top) | 3D (right/bottom) */}
         <div
           className={cn(
             "absolute z-10 overflow-y-auto overflow-x-hidden overscroll-contain bg-background app-scroll px-5 py-5",
             onPredictions ? "block" : "hidden",
-            // Desktop: right half. Mobile: bottom half.
-            "lg:left-1/2 lg:right-0 lg:top-0 lg:bottom-0",
-            "max-lg:top-1/2 max-lg:bottom-0 max-lg:left-0 max-lg:right-0",
+            // Desktop: left half. Mobile: top half.
+            "lg:left-0 lg:right-1/2 lg:top-0 lg:bottom-0",
+            "max-lg:top-0 max-lg:bottom-1/2 max-lg:left-0 max-lg:right-0",
           )}
         >
           <PredictionPanel />

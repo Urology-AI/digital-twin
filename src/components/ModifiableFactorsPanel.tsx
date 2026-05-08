@@ -56,6 +56,8 @@ export function ModifiableFactorsPanel() {
   const entry = patients.find((p) => p.id === activeId);
 
   const [bmi, setBmi] = useState("");
+  const [shim, setShim] = useState("");
+  const [ipss, setIpss] = useState("");
   const [pfmt, setPfmt] = useState<PfmtLevel>("basic");
   const [exercise, setExercise] = useState<ExerciseLevel>("moderate");
   const [smoking, setSmoking] = useState<SmokingStatus>("never");
@@ -65,10 +67,15 @@ export function ModifiableFactorsPanel() {
   const [htn, setHtn] = useState(false);
   const [cad, setCad] = useState(false);
 
+  // Sync local state from the record whenever the active patient changes OR
+  // when the BMI/SHIM/IPSS values change externally (e.g. computed from the
+  // height+weight helper in the Input wizard).
   useEffect(() => {
     if (!entry) return;
     const rec = entry.record;
     setBmi(rec.patient.bmi != null && rec.patient.bmi > 0 ? String(rec.patient.bmi) : "");
+    setShim(rec.patient.shim != null ? String(rec.patient.shim) : "");
+    setIpss(rec.patient.ipss != null ? String(rec.patient.ipss) : "");
     setSmoking((rec.patient.smoking as SmokingStatus | undefined) ?? "never");
     setExercise((rec.patient.exercise as ExerciseLevel | undefined) ?? "moderate");
     setPfmt((rec.patient.pfmt as PfmtLevel | undefined) ?? "basic");
@@ -79,12 +86,22 @@ export function ModifiableFactorsPanel() {
     setDm(rec.patient.dm ?? false);
     setHtn(rec.patient.htn ?? false);
     setCad(rec.patient.cad ?? false);
-  }, [entry?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entry?.id, entry?.record.patient.bmi, entry?.record.patient.shim, entry?.record.patient.ipss]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleBmi = (v: string) => {
     setBmi(v);
     const n = parseFloat(v);
     updateClinicalForm({ bmi: n > 0 && !isNaN(n) ? n : undefined });
+  };
+  const handleShim = (v: string) => {
+    setShim(v);
+    const n = parseInt(v);
+    updateClinicalForm({ shim: !isNaN(n) ? n : undefined });
+  };
+  const handleIpss = (v: string) => {
+    setIpss(v);
+    const n = parseInt(v);
+    updateClinicalForm({ ipss: !isNaN(n) ? n : undefined });
   };
   const handlePfmt = (v: PfmtLevel) => { setPfmt(v); updateClinicalForm({ pfmt: v }); };
   const handleExercise = (v: ExerciseLevel) => { setExercise(v); updateClinicalForm({ exercise: v }); };
@@ -122,39 +139,75 @@ export function ModifiableFactorsPanel() {
       <CardContent className="space-y-3 px-4 py-3">
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Body & Lifestyle</h3>
 
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-foreground" htmlFor="mf-bmi">
-            BMI <span className="font-normal text-muted-foreground">(kg/m²)</span>
-          </label>
-          <div className="flex items-center gap-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground" htmlFor="mf-bmi">
+              BMI <span className="font-normal text-muted-foreground">(kg/m²)</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="mf-bmi"
+                type="number"
+                step="0.5"
+                min={10}
+                max={60}
+                inputMode="decimal"
+                placeholder="27.0"
+                value={bmi}
+                onChange={(e) => handleBmi(e.target.value)}
+                className="h-8 w-20 text-sm"
+              />
+              {bmiCat && (
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                    bmiNum < 18.5
+                      ? "bg-blue-500/10 text-blue-500"
+                      : bmiNum < 25
+                        ? "bg-emerald-500/10 text-emerald-400"
+                        : bmiNum < 30
+                          ? "bg-amber-500/10 text-amber-400"
+                          : "bg-red-500/10 text-red-500",
+                  )}
+                >
+                  {bmiCat}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground" htmlFor="mf-shim">
+              SHIM <span className="font-normal text-muted-foreground">(0–25)</span>
+            </label>
             <Input
-              id="mf-bmi"
+              id="mf-shim"
               type="number"
-              step="0.5"
-              min={10}
-              max={60}
-              inputMode="decimal"
-              placeholder="27.0"
-              value={bmi}
-              onChange={(e) => handleBmi(e.target.value)}
-              className="h-8 w-28 text-sm"
+              min={0}
+              max={25}
+              inputMode="numeric"
+              placeholder="21"
+              value={shim}
+              onChange={(e) => handleShim(e.target.value)}
+              className="h-8 w-20 text-sm"
             />
-            {bmiCat && (
-              <span
-                className={cn(
-                  "rounded-full px-2 py-0.5 text-xs font-semibold",
-                  bmiNum < 18.5
-                    ? "bg-blue-500/10 text-blue-500"
-                    : bmiNum < 25
-                      ? "bg-emerald-500/10 text-emerald-400"
-                      : bmiNum < 30
-                        ? "bg-amber-500/10 text-amber-400"
-                        : "bg-red-500/10 text-red-500",
-                )}
-              >
-                {bmiCat}
-              </span>
-            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-foreground" htmlFor="mf-ipss">
+              IPSS <span className="font-normal text-muted-foreground">(0–35)</span>
+            </label>
+            <Input
+              id="mf-ipss"
+              type="number"
+              min={0}
+              max={35}
+              inputMode="numeric"
+              placeholder="8"
+              value={ipss}
+              onChange={(e) => handleIpss(e.target.value)}
+              className="h-8 w-20 text-sm"
+            />
           </div>
         </div>
 

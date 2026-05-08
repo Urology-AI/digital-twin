@@ -1,44 +1,63 @@
-import { Activity, ArrowRight, Layers } from "lucide-react";
+import { Activity, ArrowRight, Layers, Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/store/uiStore";
 
-/** Stylized prostate (bilobed walnut shape with median sulcus) — used as the brand mark. */
-function ProstateIcon({ className }: { className?: string }) {
+/**
+ * Mount Sinai brand mark (placeholder approximation of the official logo).
+ * Layout: triangle mark on the left + "Mount" / "Sinai" serif wordmark stacked on the right.
+ * The wordmark uses `currentColor` so it picks up the theme's foreground color (navy in
+ * light mode, white in dark mode) — matches the official light/dark logo variants.
+ * Triangles use brand colors directly so they stay vivid in both themes.
+ */
+function MountSinaiMark({ className, style }: { className?: string; style?: React.CSSProperties }) {
   return (
     <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 520 200"
       className={className}
-      aria-hidden
+      style={style}
+      role="img"
+      aria-label="Mount Sinai"
+      xmlns="http://www.w3.org/2000/svg"
     >
-      <path
-        d="M12 4.2c-1.4-.9-3.6-.9-5.4.2-2.3 1.4-3.6 3.9-3.6 6.5 0 2.6 1.1 5.1 3.1 6.9 1.6 1.5 3.7 2.4 5.9 2.4s4.3-.9 5.9-2.4c2-1.8 3.1-4.3 3.1-6.9 0-2.6-1.3-5.1-3.6-6.5-1.8-1.1-4-1.1-5.4-.2z"
+      {/* Triangle mark — three overlapping peaks with brand stripes */}
+      {/* Outer cyan peak */}
+      <polygon points="100,20 200,180 0,180" fill="#00AEEF" />
+      {/* Inner magenta peak (offset right) */}
+      <polygon points="140,20 240,180 40,180" fill="#D5005B" opacity="0.95" />
+      {/* Navy overlap accent at the apex */}
+      <polygon points="100,20 140,20 145,40 105,40" fill="#221F72" />
+      <polygon points="120,80 160,80 200,180 80,180" fill="#221F72" opacity="0.85" />
+
+      {/* Wordmark — stacked, serif, theme-aware via currentColor */}
+      <text
+        x="270"
+        y="92"
+        fontFamily="'Times New Roman', Georgia, serif"
+        fontSize="78"
+        fontWeight="700"
+        letterSpacing="-1"
         fill="currentColor"
-        fillOpacity="0.92"
-      />
-      <path
-        d="M12 5.5v14"
-        stroke="currentColor"
-        strokeOpacity="0.35"
-        strokeWidth="1.1"
-        strokeLinecap="round"
-      />
-      <path
-        d="M9.5 17.5c.8.6 1.7.9 2.5.9s1.7-.3 2.5-.9"
-        stroke="currentColor"
-        strokeOpacity="0.35"
-        strokeWidth="1"
-        strokeLinecap="round"
-        fill="none"
-      />
+      >
+        Mount
+      </text>
+      <text
+        x="270"
+        y="172"
+        fontFamily="'Times New Roman', Georgia, serif"
+        fontSize="78"
+        fontWeight="700"
+        letterSpacing="-1"
+        fill="currentColor"
+      >
+        Sinai
+      </text>
     </svg>
   );
 }
 
 const FEATURES = [
   {
-    Icon: ProstateIcon,
+    Icon: Stethoscope,
     title: "3D Anatomical Viewer",
     body: "Patient-specific prostate built from measured dimensions, with lesion-aware zone-level risk overlays.",
   },
@@ -64,10 +83,10 @@ export function WelcomeScreen() {
       aria-modal="true"
       aria-labelledby="welcome-title"
     >
-      {/* Decorative background gradient */}
+      {/* Decorative background gradient — Mount Sinai cyan/magenta accents */}
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-transparent to-transparent dark:from-primary/15"
+        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(0,174,239,0.12),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgba(213,0,91,0.10),transparent_55%)]"
       />
 
       {/*
@@ -78,23 +97,18 @@ export function WelcomeScreen() {
       */}
       <div className="relative flex min-h-full w-full items-center justify-center px-[clamp(0.75rem,3vw,2rem)] py-[clamp(1rem,4vh,3rem)]">
         <div className="z-10 mx-auto flex w-full max-w-3xl flex-col items-center">
-          {/* Brand mark */}
-          <div className="mb-[clamp(0.75rem,2vh,1.25rem)] flex flex-col items-center gap-2">
-            <div
-              className="relative flex items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/60 shadow-md shadow-primary/25 ring-1 ring-primary/40"
-              style={{ width: "clamp(2.5rem, 7vh, 3.25rem)", height: "clamp(2.5rem, 7vh, 3.25rem)" }}
-            >
-              <ProstateIcon className="h-[60%] w-[60%] text-primary-foreground" />
-              <span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 ring-2 ring-background">
-                <Activity className="h-2.5 w-2.5 text-white" aria-hidden />
-              </span>
-            </div>
+          {/* Mount Sinai logo */}
+          <div className="mb-[clamp(1rem,2.5vh,1.5rem)] flex flex-col items-center gap-3">
+            <MountSinaiMark
+              className="h-auto w-auto text-foreground"
+              style={{ height: "clamp(3rem, 9vh, 4.75rem)" }}
+            />
             <div className="flex flex-wrap items-center justify-center gap-1.5">
-              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[clamp(0.5rem,1.2vw,0.625rem)] font-bold uppercase tracking-wider text-amber-500">
+              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[clamp(0.5625rem,1.2vw,0.6875rem)] font-bold uppercase tracking-wider text-amber-500">
                 Research Use Only
               </span>
-              <span className="text-[clamp(0.5rem,1.2vw,0.625rem)] text-muted-foreground/70">
-                IRB STUDY-14-00050 · Mount Sinai
+              <span className="text-[clamp(0.5625rem,1.2vw,0.6875rem)] text-muted-foreground/70">
+                IRB STUDY-14-00050
               </span>
             </div>
           </div>
@@ -103,19 +117,25 @@ export function WelcomeScreen() {
           <h1
             id="welcome-title"
             className="text-center font-black tracking-tight text-foreground"
-            style={{ fontSize: "clamp(2rem, 6vw, 3.25rem)", lineHeight: 1.05 }}
+            style={{ fontSize: "clamp(2.75rem, 7.5vw, 4.25rem)", lineHeight: 1.02, letterSpacing: "-0.02em" }}
           >
             COMPASS
           </h1>
           <p
-            className="mt-1.5 text-center font-medium uppercase tracking-[0.2em] text-primary"
-            style={{ fontSize: "clamp(0.625rem, 1.4vw, 0.875rem)" }}
+            className="mt-2 text-center font-semibold uppercase tracking-[0.22em] text-primary"
+            style={{ fontSize: "clamp(0.75rem, 1.6vw, 1rem)" }}
           >
             Prostate cancer · Surgical outcomes
           </p>
           <p
-            className="mt-3 max-w-2xl text-center leading-relaxed text-muted-foreground"
-            style={{ fontSize: "clamp(0.75rem, 1.6vw, 1rem)" }}
+            className="mt-2 text-center font-medium text-foreground/80"
+            style={{ fontSize: "clamp(0.8125rem, 1.5vw, 0.9375rem)", letterSpacing: "0.01em" }}
+          >
+            Tewari Lab — Mount Sinai Department of Urology
+          </p>
+          <p
+            className="mt-4 max-w-2xl text-center leading-relaxed text-muted-foreground"
+            style={{ fontSize: "clamp(0.875rem, 1.7vw, 1.0625rem)" }}
           >
             A 3D decision-support platform for preoperative planning in robot-assisted radical
             prostatectomy. Combines clinical data with imaging and genomics to deliver
@@ -123,27 +143,27 @@ export function WelcomeScreen() {
           </p>
 
           {/* Feature highlights */}
-          <div className="mt-[clamp(1rem,3vh,1.75rem)] grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="mt-[clamp(1.25rem,3.5vh,2rem)] grid w-full grid-cols-1 gap-3.5 sm:grid-cols-3">
             {FEATURES.map(({ Icon, title, body }) => (
               <div
                 key={title}
-                className="rounded-lg border border-border/70 bg-card/80 p-[clamp(0.625rem,1.5vw,0.875rem)] shadow-sm backdrop-blur"
+                className="rounded-lg border border-border/70 bg-card/80 p-[clamp(0.875rem,1.75vw,1.125rem)] shadow-sm backdrop-blur"
               >
                 <div
-                  className="mb-2 inline-flex items-center justify-center rounded-md bg-primary/10 text-primary"
-                  style={{ width: "clamp(1.75rem, 3vw, 2rem)", height: "clamp(1.75rem, 3vw, 2rem)" }}
+                  className="mb-2.5 inline-flex items-center justify-center rounded-md bg-primary/10 text-primary"
+                  style={{ width: "clamp(2rem, 3.25vw, 2.25rem)", height: "clamp(2rem, 3.25vw, 2.25rem)" }}
                 >
                   <Icon className="h-[55%] w-[55%]" />
                 </div>
                 <h2
                   className="font-bold text-foreground"
-                  style={{ fontSize: "clamp(0.75rem, 1.4vw, 0.8125rem)" }}
+                  style={{ fontSize: "clamp(0.875rem, 1.5vw, 0.9375rem)", letterSpacing: "-0.005em" }}
                 >
                   {title}
                 </h2>
                 <p
                   className="mt-1 leading-snug text-muted-foreground"
-                  style={{ fontSize: "clamp(0.625rem, 1.2vw, 0.6875rem)" }}
+                  style={{ fontSize: "clamp(0.75rem, 1.3vw, 0.8125rem)" }}
                 >
                   {body}
                 </p>
@@ -156,12 +176,12 @@ export function WelcomeScreen() {
             type="button"
             size="lg"
             onClick={dismissWelcome}
-            className="mt-[clamp(1rem,3vh,1.5rem)] gap-2 font-semibold shadow-md shadow-primary/20"
+            className="mt-[clamp(1.25rem,3.5vh,1.75rem)] gap-2 font-semibold shadow-md shadow-primary/20"
             style={{
-              height: "clamp(2.25rem, 5vh, 2.75rem)",
-              paddingLeft: "clamp(1.25rem, 3vw, 1.75rem)",
-              paddingRight: "clamp(1.25rem, 3vw, 1.75rem)",
-              fontSize: "clamp(0.8125rem, 1.4vw, 0.875rem)",
+              height: "clamp(2.5rem, 5.5vh, 3rem)",
+              paddingLeft: "clamp(1.5rem, 3.25vw, 2rem)",
+              paddingRight: "clamp(1.5rem, 3.25vw, 2rem)",
+              fontSize: "clamp(0.875rem, 1.5vw, 0.9375rem)",
             }}
           >
             Enter Workspace
@@ -170,7 +190,7 @@ export function WelcomeScreen() {
 
           <p
             className="mt-3 text-center text-muted-foreground/60"
-            style={{ fontSize: "clamp(0.5625rem, 1vw, 0.625rem)" }}
+            style={{ fontSize: "clamp(0.625rem, 1.05vw, 0.6875rem)" }}
           >
             Decision support, not a substitute for clinical judgment.
           </p>

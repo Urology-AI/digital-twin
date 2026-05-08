@@ -357,6 +357,11 @@ export function ZoneInputWizard() {
   const [decipher, setDecipher] = useState("");
   const [shim,     setShim]     = useState("");
   const [ipss,     setIpss]     = useState("");
+  // Height/weight kept in the user-facing unit; canonical (cm, kg) values are
+  // derived on read so toggling units never loses precision.
+  const [units,     setUnits]     = useState<"metric" | "imperial">("metric");
+  const [heightVal, setHeightVal] = useState("");
+  const [weightVal, setWeightVal] = useState("");
   const [zoneData, setZoneData] = useState<ZoneDataMap>({});
 
   useEffect(() => {
@@ -395,6 +400,51 @@ export function ZoneInputWizard() {
   const handleDecipherChange = (v: string) => { setDecipher(v); const d = parseFloat(v); updateClinicalForm({ dec: v === "" || isNaN(d) ? null : d }); };
   const handleShimChange     = (v: string) => { setShim(v);     updateClinicalForm({ shim: parseInt(v) || undefined }); };
   const handleIpssChange     = (v: string) => { setIpss(v);     updateClinicalForm({ ipss: parseInt(v) || undefined }); };
+
+  /**
+   * Convert the user-entered height/weight (in the chosen unit) into canonical
+   * cm/kg, then compute BMI = kg / m². Result rounded to 1 dp and pushed to the
+   * record so the BMI field on the Outcomes page stays in sync.
+   */
+  const toCm = (v: string, u: "metric" | "imperial") => {
+    const n = parseFloat(v);
+    if (!n || n <= 0) return null;
+    return u === "metric" ? n : n * 2.54; // imperial input is inches
+  };
+  const toKg = (v: string, u: "metric" | "imperial") => {
+    const n = parseFloat(v);
+    if (!n || n <= 0) return null;
+    return u === "metric" ? n : n * 0.45359237; // imperial input is pounds
+  };
+  const computeBmi = (h: string, w: string, u: "metric" | "imperial") => {
+    const cm = toCm(h, u);
+    const kg = toKg(w, u);
+    if (!cm || !kg) return null;
+    const m = cm / 100;
+    const v = kg / (m * m);
+    return v > 0 && v < 100 ? Math.round(v * 10) / 10 : null;
+  };
+  const recomputeBmi = (h: string, w: string, u: "metric" | "imperial") => {
+    const bmi = computeBmi(h, w, u);
+    if (bmi !== null) updateClinicalForm({ bmi });
+  };
+  const handleHeightChange = (v: string) => { setHeightVal(v); recomputeBmi(v, weightVal, units); };
+  const handleWeightChange = (v: string) => { setWeightVal(v); recomputeBmi(heightVal, v, units); };
+
+  /** Toggle units — convert the currently-displayed values into the new unit. */
+  const handleUnitsToggle = (next: "metric" | "imperial") => {
+    if (next === units) return;
+    const round = (n: number) => String(Math.round(n * 10) / 10);
+    const h = parseFloat(heightVal);
+    const w = parseFloat(weightVal);
+    if (h > 0) setHeightVal(round(next === "imperial" ? h / 2.54 : h * 2.54));
+    if (w > 0) setWeightVal(round(next === "imperial" ? w / 0.45359237 : w * 0.45359237));
+    setUnits(next);
+    // BMI itself doesn't change with unit display, no recompute needed.
+  };
+
+  // Live BMI preview (only when both fields filled)
+  const computedBmi = computeBmi(heightVal, weightVal, units);
 
   /** Apply zone-derived aggregate flags to the clinical state, then save a checkpoint. */
   const applyZoneAggregates = () => {
@@ -521,6 +571,77 @@ export function ZoneInputWizard() {
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-foreground" htmlFor="wiz-ipss">IPSS <span className="font-normal text-muted-foreground">(0–35)</span></label>
                 <Input id="wiz-ipss" type="number" min={0} max={35} inputMode="numeric" placeholder="8" value={ipss} onChange={(e) => handleIpssChange(e.target.value)} className="h-11 text-base" />
+              </div>
+            </div>
+
+            {/* Height / Weight — optional pass-through that computes BMI when the user
+                doesn't know it directly. Computed value flows to record.patient.bmi.
+                Supports metric (cm / kg) and imperial (in / lb) — toggle preserves
+                the entered values by converting between units. */}
+            <div className="space-y-2 rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <span className="text-sm font-semibold text-foreground">Height & Weight <span className="font-normal text-muted-foreground">(optional — computes BMI)</span></span>
+                <div className="flex items-center gap-3">
+                  {computedBmi !== null && (
+                    <span className="text-sm tabular-nums text-muted-foreground">
+                      BMI <span className="font-bold text-primary">{computedBmi}</span>
+                    </span>
+                  )}
+                  <div className="flex overflow-hidden rounded-md border border-border text-xs font-semibold" role="group" aria-label="Unit system">
+                    <button
+                      type="button"
+                      onClick={() => handleUnitsToggle("metric")}
+                      className={`px-2.5 py-1 transition-colors ${units === "metric" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted/60"}`}
+                      aria-pressed={units === "metric"}
+                    >
+                      Metric
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUnitsToggle("imperial")}
+                      className={`px-2.5 py-1 transition-colors ${units === "imperial" ? "bg-primary text-primary-foreground" : "bg-card text-muted-foreground hover:bg-muted/60"}`}
+                      aria-pressed={units === "imperial"}
+                    >
+                      Imperial
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-5">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground" htmlFor="wiz-height">
+                    Height <span className="font-normal text-muted-foreground/70">({units === "metric" ? "cm" : "in"})</span>
+                  </label>
+                  <Input
+                    id="wiz-height"
+                    type="number"
+                    step={units === "metric" ? "0.5" : "0.25"}
+                    min={units === "metric" ? 50 : 20}
+                    max={units === "metric" ? 250 : 100}
+                    inputMode="decimal"
+                    placeholder={units === "metric" ? "178" : "70"}
+                    value={heightVal}
+                    onChange={(e) => handleHeightChange(e.target.value)}
+                    className="h-11 text-base"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-muted-foreground" htmlFor="wiz-weight">
+                    Weight <span className="font-normal text-muted-foreground/70">({units === "metric" ? "kg" : "lb"})</span>
+                  </label>
+                  <Input
+                    id="wiz-weight"
+                    type="number"
+                    step="0.1"
+                    min={units === "metric" ? 20 : 40}
+                    max={units === "metric" ? 300 : 660}
+                    inputMode="decimal"
+                    placeholder={units === "metric" ? "80" : "175"}
+                    value={weightVal}
+                    onChange={(e) => handleWeightChange(e.target.value)}
+                    className="h-11 text-base"
+                  />
+                </div>
               </div>
             </div>
 
