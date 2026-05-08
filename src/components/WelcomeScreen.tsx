@@ -11,13 +11,13 @@ function MountSinaiMark({ className, style }: { className?: string; style?: Reac
   return (
     <>
       <img
-        src="/logo_light.png"
+        src={`${import.meta.env.BASE_URL}logo_light.png`}
         alt="Mount Sinai"
         className={`block dark:hidden ${className ?? ""}`}
         style={style}
       />
       <img
-        src="/logo_dark.png"
+        src={`${import.meta.env.BASE_URL}logo_dark.png`}
         alt="Mount Sinai"
         className={`hidden dark:block ${className ?? ""}`}
         style={style}
