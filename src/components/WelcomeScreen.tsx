@@ -1,6 +1,9 @@
 import { Activity, ArrowRight, Layers, Stethoscope } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/store/uiStore";
+
+const APP_URL = "https://urology-ai.github.io/digital-twin/";
 
 /**
  * Mount Sinai brand mark — uses the official asset files in /public.
@@ -158,6 +161,28 @@ export function WelcomeScreen() {
             Enter Workspace
             <ArrowRight className="h-4 w-4" aria-hidden />
           </Button>
+
+          {/* QR code — scan to open this app on a mobile device */}
+          <div className="mt-[clamp(1.25rem,3vh,1.75rem)] flex flex-col items-center gap-2">
+            <div className="rounded-md bg-white p-2 shadow-sm ring-1 ring-border/60">
+              <QRCodeSVG
+                value={APP_URL}
+                size={96}
+                level="M"
+                marginSize={0}
+                aria-label={`QR code linking to ${APP_URL}`}
+              />
+            </div>
+            <a
+              href={APP_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="text-muted-foreground/80 underline-offset-2 hover:text-foreground hover:underline"
+              style={{ fontSize: "clamp(0.625rem, 1.05vw, 0.6875rem)" }}
+            >
+              Scan to open · urology-ai.github.io/digital-twin
+            </a>
+          </div>
 
           <p
             className="mt-3 text-center text-muted-foreground/60"
