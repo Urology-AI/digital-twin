@@ -723,8 +723,12 @@ export function createProstateScene(
   }
 
   const prostateMesh = createProstateMesh(dims, zones, medianLobeGrade);
+  prostateMesh.visible = false;
   model.add(prostateMesh);
   const { sv, vd, urethra } = createAccessoryMeshes(dims);
+  sv.visible = false;
+  vd.visible = false;
+  urethra.visible = false;
   model.add(sv, vd, urethra);
   buildZones(zones, overlay);
   model.add(heatmapGroup, boundaryGroup);
@@ -895,7 +899,11 @@ export function createProstateScene(
     },
     undefined,
     () => {
-      // GLB unavailable — procedural mesh remains as fallback.
+      // GLB unavailable — reveal the procedural mesh as fallback.
+      prostateMesh.visible = true;
+      sv.visible = true;
+      vd.visible = true;
+      urethra.visible = true;
     },
   );
 
