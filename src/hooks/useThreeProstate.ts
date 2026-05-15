@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createProstateScene,
   type ProstateDims,
@@ -27,11 +27,13 @@ export function useThreeProstate(
     startDist: number;
     startZ: number;
   } | null>(null);
+  const [glbLoading, setGlbLoading] = useState(true);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const h = createProstateScene(el, zones, overlay, dims, medianLobeGrade);
+    setGlbLoading(true);
+    const h = createProstateScene(el, zones, overlay, dims, medianLobeGrade, () => setGlbLoading(false));
     handlesRef.current = h;
     h.model.scale.setScalar(0.85 * volumeScale);
     h.setBackground(useUiStore.getState().dark ? 0x1e1e24 : 0xf5f5f7);
@@ -225,4 +227,6 @@ export function useThreeProstate(
     if (!h) return;
     h.setBackground(dark ? 0x1e1e24 : 0xf5f5f7);
   }, [dark]);
+
+  return glbLoading;
 }
