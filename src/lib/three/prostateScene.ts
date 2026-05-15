@@ -648,6 +648,7 @@ export function createProstateScene(
   overlay: OverlayType,
   dims: ProstateDims,
   medianLobeGrade: number,
+  onGlbLoad?: () => void,
 ): ProstateSceneHandles {
   // ── Procedural bump texture (created once, shared across all prostate meshes) ─
   // A tileable FBM noise map gives the surface a subtle organic bump/lump texture
@@ -723,12 +724,8 @@ export function createProstateScene(
   }
 
   const prostateMesh = createProstateMesh(dims, zones, medianLobeGrade);
-  prostateMesh.visible = false;
   model.add(prostateMesh);
   const { sv, vd, urethra } = createAccessoryMeshes(dims);
-  sv.visible = false;
-  vd.visible = false;
-  urethra.visible = false;
   model.add(sv, vd, urethra);
   buildZones(zones, overlay);
   model.add(heatmapGroup, boundaryGroup);
@@ -744,8 +741,8 @@ export function createProstateScene(
   const glbSVRight: Mesh[] = [];
   let glbLoaded = false;
 
-  // Load the real anatomical GLB asynchronously; procedural mesh is the fallback
-  // while loading (and if the file is absent).
+  // Load the real anatomical GLB asynchronously; procedural mesh stays visible
+  // as a placeholder until the GLB is ready (or permanently if the file is absent).
   const glbLoader = new GLTFLoader();
   glbLoader.load(
     `${import.meta.env.BASE_URL}models/prostate_anatomy.glb`,
@@ -896,15 +893,10 @@ export function createProstateScene(
 
       model.add(gltf.scene);
       glbLoaded = true;
+      onGlbLoad?.();
     },
     undefined,
-    () => {
-      // GLB unavailable — reveal the procedural mesh as fallback.
-      prostateMesh.visible = true;
-      sv.visible = true;
-      vd.visible = true;
-      urethra.visible = true;
-    },
+    undefined,
   );
 
   const dispose = () => {
