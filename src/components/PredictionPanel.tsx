@@ -174,7 +174,7 @@ export function PredictionPanel() {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <Card className="border-border/70">
+      <Card className="border-border/70" data-tutorial="prediction-panel">
         <CardHeader className="border-b border-border/50 bg-gradient-to-br from-muted/40 to-transparent pb-4 dark:from-muted/25">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-1">
@@ -228,7 +228,7 @@ export function PredictionPanel() {
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
 
             {/* Left: Nerve Sparing 5-zone */}
-            <div>
+            <div data-tutorial="ns-grades">
               <div className="mb-2 text-sm font-semibold uppercase tracking-wide text-primary">Nerve sparing — 5-zone</div>
               <table className="w-full border-collapse text-sm">
                 <thead>

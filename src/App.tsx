@@ -12,6 +12,7 @@ import { InfoPanel } from "@/components/InfoPanel";
 import { ReferencePanel } from "@/components/ReferencePanel";
 import { PredictionPanel } from "@/components/PredictionPanel";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
+import { TutorialOverlay } from "@/components/TutorialOverlay";
 import { ZoneInputWizard } from "@/components/ZoneInputWizard";
 import { PREDICTION_EXPLANATIONS } from "@/lib/compass/explainPrediction";
 import {
@@ -133,7 +134,7 @@ export default function App() {
             onPredictions && "max-lg:top-1/2",
           )}
         >
-          <div className="absolute inset-0 min-h-0 min-w-0">
+          <div className="absolute inset-0 min-h-0 min-w-0" data-tutorial="three-canvas">
             <ThreeCanvas />
           </div>
           {/* Controls/labels: visible on the predictions tab */}
@@ -196,6 +197,7 @@ export default function App() {
       )}
 
       {welcomeOpen && <WelcomeScreen />}
+      <TutorialOverlay />
 
       {explainKey && (
         <div
