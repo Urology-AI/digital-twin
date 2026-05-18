@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { usePatientStore } from "@/store/patientStore";
+import { useUiStore } from "@/store/uiStore";
 import { emptyLesion, type LesionRow } from "@/types/lesion";
 import { cn } from "@/lib/utils";
 
@@ -348,7 +349,10 @@ export function ZoneInputWizard() {
 
   const entry = patients.find((p) => p.id === activeId);
 
-  const [activeTab, setActiveTab]       = useState<1 | 2>(1);
+  const wizardTab = useUiStore((s) => s.wizardTab);
+  const [_localTab, setLocalTab]        = useState<1 | 2>(1);
+  const activeTab: 1 | 2               = wizardTab ?? _localTab;
+  const setActiveTab = (t: 1 | 2) => setLocalTab(t);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
 
   const [age,      setAge]      = useState("");
@@ -522,7 +526,7 @@ export function ZoneInputWizard() {
 
       {/* ── Tab 1: Demographics ── */}
       {activeTab === 1 && (
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto" data-tutorial="clinical-form">
           <div className="mx-auto max-w-2xl space-y-7 p-8">
             <div>
               <h3 className="text-2xl font-bold text-foreground">Demographics &amp; Labs</h3>
@@ -656,7 +660,7 @@ export function ZoneInputWizard() {
 
       {/* ── Tab 2: Zone Locations ── */}
       {activeTab === 2 && (
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden" data-tutorial="zone-grid">
         <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
           {/* Zone grids */}
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:p-4">

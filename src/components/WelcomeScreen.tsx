@@ -1,4 +1,4 @@
-import { Activity, ArrowRight, Layers, Stethoscope } from "lucide-react";
+import { Activity, ArrowRight, BookOpen, Layers, Stethoscope } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/store/uiStore";
@@ -49,6 +49,7 @@ const FEATURES = [
 
 export function WelcomeScreen() {
   const dismissWelcome = useUiStore((s) => s.dismissWelcome);
+  const startTutorial = useUiStore((s) => s.startTutorial);
 
   return (
     <div
@@ -145,22 +146,40 @@ export function WelcomeScreen() {
             ))}
           </div>
 
-          {/* CTA */}
-          <Button
-            type="button"
-            size="lg"
-            onClick={dismissWelcome}
-            className="mt-[clamp(1.25rem,3.5vh,1.75rem)] gap-2 font-semibold shadow-md shadow-primary/20"
-            style={{
-              height: "clamp(2.5rem, 5.5vh, 3rem)",
-              paddingLeft: "clamp(1.5rem, 3.25vw, 2rem)",
-              paddingRight: "clamp(1.5rem, 3.25vw, 2rem)",
-              fontSize: "clamp(0.875rem, 1.5vw, 0.9375rem)",
-            }}
-          >
-            Enter Workspace
-            <ArrowRight className="h-4 w-4" aria-hidden />
-          </Button>
+          {/* CTAs */}
+          <div className="mt-[clamp(1.25rem,3.5vh,1.75rem)] flex flex-col items-center gap-2.5 sm:flex-row sm:justify-center">
+            <Button
+              type="button"
+              size="lg"
+              onClick={dismissWelcome}
+              className="gap-2 font-semibold shadow-md shadow-primary/20"
+              style={{
+                height: "clamp(2.5rem, 5.5vh, 3rem)",
+                paddingLeft: "clamp(1.5rem, 3.25vw, 2rem)",
+                paddingRight: "clamp(1.5rem, 3.25vw, 2rem)",
+                fontSize: "clamp(0.875rem, 1.5vw, 0.9375rem)",
+              }}
+            >
+              Enter Workspace
+              <ArrowRight className="h-4 w-4" aria-hidden />
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              onClick={startTutorial}
+              className="gap-2 font-semibold"
+              style={{
+                height: "clamp(2.5rem, 5.5vh, 3rem)",
+                paddingLeft: "clamp(1.5rem, 3.25vw, 2rem)",
+                paddingRight: "clamp(1.5rem, 3.25vw, 2rem)",
+                fontSize: "clamp(0.875rem, 1.5vw, 0.9375rem)",
+              }}
+            >
+              <BookOpen className="h-4 w-4" aria-hidden />
+              Take the Tour
+            </Button>
+          </div>
 
           {/* QR code — scan to open this app on a mobile device */}
           <div className="mt-[clamp(1.25rem,3vh,1.75rem)] flex flex-col items-center gap-2">

@@ -83,6 +83,7 @@ export function AppHeader() {
         <label htmlFor="nav-patient" className="sr-only">Active patient</label>
         <select
           id="nav-patient"
+          data-tutorial="patient-select"
           className={cn(
             "h-8 min-w-0 flex-1 cursor-pointer truncate rounded-lg border border-input/80 bg-muted/50 px-2.5 text-xs font-medium text-foreground shadow-none transition-colors",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
