@@ -4,12 +4,7 @@ import { Button } from "@/components/ui/button";
 import { emitZoomNudge } from "@/lib/three/zoomBridge";
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
-import {
-  deriveClinicalFromLesions,
-  lesionsFromRows,
-} from "@/lib/utils/normalization";
-import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
-import { printReport } from "@/lib/printReport";
+import { printReport } from "@/lib/compass/printReport";
 import type { OverlayType } from "@/types/prediction";
 import { cn } from "@/lib/utils";
 
@@ -84,13 +79,7 @@ export function ControlsOverlay() {
   const [legendOpen, setLegendOpen] = useState(true);
 
   function handlePrint() {
-    if (!entry || !predictions) return;
-    const record = { ...entry.record, lesions: entry.lesionRows };
-    const S = deriveClinicalFromLesions(
-      clinicalStateFromRecord(record),
-      lesionsFromRows(entry.lesionRows),
-    );
-    printReport(S, predictions, entry.lesionRows);
+    printReport();
   }
 
   return (
