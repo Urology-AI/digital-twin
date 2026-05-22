@@ -1,5 +1,6 @@
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
+
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "./clinicalFromRecord";
 import { COMPASS_TO_3D } from "./constants";
@@ -7,29 +8,10 @@ import type { ZoneMap } from "@/types/patient";
 import type { ThreeZoneRuntime } from "@/types/prediction";
 
 // ── SVG Prostate Sector Map ───────────────────────────────────────────────────
+// Anatomically-shaped: elliptical cross-sections, PZpl/PZpm/TZ zones clipped to outline
 
 function buildProstateMapSVG(zones: ZoneMap, threeZones: ThreeZoneRuntime[]): string {
-  const toRad = (d: number) => (d * Math.PI) / 180;
   const f = (n: number) => n.toFixed(1);
-
-  function piePath(cx: number, cy: number, r: number, a1: number, a2: number) {
-    const x1 = cx + r * Math.cos(toRad(a1)), y1 = cy + r * Math.sin(toRad(a1));
-    const x2 = cx + r * Math.cos(toRad(a2)), y2 = cy + r * Math.sin(toRad(a2));
-    return `M${f(cx)},${f(cy)} L${f(x1)},${f(y1)} A${r},${r} 0 0,1 ${f(x2)},${f(y2)} Z`;
-  }
-
-  function donutPath(cx: number, cy: number, ri: number, ro: number, a1: number, a2: number) {
-    const xo1 = cx + ro * Math.cos(toRad(a1)), yo1 = cy + ro * Math.sin(toRad(a1));
-    const xo2 = cx + ro * Math.cos(toRad(a2)), yo2 = cy + ro * Math.sin(toRad(a2));
-    const xi2 = cx + ri * Math.cos(toRad(a2)), yi2 = cy + ri * Math.sin(toRad(a2));
-    const xi1 = cx + ri * Math.cos(toRad(a1)), yi1 = cy + ri * Math.sin(toRad(a1));
-    return `M${f(xo1)},${f(yo1)} A${ro},${ro} 0 0,1 ${f(xo2)},${f(yo2)} L${f(xi2)},${f(yi2)} A${ri},${ri} 0 0,0 ${f(xi1)},${f(yi1)} Z`;
-  }
-
-  function centroid(cx: number, cy: number, dist: number, a1: number, a2: number) {
-    const am = (a1 + a2) / 2;
-    return { x: cx + dist * Math.cos(toRad(am)), y: cy + dist * Math.sin(toRad(am)) };
-  }
 
   function fillC(v: number) {
     if (v >= 0.5) return "#FADADD";
@@ -48,7 +30,6 @@ function buildProstateMapSVG(zones: ZoneMap, threeZones: ThreeZoneRuntime[]): st
     if (v >= 0.15) return "#7D6608";
     return "#1A6B2F";
   }
-
   function gzv(key: string, ov: string): number {
     const pd = zones[key as keyof typeof zones];
     if (pd) {
@@ -68,22 +49,30 @@ function buildProstateMapSVG(zones: ZoneMap, threeZones: ThreeZoneRuntime[]): st
   const panelW = 162;
   const pad = 6;
   const svgW = overlays.length * panelW + pad * 2;
-  const svgH = 438;
+  const svgH = 445;
 
-  const r = 46;   // outer radius (base/mid)
-  const ri = 24;  // inner radius (medial/lateral boundary)
-  const ra = 32;  // apex radius
-
-  // Level definitions: zone keys per anatomical region
-  const baseLevelZones = { antL: "1a", antR: "4a", pmL: "1p", plL: "2p", pmR: "6p", plR: "7p" };
-  const midLevelZones  = { antL: "2a", antR: "5a", pmL: "3p", plL: "4p", pmR: "8p", plR: "9p" };
-  const apexLevelZones = { antL: "3a", antR: "6a", postL: "5p", postR: "10p" };
-
+  // BASE and MID: 6-zone levels (PZpl-L, PZpm-L, ANT-L, PZpl-R, PZpm-R, ANT-R)
   const fullLevels = [
-    { cy: 82,  label: "BASE", zk: baseLevelZones },
-    { cy: 215, label: "MID",  zk: midLevelZones  },
+    { label: "BASE", cy: 92,  rx: 50, ry: 40, antL: "1a", antR: "4a", pmL: "1p", plL: "2p", pmR: "6p", plR: "7p", pmRx: 17, pmRy: 13, pmXOff: 13, pmCyOff: 8 },
+    { label: "MID",  cy: 228, rx: 50, ry: 40, antL: "2a", antR: "5a", pmL: "3p", plL: "4p", pmR: "8p", plR: "9p", pmRx: 17, pmRy: 13, pmXOff: 13, pmCyOff: 8 },
   ] as const;
-  const apexCy = 330;
+
+  // APEX: 4-zone (no PZpm distinction)
+  const apexCy = 346;
+  const apexRx = 34;
+  const apexRy = 27;
+
+  // Build clipPath defs first (one ellipse per panel × level)
+  let defs = "<defs>";
+  overlays.forEach((_ov, idx) => {
+    const px = pad + idx * panelW;
+    const cx = px + panelW / 2;
+    for (const { label, cy, rx, ry } of fullLevels) {
+      defs += `<clipPath id="cp-${idx}-${label}"><ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${rx}" ry="${ry}"/></clipPath>`;
+    }
+    defs += `<clipPath id="cp-${idx}-APEX"><ellipse cx="${f(cx)}" cy="${f(apexCy)}" rx="${apexRx}" ry="${apexRy}"/></clipPath>`;
+  });
+  defs += "</defs>";
 
   let s = "";
 
@@ -99,79 +88,97 @@ function buildProstateMapSVG(zones: ZoneMap, threeZones: ThreeZoneRuntime[]): st
   overlays.forEach((ov, idx) => {
     const px = pad + idx * panelW;
     const cx = px + panelW / 2;
+    const ovLabel = ovLabels[idx] ?? ov;
+    const pt = `text-anchor="middle" font-family="Arial,sans-serif" font-size="7.5" font-weight="700"`;
 
     // Panel heading
-    s += `<rect x="${px+4}" y="6" width="${panelW-8}" height="20" rx="3" fill="#1a5276" opacity="0.08"/>`;
-    const ovLabel = ovLabels[idx] ?? ov;
-    s += `<text x="${cx}" y="20" text-anchor="middle" font-family="Arial,sans-serif" font-size="10.5" font-weight="700" fill="#1a5276">${ovLabel}</text>`;
+    s += `<rect x="${px + 4}" y="6" width="${panelW - 8}" height="20" rx="3" fill="#1a5276" opacity="0.08"/>`;
+    s += `<text x="${f(cx)}" y="20" text-anchor="middle" font-family="Arial,sans-serif" font-size="10.5" font-weight="700" fill="#1a5276">${ovLabel}</text>`;
 
-    // ── BASE & MID ────────────────────────────────────────
-    for (const { cy, label, zk } of fullLevels) {
-      // Section label
-      s += `<text x="${px + 8}" y="${cy - r - 5}" font-family="Arial,sans-serif" font-size="8" font-weight="700" fill="#888" letter-spacing="1.5">${label}</text>`;
-      // Circle
-      s += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#f8f8f8" stroke="#ccc" stroke-width="1.2"/>`;
-      // Inner dashed ring
-      s += `<circle cx="${cx}" cy="${cy}" r="${ri}" fill="none" stroke="#ddd" stroke-width="0.7" stroke-dasharray="2.5,2"/>`;
-      // Urethra dot
-      s += `<circle cx="${cx}" cy="${cy}" r="3.5" fill="#e0e0e0" stroke="#bbb" stroke-width="0.6"/>`;
-      // Center dividers
-      s += `<line x1="${cx}" y1="${cy - r}" x2="${cx}" y2="${cy + r}" stroke="#bbb" stroke-width="0.8"/>`;
-      s += `<line x1="${cx - r}" y1="${cy}" x2="${cx + r}" y2="${cy}" stroke="#ccc" stroke-width="0.6" stroke-dasharray="2,2"/>`;
-      // ANT / POST micro-labels
-      s += `<text x="${cx}" y="${cy - r + 9}" text-anchor="middle" font-size="6.5" fill="#aaa" font-family="Arial">ANT</text>`;
-      s += `<text x="${cx}" y="${cy + r - 3}" text-anchor="middle" font-size="6.5" fill="#aaa" font-family="Arial">POST</text>`;
+    // ── BASE & MID (6-zone, anatomical ellipse) ───────────────────────────────
+    for (const { label, cy, rx, ry, antL, antR, pmL, plL, pmR, plR, pmRx, pmRy, pmXOff, pmCyOff } of fullLevels) {
+      const cpId = `cp-${idx}-${label}`;
+      const plLv = gzv(plL, ov);
+      const plRv = gzv(plR, ov);
+      const pmLv = gzv(pmL, ov);
+      const pmRv = gzv(pmR, ov);
+      const antLv = gzv(antL, ov);
+      const antRv = gzv(antR, ov);
 
-      type FullSector = { path: string; key: string; dist: number; a1: number; a2: number };
-      const sectors: FullSector[] = [
-        { path: piePath(cx, cy, r, 180, 270),       key: zk.antL, dist: r * 0.62,          a1: 180, a2: 270 },
-        { path: piePath(cx, cy, r, 270, 360),       key: zk.antR, dist: r * 0.62,          a1: 270, a2: 360 },
-        { path: piePath(cx, cy, ri, 90, 180),       key: zk.pmL,  dist: ri * 0.58,         a1: 90,  a2: 180 },
-        { path: donutPath(cx, cy, ri, r, 90, 180),  key: zk.plL,  dist: (r + ri) / 2,      a1: 90,  a2: 180 },
-        { path: piePath(cx, cy, ri, 0, 90),         key: zk.pmR,  dist: ri * 0.58,         a1: 0,   a2: 90  },
-        { path: donutPath(cx, cy, ri, r, 0, 90),    key: zk.plR,  dist: (r + ri) / 2,      a1: 0,   a2: 90  },
-      ];
+      s += `<text x="${px + 8}" y="${cy - ry - 6}" font-family="Arial,sans-serif" font-size="8" font-weight="700" fill="#888" letter-spacing="1.5">${label}</text>`;
 
-      for (const { path, key, dist, a1, a2 } of sectors) {
-        const v = gzv(key, ov);
-        const pct = Math.round(v * 100);
-        const c = centroid(cx, cy, dist, a1, a2);
-        s += `<path d="${path}" fill="${fillC(v)}" stroke="${strokeC(v)}" stroke-width="0.9"/>`;
-        s += `<text x="${f(c.x)}" y="${f(c.y + 3)}" text-anchor="middle" font-family="Arial,sans-serif" font-size="7.5" font-weight="700" fill="${txtC(v)}">${pct}%</text>`;
+      s += `<g clip-path="url(#${cpId})">`;
+        // PZpl (outer posterior zone) — fills bottom half, clipped to ellipse
+        s += `<rect x="${f(cx - rx - 1)}" y="${f(cy - 1)}" width="${f(rx + 1)}" height="${f(ry + 1)}" fill="${fillC(plLv)}"/>`;
+        s += `<rect x="${f(cx)}" y="${f(cy - 1)}" width="${f(rx + 1)}" height="${f(ry + 1)}" fill="${fillC(plRv)}"/>`;
+        // PZpm (inner medial posterior) — small ellipse overlaid on PZpl
+        s += `<ellipse cx="${f(cx - pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${fillC(pmLv)}" stroke="${strokeC(pmLv)}" stroke-width="0.7"/>`;
+        s += `<ellipse cx="${f(cx + pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${fillC(pmRv)}" stroke="${strokeC(pmRv)}" stroke-width="0.7"/>`;
+        // ANT / TZ — fills top half, drawn over posterior to clean up center
+        s += `<rect x="${f(cx - rx - 1)}" y="${f(cy - ry - 1)}" width="${f(rx + 1)}" height="${f(ry + 1)}" fill="${fillC(antLv)}"/>`;
+        s += `<rect x="${f(cx)}" y="${f(cy - ry - 1)}" width="${f(rx + 1)}" height="${f(ry + 1)}" fill="${fillC(antRv)}"/>`;
+        // Outer ellipse border
+        s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${rx}" ry="${ry}" fill="none" stroke="#999" stroke-width="1.5"/>`;
+        // ANT/POST anatomical boundary: bezier curving slightly into posterior
+        s += `<path d="M${f(cx - rx)},${f(cy)} C${f(cx - rx * 0.38)},${f(cy + 8)} ${f(cx + rx * 0.38)},${f(cy + 8)} ${f(cx + rx)},${f(cy)}" fill="none" stroke="#aaa" stroke-width="0.9"/>`;
+        // L/R midline
+        s += `<line x1="${f(cx)}" y1="${f(cy - ry)}" x2="${f(cx)}" y2="${f(cy + ry)}" stroke="#aaa" stroke-width="0.8"/>`;
+      s += `</g>`;
+
+      // Urethra dot (rendered above clip group)
+      s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="2.5" fill="#d4d4d4" stroke="#bbb" stroke-width="0.7"/>`;
+
+      // Risk percentage labels
+      s += `<text x="${f(cx - rx * 0.5)}" y="${f(cy - ry * 0.48 + 3)}" ${pt} fill="${txtC(antLv)}">${Math.round(antLv * 100)}%</text>`;
+      s += `<text x="${f(cx + rx * 0.5)}" y="${f(cy - ry * 0.48 + 3)}" ${pt} fill="${txtC(antRv)}">${Math.round(antRv * 100)}%</text>`;
+      s += `<text x="${f(cx - pmXOff)}" y="${f(cy + pmCyOff + 3)}" ${pt} fill="${txtC(pmLv)}">${Math.round(pmLv * 100)}%</text>`;
+      s += `<text x="${f(cx + pmXOff)}" y="${f(cy + pmCyOff + 3)}" ${pt} fill="${txtC(pmRv)}">${Math.round(pmRv * 100)}%</text>`;
+      s += `<text x="${f(cx - rx * 0.68)}" y="${f(cy + ry * 0.7 + 3)}" ${pt} fill="${txtC(plLv)}">${Math.round(plLv * 100)}%</text>`;
+      s += `<text x="${f(cx + rx * 0.68)}" y="${f(cy + ry * 0.7 + 3)}" ${pt} fill="${txtC(plRv)}">${Math.round(plRv * 100)}%</text>`;
+
+      // Micro anatomy labels (first panel only to avoid clutter)
+      if (idx === 0) {
+        const ml = `text-anchor="middle" font-family="Arial,sans-serif" font-size="6" fill="#b0b0b0"`;
+        s += `<text x="${f(cx - rx * 0.5)}" y="${f(cy - ry + 9)}" ${ml}>TZ</text>`;
+        s += `<text x="${f(cx + rx * 0.5)}" y="${f(cy - ry + 9)}" ${ml}>TZ</text>`;
+        s += `<text x="${f(cx - rx * 0.72)}" y="${f(cy + ry - 4)}" ${ml}>PZpl</text>`;
+        s += `<text x="${f(cx + rx * 0.72)}" y="${f(cy + ry - 4)}" ${ml}>PZpl</text>`;
       }
     }
 
-    // ── APEX ─────────────────────────────────────────────
-    const acy = apexCy;
-    s += `<text x="${px + 8}" y="${acy - ra - 5}" font-family="Arial,sans-serif" font-size="8" font-weight="700" fill="#888" letter-spacing="1.5">APEX</text>`;
-    s += `<circle cx="${cx}" cy="${acy}" r="${ra}" fill="#f8f8f8" stroke="#ccc" stroke-width="1.2"/>`;
-    s += `<circle cx="${cx}" cy="${acy}" r="3.5" fill="#e0e0e0" stroke="#bbb" stroke-width="0.6"/>`;
-    s += `<line x1="${cx}" y1="${acy - ra}" x2="${cx}" y2="${acy + ra}" stroke="#bbb" stroke-width="0.8"/>`;
-    s += `<line x1="${cx - ra}" y1="${acy}" x2="${cx + ra}" y2="${acy}" stroke="#ccc" stroke-width="0.6" stroke-dasharray="2,2"/>`;
-    s += `<text x="${cx}" y="${acy - ra + 9}" text-anchor="middle" font-size="6.5" fill="#aaa" font-family="Arial">ANT</text>`;
-    s += `<text x="${cx}" y="${acy + ra - 3}" text-anchor="middle" font-size="6.5" fill="#aaa" font-family="Arial">POST</text>`;
+    // ── APEX (4-zone) ─────────────────────────────────────────────────────────
+    {
+      const antLv  = gzv("3a",  ov);
+      const antRv  = gzv("6a",  ov);
+      const postLv = gzv("5p",  ov);
+      const postRv = gzv("10p", ov);
 
-    const apexSectors = [
-      { path: piePath(cx, acy, ra, 180, 270), key: apexLevelZones.antL,  a1: 180, a2: 270, dist: ra * 0.62 },
-      { path: piePath(cx, acy, ra, 270, 360), key: apexLevelZones.antR,  a1: 270, a2: 360, dist: ra * 0.62 },
-      { path: piePath(cx, acy, ra, 90, 180),  key: apexLevelZones.postL, a1: 90,  a2: 180, dist: ra * 0.62 },
-      { path: piePath(cx, acy, ra, 0, 90),    key: apexLevelZones.postR, a1: 0,   a2: 90,  dist: ra * 0.62 },
-    ];
+      s += `<text x="${px + 8}" y="${apexCy - apexRy - 6}" font-family="Arial,sans-serif" font-size="8" font-weight="700" fill="#888" letter-spacing="1.5">APEX</text>`;
 
-    for (const { path, key, a1, a2, dist } of apexSectors) {
-      const v = gzv(key, ov);
-      const pct = Math.round(v * 100);
-      const c = centroid(cx, acy, dist, a1, a2);
-      s += `<path d="${path}" fill="${fillC(v)}" stroke="${strokeC(v)}" stroke-width="0.9"/>`;
-      s += `<text x="${f(c.x)}" y="${f(c.y + 3)}" text-anchor="middle" font-family="Arial,sans-serif" font-size="7.5" font-weight="700" fill="${txtC(v)}">${pct}%</text>`;
+      s += `<g clip-path="url(#cp-${idx}-APEX)">`;
+        s += `<rect x="${f(cx - apexRx - 1)}" y="${f(apexCy - 1)}" width="${f(apexRx + 1)}" height="${f(apexRy + 1)}" fill="${fillC(postLv)}"/>`;
+        s += `<rect x="${f(cx)}" y="${f(apexCy - 1)}" width="${f(apexRx + 1)}" height="${f(apexRy + 1)}" fill="${fillC(postRv)}"/>`;
+        s += `<rect x="${f(cx - apexRx - 1)}" y="${f(apexCy - apexRy - 1)}" width="${f(apexRx + 1)}" height="${f(apexRy + 1)}" fill="${fillC(antLv)}"/>`;
+        s += `<rect x="${f(cx)}" y="${f(apexCy - apexRy - 1)}" width="${f(apexRx + 1)}" height="${f(apexRy + 1)}" fill="${fillC(antRv)}"/>`;
+        s += `<ellipse cx="${f(cx)}" cy="${f(apexCy)}" rx="${apexRx}" ry="${apexRy}" fill="none" stroke="#999" stroke-width="1.5"/>`;
+        s += `<path d="M${f(cx - apexRx)},${f(apexCy)} C${f(cx - apexRx * 0.4)},${f(apexCy + 6)} ${f(cx + apexRx * 0.4)},${f(apexCy + 6)} ${f(cx + apexRx)},${f(apexCy)}" fill="none" stroke="#aaa" stroke-width="0.9"/>`;
+        s += `<line x1="${f(cx)}" y1="${f(apexCy - apexRy)}" x2="${f(cx)}" y2="${f(apexCy + apexRy)}" stroke="#aaa" stroke-width="0.8"/>`;
+      s += `</g>`;
+
+      s += `<circle cx="${f(cx)}" cy="${f(apexCy)}" r="2.5" fill="#d4d4d4" stroke="#bbb" stroke-width="0.7"/>`;
+
+      s += `<text x="${f(cx - apexRx * 0.5)}" y="${f(apexCy - apexRy * 0.45 + 3)}" ${pt} fill="${txtC(antLv)}">${Math.round(antLv * 100)}%</text>`;
+      s += `<text x="${f(cx + apexRx * 0.5)}" y="${f(apexCy - apexRy * 0.45 + 3)}" ${pt} fill="${txtC(antRv)}">${Math.round(antRv * 100)}%</text>`;
+      s += `<text x="${f(cx - apexRx * 0.5)}" y="${f(apexCy + apexRy * 0.55 + 3)}" ${pt} fill="${txtC(postLv)}">${Math.round(postLv * 100)}%</text>`;
+      s += `<text x="${f(cx + apexRx * 0.5)}" y="${f(apexCy + apexRy * 0.55 + 3)}" ${pt} fill="${txtC(postRv)}">${Math.round(postRv * 100)}%</text>`;
     }
 
-    // ── Seminal Vesicles ──────────────────────────────────
-    const svTop = 386;
+    // ── Seminal Vesicles ──────────────────────────────────────────────────────
+    const svTop = 388;
     s += `<text x="${px + 8}" y="${svTop - 5}" font-family="Arial,sans-serif" font-size="7.5" font-weight="700" fill="#888" letter-spacing="1">SV</text>`;
     const svCells = [
-      { key: "SV-L", label: "L", x: px + 8, w: panelW / 2 - 12 },
-      { key: "SV-R", label: "R", x: px + panelW / 2 + 4, w: panelW / 2 - 12 },
+      { key: "SV-L", label: "SV-L", x: px + 8, w: panelW / 2 - 12 },
+      { key: "SV-R", label: "SV-R", x: px + panelW / 2 + 4, w: panelW / 2 - 12 },
     ];
     for (const { key, label, x, w } of svCells) {
       const v = gzv(key, ov);
@@ -181,13 +188,13 @@ function buildProstateMapSVG(zones: ZoneMap, threeZones: ThreeZoneRuntime[]): st
       s += `<text x="${x + w / 2}" y="${svTop + 19}" text-anchor="middle" font-size="8" font-weight="700" fill="${txtC(v)}" font-family="Arial">${pct}%</text>`;
     }
 
-    // Per-panel legend (all 4 tiers)
+    // ── Per-panel legend ──────────────────────────────────────────────────────
     const legY = svgH - 20;
     const legItems = [
-      { label: "<8%",   fill: "#EEF8EE", stroke: "#27AE60" },
-      { label: "8–15%", fill: "#DFF0D8", stroke: "#27AE60" },
-      { label: "15–30%",fill: "#FEF3CD", stroke: "#D4811E" },
-      { label: "≥30%",  fill: "#FDECEA", stroke: "#C0392B" },
+      { label: "<8%",    fill: "#EEF8EE", stroke: "#27AE60" },
+      { label: "8–15%",  fill: "#DFF0D8", stroke: "#27AE60" },
+      { label: "15–30%", fill: "#FEF3CD", stroke: "#D4811E" },
+      { label: "≥30%",   fill: "#FDECEA", stroke: "#C0392B" },
     ];
     legItems.forEach(({ label, fill, stroke }, i) => {
       const lx = px + 4 + i * (panelW / 4);
@@ -196,20 +203,16 @@ function buildProstateMapSVG(zones: ZoneMap, threeZones: ThreeZoneRuntime[]): st
     });
   });
 
-  return `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;max-width:${svgW}px">${s}</svg>`;
+  return `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;max-width:${svgW}px">${defs}${s}</svg>`;
 }
 
-// ── Main print function ───────────────────────────────────────────────────────
+// ── HTML builder (exported for modal use) ────────────────────────────────────
 
-export function printReport() {
+export function buildPrintHtml(): string | null {
   const { patients, activeId, predictions, threeZones } = usePatientStore.getState();
-  useUiStore.getState(); // kept for future overlay preference
 
   const entry = patients.find((p) => p.id === activeId);
-  if (!entry || !predictions) {
-    alert("No patient data loaded.");
-    return;
-  }
+  if (!entry || !predictions) return null;
 
   const record = { ...entry.record, lesions: entry.lesionRows };
   const S = deriveClinicalFromLesions(
@@ -423,7 +426,7 @@ ${sideEceHtml}
 <div class="map-box">
   <div class="map-box-title">
     Prostate Sector Map — Zone Risk Distribution
-    <span>Axial view · Patient L on left · ANT = top · POST = bottom · Inner ring = medial</span>
+    <span>Axial view · Patient L on left · ANT = top · POST = bottom · Inner ellipse = PZpm · Outer post = PZpl</span>
   </div>
   <div style="padding:10px 8px 4px">${prostateMapSVG}</div>
 </div>
@@ -442,15 +445,19 @@ ${lesHtml}
   Model card: MODEL_CARD.md · Data dictionary: DATA_DICTIONARY.md · IRB STUDY-14-00050
 </div>
 
-<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
-
 </body></html>`;
 
-  const w = window.open("", "_blank");
-  if (!w) {
-    alert("Pop-up blocked — please allow pop-ups for this site.");
+  return html;
+}
+
+// ── Open the in-app print modal ───────────────────────────────────────────────
+
+export function printReport() {
+  const { patients, activeId, predictions } = usePatientStore.getState();
+  const entry = patients.find((p) => p.id === activeId);
+  if (!entry || !predictions) {
+    alert("No patient data loaded.");
     return;
   }
-  w.document.write(html);
-  w.document.close();
+  useUiStore.getState().setPrintReportOpen(true);
 }

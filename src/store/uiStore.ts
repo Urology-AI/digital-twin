@@ -23,6 +23,7 @@ interface UiState {
   lesionsOnly: boolean;
   infoOpen: boolean;
   caseLogOpen: boolean;
+  printReportOpen: boolean;
   referenceOpen: boolean;
   chatOpen: boolean;
   welcomeOpen: boolean;
@@ -40,6 +41,7 @@ interface UiState {
   toggleLesionsOnly: () => void;
   setInfoOpen: (v: boolean) => void;
   setCaseLogOpen: (v: boolean) => void;
+  setPrintReportOpen: (v: boolean) => void;
   setReferenceOpen: (v: boolean) => void;
   setChatOpen: (v: boolean) => void;
   setWelcomeOpen: (v: boolean) => void;
@@ -62,6 +64,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   lesionsOnly: false,
   infoOpen: false,
   caseLogOpen: false,
+  printReportOpen: false,
   referenceOpen: false,
   chatOpen: false,
   welcomeOpen: !readWelcomeSeen(),
@@ -80,6 +83,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   toggleLesionsOnly: () => set({ lesionsOnly: !get().lesionsOnly }),
   setInfoOpen: (v) => set({ infoOpen: v }),
   setCaseLogOpen: (v) => set({ caseLogOpen: v }),
+  setPrintReportOpen: (v) => set({ printReportOpen: v }),
   setReferenceOpen: (v) => set({ referenceOpen: v }),
   setChatOpen: (v) => set({ chatOpen: v }),
   setWelcomeOpen: (v) => set({ welcomeOpen: v }),

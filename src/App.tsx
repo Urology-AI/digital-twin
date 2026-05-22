@@ -13,6 +13,7 @@ import { ReferencePanel } from "@/components/ReferencePanel";
 import { PredictionPanel } from "@/components/PredictionPanel";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { TutorialOverlay } from "@/components/TutorialOverlay";
+import { PrintReportModal } from "@/components/PrintReportModal";
 import { ZoneInputWizard } from "@/components/ZoneInputWizard";
 import { PREDICTION_EXPLANATIONS } from "@/lib/compass/explainPrediction";
 import {
@@ -198,6 +199,7 @@ export default function App() {
 
       {welcomeOpen && <WelcomeScreen />}
       <TutorialOverlay />
+      <PrintReportModal />
 
       {explainKey && (
         <div
