@@ -5,6 +5,7 @@ import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
 import { emptyLesion, type LesionRow } from "@/types/lesion";
 import { cn } from "@/lib/utils";
+import { NoteImportModal, type NoteImportClinical } from "@/components/NoteImportModal";
 
 // ── Zone definitions ──────────────────────────────────────────────────────────
 interface ZoneDef {
@@ -354,6 +355,7 @@ export function ZoneInputWizard() {
   const activeTab: 1 | 2               = wizardTab ?? _localTab;
   const setActiveTab = (t: 1 | 2) => setLocalTab(t);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
+  const [showNoteImport, setShowNoteImport] = useState(false);
 
   const [age,      setAge]      = useState("");
   const [psa,      setPsa]      = useState("");
@@ -469,6 +471,24 @@ export function ZoneInputWizard() {
     });
     pushHistory();
   };
+
+  const applyNoteImport = useCallback(
+    (rows: import("@/types/lesion").LesionRow[], clinical: NoteImportClinical) => {
+      const existingRows = zoneDataToRows(zoneData);
+      const merged = rowsToZoneData([...existingRows, ...rows]);
+      setZoneData(merged);
+      updateLesionRows(zoneDataToRows(merged));
+      if (clinical.vol !== undefined) {
+        setVol(String(clinical.vol));
+        updateClinicalForm({ vol: clinical.vol });
+      }
+      if (clinical.gg !== undefined) updateClinicalForm({ gg: clinical.gg });
+      if (clinical.cores !== undefined) updateClinicalForm({ cores: clinical.cores });
+      if (clinical.maxcore !== undefined) updateClinicalForm({ maxcore: clinical.maxcore });
+      pushHistory();
+    },
+    [zoneData, updateLesionRows, updateClinicalForm, pushHistory],
+  );
 
   if (!entry) return null;
 
@@ -664,14 +684,30 @@ export function ZoneInputWizard() {
         <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
           {/* Zone grids */}
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:p-4">
-            {/* Legend */}
-            <div className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-muted-foreground/80">
-              <span className="font-semibold text-muted-foreground">Click zone → enter findings · 3D updates live</span>
-              <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-blue-500 text-[8px] font-bold text-white">M</span> MRI</span>
-              <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-teal-500 text-[8px] font-bold text-white">U</span> MUS</span>
-              <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-purple-500 text-[8px] font-bold text-white">P</span> PSMA</span>
-              <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-amber-600 text-[8px] font-bold text-white">B</span> Bx</span>
+            {/* Legend + import button */}
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-5 gap-y-1.5 text-xs text-muted-foreground/80">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+                <span className="font-semibold text-muted-foreground">Click zone → enter findings · 3D updates live</span>
+                <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-blue-500 text-[8px] font-bold text-white">M</span> MRI</span>
+                <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-teal-500 text-[8px] font-bold text-white">U</span> MUS</span>
+                <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-purple-500 text-[8px] font-bold text-white">P</span> PSMA</span>
+                <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-amber-600 text-[8px] font-bold text-white">B</span> Bx</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNoteImport(true)}
+                className="flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-border/80 hover:bg-muted/50 hover:text-foreground"
+              >
+                ↑ Import note
+              </button>
             </div>
+
+            {showNoteImport && (
+              <NoteImportModal
+                onClose={() => setShowNoteImport(false)}
+                onApply={applyNoteImport}
+              />
+            )}
 
             {/* Posterior grid */}
             <div className="shrink-0 rounded-lg border border-border bg-muted/10 p-3">
