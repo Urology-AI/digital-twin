@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { usePatientStore } from "@/store/patientStore";
 import type { LesionRow } from "@/types/lesion";
+import { ParseNoteModal } from "@/components/ParseNoteModal";
 
 const SOURCES = ["MRI", "MUS", "PSMA", "Bx", "ExactVu"] as const;
 const SIDES = ["L", "R"] as const;
@@ -50,6 +52,7 @@ function updateRow(
 }
 
 export function LesionTable() {
+  const [showImport, setShowImport] = useState(false);
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
   const updateLesionRows = usePatientStore((s) => s.updateLesionRows);
@@ -335,18 +338,30 @@ export function LesionTable() {
             })}
           </tbody>
         </table>
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="min-h-8 w-full text-xs sm:w-auto"
-          onClick={() => {
-            addLesion();
-            pushHistory();
-          }}
-        >
-          + Add lesion
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="min-h-8 text-xs"
+            onClick={() => {
+              addLesion();
+              pushHistory();
+            }}
+          >
+            + Add lesion
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-8 text-xs"
+            onClick={() => setShowImport(true)}
+          >
+            Import from note
+          </Button>
+        </div>
+        {showImport && <ParseNoteModal onClose={() => setShowImport(false)} />}
       </CardContent>
     </Card>
   );
