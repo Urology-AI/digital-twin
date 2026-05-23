@@ -1,183 +1,240 @@
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
+
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "./clinicalFromRecord";
-import type { ZoneMap } from "@/types/patient";
+import type { LesionRow } from "@/types/lesion";
 
-// ── Zone heatmap sector map ───────────────────────────────────────────────────
-// Single map colored by cancer probability per zone — same green→orange→red
-// ramp as the 3D model's overlayColor("cancer") function.
+// ── OR-style Prostate Sector Map ──────────────────────────────────────────────
+// Three columns (MRI / MUS / PET), binary sector shading from lesion rows.
+// Matches the clinical OR printout format surgeons use intraoperatively.
 
-function cancerColor(val: number): string {
-  // Mirrors overlayColor(val, "cancer") from prostateScene.ts
-  let r: number, g: number, b: number;
-  if (val < 0.1) {
-    r = 0.18; g = 0.8; b = 0.44;
-  } else if (val < 0.3) {
-    const t = (val - 0.1) / 0.2;
-    r = 0.18 + t * 0.72; g = 0.8 - t * 0.3; b = 0.44 - t * 0.34;
-  } else if (val < 0.6) {
-    const t = (val - 0.3) / 0.3;
-    r = 0.9; g = 0.5 - t * 0.2; b = 0.1;
-  } else {
-    const t = Math.min((val - 0.6) / 0.4, 1);
-    r = 0.95; g = 0.3 - t * 0.25; b = 0.08;
+function lesionRowToSectors(row: LesionRow): string[] {
+  const pos = row.zone || "";
+  const isAnt = pos === "Anterior";
+  const isLat = pos === "Posterolateral" || pos === "Lateral";
+  const isMed = pos === "Medial";
+
+  function sectorsForSide(s: "L" | "R"): string[] {
+    if (isAnt) {
+      if (row.level === "Base") return [s === "L" ? "1a" : "4a"];
+      if (row.level === "Mid")  return [s === "L" ? "2a" : "5a"];
+      return [s === "L" ? "3a" : "6a"];
+    }
+    if (row.level === "Apex") return [s === "L" ? "5p" : "10p"];
+    if (isLat) {
+      if (row.level === "Base") return [s === "L" ? "2p" : "7p"];
+      if (row.level === "Mid")  return [s === "L" ? "4p" : "9p"];
+    }
+    if (isMed) {
+      if (row.level === "Base") return [s === "L" ? "1p" : "6p"];
+      if (row.level === "Mid")  return [s === "L" ? "3p" : "8p"];
+    }
+    // Generic posterior — mark both medial + lateral
+    if (row.level === "Base") return s === "L" ? ["1p", "2p"] : ["6p", "7p"];
+    if (row.level === "Mid")  return s === "L" ? ["3p", "4p"] : ["8p", "9p"];
+    return [s === "L" ? "5p" : "10p"];
   }
-  const h = (x: number) => Math.round(Math.min(x, 1) * 255).toString(16).padStart(2, "0");
-  return `#${h(r)}${h(g)}${h(b)}`;
+
+  if (row.side === "L" || row.side === "R") return sectorsForSide(row.side);
+  return [...sectorsForSide("L"), ...sectorsForSide("R")];
 }
 
-function buildZoneHeatmapSVG(zones: ZoneMap): string {
+function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
   const f = (n: number) => n.toFixed(1);
 
-  function zc(key: string): string {
-    const v = (zones as Record<string, { cancer?: number } | undefined>)[key]?.cancer ?? 0.02;
-    return cancerColor(v);
+  type Col = "MRI" | "MUS" | "PET";
+  const cols: Col[] = ["MRI", "MUS", "PET"];
+
+  // Build positive sector sets and SV flags per modality
+  const pos: Record<Col, Set<string>> = { MRI: new Set(), MUS: new Set(), PET: new Set() };
+  const svL: Record<Col, boolean> = { MRI: false, MUS: false, PET: false };
+  const svR: Record<Col, boolean> = { MRI: false, MUS: false, PET: false };
+
+  for (const row of lesionRows) {
+    const grp: Col = row.source === "MRI" ? "MRI" : row.source === "PSMA" ? "PET" : "MUS";
+    if (row.svi) {
+      if (row.side === "L" || row.side === "") svL[grp] = true;
+      if (row.side === "R" || row.side === "") svR[grp] = true;
+    }
+    lesionRowToSectors(row).forEach((z) => pos[grp].add(z));
   }
 
-  const colW = 300;
-  const pad  = 16;
-  const svgW = colW + pad * 2;
+  const colW = 218;
+  const pad = 8;
+  const svgW = cols.length * colW + pad * 2;
 
-  const svTop = 30;
-  const svH   = 26;
-  const baseY = 138;
-  const midY  = 260;
-  const apexY = 362;
-  const lrY   = 406;
-  const legY  = 430;
-  const svgH  = 450;
+  // Row vertical positions
+  const svTop = 36;
+  const svH = 26;
+  const baseY = 148;
+  const midY = 278;
+  const apexY = 383;
+  const lrY   = 428;
+  const svgH  = 440;
 
-  const fRx = 76, fRy = 62;
-  const aRx = 58, aRy = 46;
-  const pmRx = 24, pmRy = 18, pmXOff = 21, pmCyOff = 14;
+  // Ellipse radii
+  const fRx = 58, fRy = 48;
+  const aRx = 44, aRy = 35;
+  const pmRx = 18, pmRy = 14, pmXOff = 16, pmCyOff = 11;
 
-  const BORDER  = "#2c2c2c";
-  const LABEL_C = "#1a1a1a";
-  const LEVEL_C = "#555555";
-  const DASH    = `stroke-dasharray="3 2"`;
-  const FA      = `font-family="Arial,sans-serif"`;
+  const POS_FILL   = "#c0c0c0";
+  const NEG_FILL   = "#ffffff";
+  const BORDER     = "#2c2c2c";
+  const LABEL_C    = "#1a1a1a";
+  const LEVEL_C    = "#666666";
+  const DASH       = `stroke-dasharray="3 2"`;
+  const FA         = `font-family="Arial,sans-serif"`;
 
-  const cx = pad + colW / 2;
+  function fill(col: Col, sector: string) {
+    return pos[col].has(sector) ? POS_FILL : NEG_FILL;
+  }
 
+  // clipPath defs
   let defs = "<defs>";
-  defs += `<clipPath id="cb"><ellipse cx="${f(cx)}" cy="${f(baseY)}" rx="${fRx}" ry="${fRy}"/></clipPath>`;
-  defs += `<clipPath id="cm"><ellipse cx="${f(cx)}" cy="${f(midY)}"  rx="${fRx}" ry="${fRy}"/></clipPath>`;
-  defs += `<clipPath id="ca"><ellipse cx="${f(cx)}" cy="${f(apexY)}" rx="${aRx}"  ry="${aRy}"/></clipPath>`;
-  // Gradient for legend
-  defs += `<linearGradient id="leg" x1="0" y1="0" x2="1" y2="0">
-    <stop offset="0%"   stop-color="${cancerColor(0.02)}"/>
-    <stop offset="33%"  stop-color="${cancerColor(0.15)}"/>
-    <stop offset="60%"  stop-color="${cancerColor(0.35)}"/>
-    <stop offset="100%" stop-color="${cancerColor(0.80)}"/>
-  </linearGradient>`;
+  cols.forEach((_c, idx) => {
+    const cx = pad + idx * colW + colW / 2;
+    defs += `<clipPath id="cb${idx}"><ellipse cx="${f(cx)}" cy="${f(baseY)}" rx="${fRx}" ry="${fRy}"/></clipPath>`;
+    defs += `<clipPath id="cm${idx}"><ellipse cx="${f(cx)}" cy="${f(midY)}"  rx="${fRx}" ry="${fRy}"/></clipPath>`;
+    defs += `<clipPath id="ca${idx}"><ellipse cx="${f(cx)}" cy="${f(apexY)}" rx="${aRx}"  ry="${aRy}"/></clipPath>`;
+  });
   defs += "</defs>";
 
   let s = `<rect width="${svgW}" height="${svgH}" fill="#f9f9f9" rx="4"/>`;
 
-  const lbl = `text-anchor="middle" ${FA}`;
-
-  // ── Seminal Vesicles ────────────────────────────────────────────────────────
-  s += `<text x="${pad}" y="${svTop - 4}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">SV</text>`;
-  const svW  = colW / 2 - 16;
-  const svLx = pad + 4;
-  const svRx = pad + colW / 2 + 12;
-  for (const [x, key, lbTxt] of [
-    [svLx, "SV-L", "SV-L"],
-    [svRx, "SV-R", "SV-R"],
-  ] as [number, string, string][]) {
-    const v = (zones as Record<string, { svi?: number } | undefined>)[key]?.svi ?? 0.02;
-    const fc = cancerColor(v);
-    s += `<rect x="${x}" y="${svTop}" width="${svW}" height="${svH}" rx="9" fill="${fc}" stroke="${BORDER}" stroke-width="1.3"/>`;
-    s += `<text x="${x + svW / 2}" y="${svTop + svH / 2 + 4}" ${lbl} font-size="9" font-weight="700" fill="${LABEL_C}">${lbTxt}</text>`;
+  // Column separators
+  for (let i = 1; i < cols.length; i++) {
+    const lx = pad + i * colW;
+    s += `<line x1="${lx}" y1="8" x2="${lx}" y2="${svgH - 8}" stroke="#d8d8d8" stroke-width="1"/>`;
   }
 
-  // ── BASE ─────────────────────────────────────────────────────────────────────
-  {
-    const cy = baseY;
-    s += `<text x="${pad}" y="${cy - fRy - 5}" ${FA} font-size="9" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">BASE</text>`;
-    s += `<g clip-path="url(#cb)">`;
-    s += `<rect x="${f(cx - fRx)}" y="${f(cy)}"       width="${f(fRx)}" height="${f(fRy)}" fill="${zc("2p")}"/>`;
-    s += `<rect x="${f(cx)}"       y="${f(cy)}"       width="${f(fRx)}" height="${f(fRy)}" fill="${zc("7p")}"/>`;
-    s += `<ellipse cx="${f(cx - pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${zc("1p")}" stroke="${BORDER}" stroke-width="0.8"/>`;
-    s += `<ellipse cx="${f(cx + pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${zc("6p")}" stroke="${BORDER}" stroke-width="0.8"/>`;
-    s += `<rect x="${f(cx - fRx)}" y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${zc("1a")}"/>`;
-    s += `<rect x="${f(cx)}"       y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${zc("4a")}"/>`;
-    s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${fRx}" ry="${fRy}" fill="none" stroke="${BORDER}" stroke-width="1.6"/>`;
-    s += `<line x1="${f(cx - fRx)}" y1="${f(cy)}" x2="${f(cx + fRx)}" y2="${f(cy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
-    s += `<line x1="${f(cx)}" y1="${f(cy - fRy)}" x2="${f(cx)}" y2="${f(cy + fRy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
-    s += `</g>`;
-    s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="3.5" fill="#e8e8e8" stroke="${BORDER}" stroke-width="0.8"/>`;
-    const tl = `text-anchor="middle" ${FA} font-size="10" font-weight="700" fill="${LABEL_C}"`;
-    s += `<text x="${f(cx - fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>1a</text>`;
-    s += `<text x="${f(cx + fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>4a</text>`;
-    s += `<text x="${f(cx - pmXOff)}"      y="${f(cy + pmCyOff + 4)}"    ${tl}>1p</text>`;
-    s += `<text x="${f(cx + pmXOff)}"      y="${f(cy + pmCyOff + 4)}"    ${tl}>6p</text>`;
-    s += `<text x="${f(cx - fRx * 0.82)}" y="${f(cy + fRy * 0.74 + 4)}" ${tl}>2p</text>`;
-    s += `<text x="${f(cx + fRx * 0.82)}" y="${f(cy + fRy * 0.74 + 4)}" ${tl}>7p</text>`;
-  }
+  cols.forEach((col, idx) => {
+    const px = pad + idx * colW;
+    const cx = px + colW / 2;
+    const lbl = `text-anchor="middle" ${FA}`;
 
-  // ── MID ──────────────────────────────────────────────────────────────────────
-  {
-    const cy = midY;
-    s += `<text x="${pad}" y="${cy - fRy - 5}" ${FA} font-size="9" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">MID</text>`;
-    s += `<g clip-path="url(#cm)">`;
-    s += `<rect x="${f(cx - fRx)}" y="${f(cy)}"       width="${f(fRx)}" height="${f(fRy)}" fill="${zc("4p")}"/>`;
-    s += `<rect x="${f(cx)}"       y="${f(cy)}"       width="${f(fRx)}" height="${f(fRy)}" fill="${zc("9p")}"/>`;
-    s += `<ellipse cx="${f(cx - pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${zc("3p")}" stroke="${BORDER}" stroke-width="0.8"/>`;
-    s += `<ellipse cx="${f(cx + pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${zc("8p")}" stroke="${BORDER}" stroke-width="0.8"/>`;
-    s += `<rect x="${f(cx - fRx)}" y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${zc("2a")}"/>`;
-    s += `<rect x="${f(cx)}"       y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${zc("5a")}"/>`;
-    s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${fRx}" ry="${fRy}" fill="none" stroke="${BORDER}" stroke-width="1.6"/>`;
-    s += `<line x1="${f(cx - fRx)}" y1="${f(cy)}" x2="${f(cx + fRx)}" y2="${f(cy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
-    s += `<line x1="${f(cx)}" y1="${f(cy - fRy)}" x2="${f(cx)}" y2="${f(cy + fRy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
-    s += `</g>`;
-    s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="3.5" fill="#e8e8e8" stroke="${BORDER}" stroke-width="0.8"/>`;
-    const tl = `text-anchor="middle" ${FA} font-size="10" font-weight="700" fill="${LABEL_C}"`;
-    s += `<text x="${f(cx - fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>2a</text>`;
-    s += `<text x="${f(cx + fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>5a</text>`;
-    s += `<text x="${f(cx - pmXOff)}"      y="${f(cy + pmCyOff + 4)}"    ${tl}>3p</text>`;
-    s += `<text x="${f(cx + pmXOff)}"      y="${f(cy + pmCyOff + 4)}"    ${tl}>8p</text>`;
-    s += `<text x="${f(cx - fRx * 0.82)}" y="${f(cy + fRy * 0.74 + 4)}" ${tl}>4p</text>`;
-    s += `<text x="${f(cx + fRx * 0.82)}" y="${f(cy + fRy * 0.74 + 4)}" ${tl}>9p</text>`;
-  }
+    // Column header
+    s += `<rect x="${px + 6}" y="5" width="${colW - 12}" height="22" rx="3" fill="#2c3e50" opacity="0.09"/>`;
+    s += `<text x="${f(cx)}" y="20" ${lbl} font-size="13" font-weight="800" fill="#2c3e50">${col}</text>`;
 
-  // ── APEX ─────────────────────────────────────────────────────────────────────
-  {
-    const cy = apexY;
-    s += `<text x="${pad}" y="${cy - aRy - 5}" ${FA} font-size="9" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">APEX</text>`;
-    s += `<g clip-path="url(#ca)">`;
-    s += `<rect x="${f(cx - aRx)}" y="${f(cy)}"       width="${f(aRx)}" height="${f(aRy)}" fill="${zc("5p")}"/>`;
-    s += `<rect x="${f(cx)}"       y="${f(cy)}"       width="${f(aRx)}" height="${f(aRy)}" fill="${zc("10p")}"/>`;
-    s += `<rect x="${f(cx - aRx)}" y="${f(cy - aRy)}" width="${f(aRx)}" height="${f(aRy)}" fill="${zc("3a")}"/>`;
-    s += `<rect x="${f(cx)}"       y="${f(cy - aRy)}" width="${f(aRx)}" height="${f(aRy)}" fill="${zc("6a")}"/>`;
-    s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${aRx}" ry="${aRy}" fill="none" stroke="${BORDER}" stroke-width="1.6"/>`;
-    s += `<line x1="${f(cx - aRx)}" y1="${f(cy)}" x2="${f(cx + aRx)}" y2="${f(cy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
-    s += `<line x1="${f(cx)}" y1="${f(cy - aRy)}" x2="${f(cx)}" y2="${f(cy + aRy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
-    s += `</g>`;
-    s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="6" fill="#ffffff" stroke="${BORDER}" stroke-width="1.3"/>`;
-    s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="2.5" fill="${BORDER}"/>`;
-    const tl = `text-anchor="middle" ${FA} font-size="10" font-weight="700" fill="${LABEL_C}"`;
-    s += `<text x="${f(cx - aRx * 0.5)}" y="${f(cy - aRy * 0.48 + 4)}"  ${tl}>3a</text>`;
-    s += `<text x="${f(cx + aRx * 0.5)}" y="${f(cy - aRy * 0.48 + 4)}"  ${tl}>6a</text>`;
-    s += `<text x="${f(cx - aRx * 0.5)}" y="${f(cy + aRy * 0.68 + 4)}"  ${tl}>5p</text>`;
-    s += `<text x="${f(cx + aRx * 0.5)}" y="${f(cy + aRy * 0.68 + 4)}"  ${tl}>10p</text>`;
-  }
+    // ── Seminal Vesicles ──────────────────────────────────────────────────────
+    s += `<text x="${px + 10}" y="${svTop - 3}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">SV</text>`;
+    const svW = colW / 2 - 14;
+    const svLx = px + 10, svRx = px + colW / 2 + 4;
+    for (const [x, hasPos, lbTxt] of [
+      [svLx, svL[col], "SV-L"],
+      [svRx, svR[col], "SV-R"],
+    ] as [number, boolean, string][]) {
+      const fc = hasPos ? POS_FILL : NEG_FILL;
+      s += `<rect x="${x}" y="${svTop}" width="${svW}" height="${svH}" rx="9" fill="${fc}" stroke="${BORDER}" stroke-width="1.3"/>`;
+      s += `<text x="${x + svW / 2}" y="${svTop + svH / 2 + 4}" ${lbl} font-size="9" font-weight="700" fill="${LABEL_C}">${lbTxt}</text>`;
+    }
 
-  // ── L / R labels ─────────────────────────────────────────────────────────────
-  const lrTl = `text-anchor="middle" ${FA} font-size="13" font-weight="700" fill="#444"`;
-  s += `<text x="${f(cx - fRx * 0.45)}" y="${lrY}" ${lrTl}>L</text>`;
-  s += `<text x="${f(cx + fRx * 0.45)}" y="${lrY}" ${lrTl}>R</text>`;
+    // ── BASE ──────────────────────────────────────────────────────────────────
+    {
+      const cy = baseY;
+      s += `<text x="${px + 10}" y="${cy - fRy - 5}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">base</text>`;
 
-  // ── Gradient legend ───────────────────────────────────────────────────────────
-  const legW = colW - 24;
-  const legLx = pad + 12;
-  s += `<rect x="${legLx}" y="${legY}" width="${legW}" height="9" rx="2" fill="url(#leg)" stroke="#ccc" stroke-width="0.5"/>`;
-  s += `<text x="${legLx}" y="${legY + 19}" ${FA} font-size="7.5" fill="#666">Low risk</text>`;
-  s += `<text x="${legLx + legW}" y="${legY + 19}" text-anchor="end" ${FA} font-size="7.5" fill="#666">High risk</text>`;
-  s += `<text x="${legLx + legW / 2}" y="${legY + 19}" text-anchor="middle" ${FA} font-size="7.5" fill="#666">Cancer probability</text>`;
+      const antL = fill(col, "1a"), antR = fill(col, "4a");
+      const plL  = fill(col, "2p"), plR  = fill(col, "7p");
+      const pmL  = fill(col, "1p"), pmR  = fill(col, "6p");
 
-  return `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;max-width:${svgW}px;margin:0 auto">${defs}${s}</svg>`;
+      s += `<g clip-path="url(#cb${idx})">`;
+      s += `<rect x="${f(cx - fRx)}" y="${f(cy)}"      width="${f(fRx)}" height="${f(fRy)}" fill="${plL}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy)}"      width="${f(fRx)}" height="${f(fRy)}" fill="${plR}"/>`;
+      s += `<ellipse cx="${f(cx - pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${pmL}" stroke="${BORDER}" stroke-width="0.8"/>`;
+      s += `<ellipse cx="${f(cx + pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${pmR}" stroke="${BORDER}" stroke-width="0.8"/>`;
+      s += `<rect x="${f(cx - fRx)}" y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${antL}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${antR}"/>`;
+      s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${fRx}" ry="${fRy}" fill="none" stroke="${BORDER}" stroke-width="1.6"/>`;
+      s += `<line x1="${f(cx - fRx)}" y1="${f(cy)}" x2="${f(cx + fRx)}" y2="${f(cy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
+      s += `<line x1="${f(cx)}" y1="${f(cy - fRy)}" x2="${f(cx)}" y2="${f(cy + fRy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
+      s += `</g>`;
+      s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="3" fill="#cccccc" stroke="${BORDER}" stroke-width="0.8"/>`;
+
+      const tl = `text-anchor="middle" ${FA} font-size="9" font-weight="700" fill="${LABEL_C}"`;
+      s += `<text x="${f(cx - fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>1a</text>`;
+      s += `<text x="${f(cx + fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>4a</text>`;
+      s += `<text x="${f(cx - pmXOff)}"      y="${f(cy + pmCyOff + 4)}"    ${tl}>1p</text>`;
+      s += `<text x="${f(cx + pmXOff)}"      y="${f(cy + pmCyOff + 4)}"    ${tl}>6p</text>`;
+      s += `<text x="${f(cx - fRx * 0.82)}" y="${f(cy + fRy * 0.75 + 3)}" ${tl}>2p</text>`;
+      s += `<text x="${f(cx + fRx * 0.82)}" y="${f(cy + fRy * 0.75 + 3)}" ${tl}>7p</text>`;
+    }
+
+    // ── MID ───────────────────────────────────────────────────────────────────
+    {
+      const cy = midY;
+      s += `<text x="${px + 10}" y="${cy - fRy - 5}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">mid</text>`;
+
+      const antL = fill(col, "2a"), antR = fill(col, "5a");
+      const plL  = fill(col, "4p"), plR  = fill(col, "9p");
+      const pmL  = fill(col, "3p"), pmR  = fill(col, "8p");
+
+      s += `<g clip-path="url(#cm${idx})">`;
+      s += `<rect x="${f(cx - fRx)}" y="${f(cy)}"      width="${f(fRx)}" height="${f(fRy)}" fill="${plL}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy)}"      width="${f(fRx)}" height="${f(fRy)}" fill="${plR}"/>`;
+      s += `<ellipse cx="${f(cx - pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${pmL}" stroke="${BORDER}" stroke-width="0.8"/>`;
+      s += `<ellipse cx="${f(cx + pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${pmR}" stroke="${BORDER}" stroke-width="0.8"/>`;
+      s += `<rect x="${f(cx - fRx)}" y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${antL}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${antR}"/>`;
+      s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${fRx}" ry="${fRy}" fill="none" stroke="${BORDER}" stroke-width="1.6"/>`;
+      s += `<line x1="${f(cx - fRx)}" y1="${f(cy)}" x2="${f(cx + fRx)}" y2="${f(cy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
+      s += `<line x1="${f(cx)}" y1="${f(cy - fRy)}" x2="${f(cx)}" y2="${f(cy + fRy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
+      s += `</g>`;
+      s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="3" fill="#cccccc" stroke="${BORDER}" stroke-width="0.8"/>`;
+
+      const tl = `text-anchor="middle" ${FA} font-size="9" font-weight="700" fill="${LABEL_C}"`;
+      s += `<text x="${f(cx - fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>2a</text>`;
+      s += `<text x="${f(cx + fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>5a</text>`;
+      s += `<text x="${f(cx - pmXOff)}"      y="${f(cy + pmCyOff + 4)}"    ${tl}>3p</text>`;
+      s += `<text x="${f(cx + pmXOff)}"      y="${f(cy + pmCyOff + 4)}"    ${tl}>8p</text>`;
+      s += `<text x="${f(cx - fRx * 0.82)}" y="${f(cy + fRy * 0.75 + 3)}" ${tl}>4p</text>`;
+      s += `<text x="${f(cx + fRx * 0.82)}" y="${f(cy + fRy * 0.75 + 3)}" ${tl}>9p</text>`;
+    }
+
+    // ── APEX ──────────────────────────────────────────────────────────────────
+    {
+      const cy = apexY;
+      s += `<text x="${px + 10}" y="${cy - aRy - 5}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">apex</text>`;
+
+      const antL  = fill(col, "3a"),  antR  = fill(col, "6a");
+      const postL = fill(col, "5p"),  postR = fill(col, "10p");
+
+      s += `<g clip-path="url(#ca${idx})">`;
+      s += `<rect x="${f(cx - aRx)}" y="${f(cy)}"      width="${f(aRx)}" height="${f(aRy)}" fill="${postL}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy)}"      width="${f(aRx)}" height="${f(aRy)}" fill="${postR}"/>`;
+      s += `<rect x="${f(cx - aRx)}" y="${f(cy - aRy)}" width="${f(aRx)}" height="${f(aRy)}" fill="${antL}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy - aRy)}" width="${f(aRx)}" height="${f(aRy)}" fill="${antR}"/>`;
+      s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${aRx}" ry="${aRy}" fill="none" stroke="${BORDER}" stroke-width="1.6"/>`;
+      s += `<line x1="${f(cx - aRx)}" y1="${f(cy)}" x2="${f(cx + aRx)}" y2="${f(cy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
+      s += `<line x1="${f(cx)}" y1="${f(cy - aRy)}" x2="${f(cx)}" y2="${f(cy + aRy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
+      s += `</g>`;
+      // Open-circle urethra marker at apex
+      s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="5.5" fill="#ffffff" stroke="${BORDER}" stroke-width="1.3"/>`;
+      s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="2.5" fill="${BORDER}"/>`;
+
+      const tl = `text-anchor="middle" ${FA} font-size="9" font-weight="700" fill="${LABEL_C}"`;
+      s += `<text x="${f(cx - aRx * 0.5)}" y="${f(cy - aRy * 0.48 + 4)}"  ${tl}>3a</text>`;
+      s += `<text x="${f(cx + aRx * 0.5)}" y="${f(cy - aRy * 0.48 + 4)}"  ${tl}>6a</text>`;
+      s += `<text x="${f(cx - aRx * 0.5)}" y="${f(cy + aRy * 0.68 + 3)}"  ${tl}>5p</text>`;
+      s += `<text x="${f(cx + aRx * 0.5)}" y="${f(cy + aRy * 0.68 + 3)}"  ${tl}>10p</text>`;
+    }
+
+    // ── L / R labels ──────────────────────────────────────────────────────────
+    const tl = `text-anchor="middle" ${FA} font-size="12" font-weight="700" fill="#444"`;
+    s += `<text x="${f(cx - fRx * 0.45)}" y="${lrY}" ${tl}>L</text>`;
+    s += `<text x="${f(cx + fRx * 0.45)}" y="${lrY}" ${tl}>R</text>`;
+  });
+
+  // Bottom legend (single, centered)
+  const legY = svgH - 14;
+  const legCx = svgW / 2;
+  s += `<rect x="${legCx - 52}" y="${legY - 9}" width="9" height="9" rx="1" fill="${POS_FILL}" stroke="${BORDER}" stroke-width="0.8"/>`;
+  s += `<text x="${legCx - 41}" y="${legY - 1}" ${FA} font-size="7.5" fill="#777">Positive finding</text>`;
+  s += `<rect x="${legCx + 40}" y="${legY - 9}" width="9" height="9" rx="1" fill="${NEG_FILL}" stroke="${BORDER}" stroke-width="0.8"/>`;
+  s += `<text x="${legCx + 51}" y="${legY - 1}" ${FA} font-size="7.5" fill="#777">Negative</text>`;
+
+  return `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;max-width:${svgW}px">${defs}${s}</svg>`;
 }
 
 // ── HTML builder (exported for modal use) ────────────────────────────────────
@@ -205,8 +262,8 @@ export function buildPrintHtml(): string | null {
   const riskBorderColor = (v: number) =>
     v >= 0.3 ? "#F1948A" : v >= 0.15 ? "#F8C471" : "#82E0AA";
 
-  // ── Zone heatmap ─────────────────────────────────────────────────────────
-  const prostateMapSVG = buildZoneHeatmapSVG(entry.record.zones ?? {});
+  // ── OR-style prostate sector map ─────────────────────────────────────────
+  const prostateMapSVG = buildORSectorMapSVG(entry.lesionRows);
 
   // ── Prediction cards ──────────────────────────────────────────────────────
   const predFields = [
@@ -454,8 +511,8 @@ ${sideEceHtml}
 
 <div class="map-box">
   <div class="map-box-title">
-    Prostate Zone Heatmap — Cancer Probability
-    <span>Axial view · L on left · ANT = top · POST = bottom · Color = cancer risk (green → orange → red) · Inner ellipse = PZpm</span>
+    Prostate Sector Map — Imaging Findings by Modality
+    <span>Axial view · L on left · ANT = top · POST = bottom · Shaded = positive finding · Inner ellipse = PZpm</span>
   </div>
   <div style="padding:10px 8px 4px">${prostateMapSVG}</div>
 </div>
