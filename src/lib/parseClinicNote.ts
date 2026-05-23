@@ -224,6 +224,11 @@ function parseMriLines(
         );
       }
       lesions.push(...rows);
+      // "extending to TZ/central/anterior" → add anterior zone rows too
+      if (/extending\s+to\s+(?:tz|central|cz|az|anterior)/i.test(seg)) {
+        const { rows: antRows } = expandToZoneRows({ ...base, zone: "Anterior" }, side, "Anterior", levels);
+        lesions.push(...antRows);
+      }
     }
   }
   return { lesions, volumeCc };
@@ -266,6 +271,24 @@ function parseMusLines(lines: string[], warnings: string[]): LesionRow[] {
   return result;
 }
 
+function parsePsaLine(lines: string[]): { psa?: number; shim?: number; totalCores?: number } {
+  const text = lines.join(" ");
+  const psaM = text.match(/psa\s+(\d+(?:\.\d+)?)/i);
+  const shimM = text.match(/shim\s+(\d+)/i);
+  // "Left: 3 ... Right: 3" or "Left: 3 Right:3" → total cores
+  const coresL = text.match(/left\s*:\s*(\d+)/i);
+  const coresR = text.match(/right\s*:\s*(\d+)/i);
+  const totalCores =
+    coresL || coresR
+      ? (coresL ? parseInt(coresL[1] ?? "0") : 0) + (coresR ? parseInt(coresR[1] ?? "0") : 0)
+      : undefined;
+  return {
+    psa: psaM ? parseFloat(psaM[1] ?? "0") : undefined,
+    shim: shimM ? parseInt(shimM[1] ?? "0") : undefined,
+    totalCores,
+  };
+}
+
 function parsePsmaLines(lines: string[], warnings: string[]): LesionRow[] {
   const result: LesionRow[] = [];
   for (const line of lines) {
@@ -305,6 +328,8 @@ export interface ParsedNote {
   biopsyTotalCores?: number;
   biopsyMaxCorePct?: number;
   biopsyGG?: number;
+  psa?: number;
+  shim?: number;
   warnings: string[];
 }
 
@@ -322,6 +347,7 @@ export function parseClinicNote(text: string): ParsedNote {
     mri: [] as string[],
     mus: [] as string[],
     psma: [] as string[],
+    psa: [] as string[],
   };
   type SectionKey = keyof typeof sections;
   let current: SectionKey | null = null;
@@ -346,6 +372,9 @@ export function parseClinicNote(text: string): ParsedNote {
       current = "psma";
       const rest = raw.replace(/^psma\s*/i, "").trim();
       if (rest) sections.psma.push(rest);
+    } else if (/^psa\b/i.test(trimmed)) {
+      current = "psa";
+      sections.psa.push(trimmed); // keep full line including "PSA" keyword
     } else if (current && trimmed) {
       sections[current].push(trimmed);
     } else if (!current && trimmed.length >= 6 && /gleason|pirads|primus|suv\b/i.test(trimmed)) {
@@ -358,10 +387,13 @@ export function parseClinicNote(text: string): ParsedNote {
   const { lesions: mriLesions, volumeCc } = parseMriLines(sections.mri, warnings);
   const musLesions = parseMusLines(sections.mus, warnings);
   const psmaLesions = parsePsmaLines(sections.psma, warnings);
+  const psaData = parsePsaLine(sections.psa);
 
   const biopsyText = sections.biopsy.join(" ");
   const coresMatch = biopsyText.match(/(\d+)\s+\d+(?:st|nd|rd|th)\b/i);
-  const biopsyTotalCores = coresMatch ? parseInt(coresMatch[1] ?? "0") : undefined;
+  const biopsyTotalCores =
+    coresMatch ? parseInt(coresMatch[1] ?? "0")
+    : psaData.totalCores;
 
   const maxCorePct =
     bxLesions.length > 0 ? Math.max(...bxLesions.map((l) => l.corePct)) : undefined;
@@ -376,6 +408,8 @@ export function parseClinicNote(text: string): ParsedNote {
     biopsyTotalCores,
     biopsyMaxCorePct: maxCorePct,
     biopsyGG: maxGG,
+    psa: psaData.psa,
+    shim: psaData.shim,
     warnings,
   };
 }

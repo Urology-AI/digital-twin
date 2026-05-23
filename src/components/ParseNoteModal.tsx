@@ -17,19 +17,17 @@ const ABUTMENT_LABELS: Record<number, string> = {
 };
 
 const EXAMPLE_NOTE = `Biopsy
-Gleason 7 (4+3) 30% Right PL PZ
-Gleason 6 (3+3) 10% Left PZ
-Gleason 6 (3+3) 50%
+Gleason 7 (4+3) 80% Left side
+Gleason 7 (4+3) 50% Right side
 
-MRI 42cc
-PIRADS 5 Right PL PZ mid Abut yes No EPE
-PIRADS 4 Left PZ base No abut No EPE
+MRI 29cc
+PIRADS 5 Left PZ base to apex extending to central and TZ Abut present No EPE
 
-MUS
-PRIMUS 4 Right PL PZ mid Abut yes
+MUS 36cc
+PRIMUS 4 Left PL PZ apex to base Abut yes No EPE
+PRIMUS 3 Right PL PZ mid to base Abut yes No EPE
 
-PSMA
-SUV 8.5 Right PL PZ`;
+PSA 19.93 SHIM 23 Left: 3 (Ant + Post) Right: 3 (post)`;
 
 type Step = "format" | "enter" | "review";
 
@@ -57,7 +55,7 @@ export function ParseNoteModal({ onClose }: Props) {
     const result = parseClinicNote(text);
     if (result.lesions.length === 0 && !result.prostateVolumeCc && !result.biopsyGG) {
       setError(
-        "No recognizable data found. Check that section headers (Biopsy, MRI, MUS, PSMA) appear at the start of a line.",
+        "No recognizable data found. Check that section headers (Biopsy, MRI, MUS, PSMA, PSA) appear at the start of a line.",
       );
       return;
     }
@@ -72,6 +70,7 @@ export function ParseNoteModal({ onClose }: Props) {
     if (parsed.biopsyGG !== undefined) updateClinicalForm({ gg: parsed.biopsyGG });
     if (parsed.biopsyTotalCores !== undefined) updateClinicalForm({ cores: parsed.biopsyTotalCores });
     if (parsed.biopsyMaxCorePct !== undefined) updateClinicalForm({ maxcore: parsed.biopsyMaxCorePct });
+    if (parsed.psa !== undefined) updateClinicalForm({ psa: parsed.psa });
     pushHistory();
     onClose();
   }
@@ -121,21 +120,20 @@ export function ParseNoteModal({ onClose }: Props) {
                 </p>
                 <pre className="flex-1 overflow-auto rounded-lg border border-border bg-muted/30 p-3 text-[11px] font-mono leading-relaxed text-foreground">
 {`Biopsy
-Gleason 7 (4+3) 30% Right PL PZ
-Gleason 6 (3+3) 10% Left PZ
-Gleason 6 (3+3) 50%
+Gleason 7 (4+3) 80% Left side
+Gleason 7 (4+3) 50% Right side
 
-MRI 42cc
-PIRADS 5 Right PL PZ mid
+MRI 29cc
+PIRADS 5 Left PZ base to apex
+  extending to TZ Abut present No EPE
+
+MUS 36cc
+PRIMUS 4 Left PL PZ apex to base
   Abut yes No EPE
-PIRADS 4 Left PZ base
-  No abut No EPE
+PRIMUS 3 Right PL PZ mid to base
+  Abut yes No EPE
 
-MUS
-PRIMUS 4 Right PL PZ mid Abut yes
-
-PSMA
-SUV 8.5 Right PL PZ`}
+PSA 19.93 SHIM 23 Left: 3 Right: 3`}
                 </pre>
               </div>
 
@@ -151,22 +149,27 @@ SUV 8.5 Right PL PZ`}
                     {
                       hdr: "Biopsy",
                       key: "Gleason X (a+b)",
-                      opt: "% core  ·  side  ·  zone  ·  level",
+                      opt: "% core  ·  Left/Right  ·  PL PZ / PZ / TZ  ·  base/mid/apex",
                     },
                     {
                       hdr: "MRI",
                       key: "PIRADS X  or  Xcc",
-                      opt: "side  ·  zone  ·  level  ·  Abut yes/no  ·  EPE/No EPE",
+                      opt: "side  ·  zone  ·  level / base to apex  ·  extending to TZ  ·  Abut yes/no  ·  EPE/No EPE",
                     },
                     {
                       hdr: "MUS",
                       key: "PRIMUS X",
-                      opt: "side  ·  zone  ·  level  ·  Abut yes/no",
+                      opt: "side  ·  PL PZ / PZ  ·  level / apex to base  ·  Abut yes/no",
                     },
                     {
                       hdr: "PSMA",
                       key: "SUV X",
                       opt: "side  ·  zone  ·  level",
+                    },
+                    {
+                      hdr: "PSA",
+                      key: "PSA X  SHIM X",
+                      opt: "Left: N  Right: N (core counts)  — sets PSA field",
                     },
                   ].map(({ hdr, key, opt }) => (
                     <div
@@ -243,8 +246,9 @@ SUV 8.5 Right PL PZ`}
               Paste or type your note. Start each section with{" "}
               <span className="font-mono text-foreground">Biopsy</span>,{" "}
               <span className="font-mono text-foreground">MRI</span>,{" "}
-              <span className="font-mono text-foreground">MUS</span>, or{" "}
-              <span className="font-mono text-foreground">PSMA</span> at the beginning of a line.
+              <span className="font-mono text-foreground">MUS</span>,{" "}
+              <span className="font-mono text-foreground">PSMA</span>, or{" "}
+              <span className="font-mono text-foreground">PSA</span> at the beginning of a line.
             </p>
             <textarea
               autoFocus
@@ -290,15 +294,27 @@ SUV 8.5 Right PL PZ`}
               {(parsed.prostateVolumeCc !== undefined ||
                 parsed.biopsyGG !== undefined ||
                 parsed.biopsyTotalCores !== undefined ||
-                parsed.biopsyMaxCorePct !== undefined) && (
+                parsed.biopsyMaxCorePct !== undefined ||
+                parsed.psa !== undefined ||
+                parsed.shim !== undefined) && (
                 <div className="rounded-lg border border-border bg-muted/30 p-3">
                   <p className="mb-2 text-xs font-semibold text-foreground">
                     Clinical fields to update
                   </p>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    {parsed.psa !== undefined && (
+                      <span>
+                        PSA: <span className="text-foreground">{parsed.psa} ng/mL</span>
+                      </span>
+                    )}
+                    {parsed.shim !== undefined && (
+                      <span>
+                        SHIM: <span className="text-foreground">{parsed.shim}</span>
+                      </span>
+                    )}
                     {parsed.prostateVolumeCc !== undefined && (
                       <span>
-                        Prostate volume:{" "}
+                        Volume:{" "}
                         <span className="text-foreground">{parsed.prostateVolumeCc} cc</span>
                       </span>
                     )}

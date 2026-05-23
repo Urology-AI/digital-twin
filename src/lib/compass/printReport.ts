@@ -78,7 +78,6 @@ function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
   const aRx = 44, aRy = 35;
   const pmRx = 18, pmRy = 14, pmXOff = 16, pmCyOff = 11;
 
-  const POS_FILL   = "#c0c0c0";
   const NEG_FILL   = "#ffffff";
   const BORDER     = "#2c2c2c";
   const LABEL_C    = "#1a1a1a";
@@ -86,8 +85,17 @@ function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
   const DASH       = `stroke-dasharray="3 2"`;
   const FA         = `font-family="Arial,sans-serif"`;
 
-  function fill(col: Col, sector: string) {
-    return pos[col].has(sector) ? POS_FILL : NEG_FILL;
+  // L sectors: 1a–3a, 1p–5p  |  R sectors: 4a–6a, 6p–10p
+  function isLeftSector(s: string): boolean {
+    const n = parseInt(s);
+    return s.endsWith("a") ? n <= 3 : n <= 5;
+  }
+
+  function fill(col: Col, sector: string): string {
+    if (!pos[col].has(sector)) return NEG_FILL;
+    if (col === "MRI") return "#C0392B";
+    if (col === "MUS") return isLeftSector(sector) ? "#2471A3" : "#D4AC0D";
+    return "#D4AC0D"; // PET
   }
 
   // clipPath defs
@@ -121,11 +129,16 @@ function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
     s += `<text x="${px + 10}" y="${svTop - 3}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">SV</text>`;
     const svW = colW / 2 - 14;
     const svLx = px + 10, svRx = px + colW / 2 + 4;
-    for (const [x, hasPos, lbTxt] of [
-      [svLx, svL[col], "SV-L"],
-      [svRx, svR[col], "SV-R"],
-    ] as [number, boolean, string][]) {
-      const fc = hasPos ? POS_FILL : NEG_FILL;
+    for (const [x, hasPos, lbTxt, isLeft] of [
+      [svLx, svL[col], "SV-L", true],
+      [svRx, svR[col], "SV-R", false],
+    ] as [number, boolean, string, boolean][]) {
+      let fc = NEG_FILL;
+      if (hasPos) {
+        if (col === "MRI") fc = "#C0392B";
+        else if (col === "MUS") fc = isLeft ? "#2471A3" : "#D4AC0D";
+        else fc = "#D4AC0D";
+      }
       s += `<rect x="${x}" y="${svTop}" width="${svW}" height="${svH}" rx="9" fill="${fc}" stroke="${BORDER}" stroke-width="1.3"/>`;
       s += `<text x="${x + svW / 2}" y="${svTop + svH / 2 + 4}" ${lbl} font-size="9" font-weight="700" fill="${LABEL_C}">${lbTxt}</text>`;
     }
@@ -226,21 +239,35 @@ function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
     s += `<text x="${f(cx + fRx * 0.45)}" y="${lrY}" ${tl}>R</text>`;
   });
 
-  // Bottom legend (single, centered)
+  // Bottom legend
   const legY = svgH - 14;
-  const legCx = svgW / 2;
-  s += `<rect x="${legCx - 52}" y="${legY - 9}" width="9" height="9" rx="1" fill="${POS_FILL}" stroke="${BORDER}" stroke-width="0.8"/>`;
-  s += `<text x="${legCx - 41}" y="${legY - 1}" ${FA} font-size="7.5" fill="#777">Positive finding</text>`;
-  s += `<rect x="${legCx + 40}" y="${legY - 9}" width="9" height="9" rx="1" fill="${NEG_FILL}" stroke="${BORDER}" stroke-width="0.8"/>`;
-  s += `<text x="${legCx + 51}" y="${legY - 1}" ${FA} font-size="7.5" fill="#777">Negative</text>`;
+  const legItems: [string, string][] = [
+    ["#C0392B", "MRI"], ["#2471A3", "MUS-L"], ["#D4AC0D", "MUS-R / PET"], [NEG_FILL, "Negative"],
+  ];
+  let legX = 12;
+  legItems.forEach(([color, label]) => {
+    s += `<rect x="${legX}" y="${legY - 9}" width="9" height="9" rx="1" fill="${color}" stroke="${BORDER}" stroke-width="0.8"/>`;
+    s += `<text x="${legX + 11}" y="${legY - 1}" ${FA} font-size="7.5" fill="#777">${label}</text>`;
+    legX += label.length * 5 + 18;
+  });
 
   return `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;max-width:${svgW}px">${defs}${s}</svg>`;
 }
 
 // ── HTML builder (exported for modal use) ────────────────────────────────────
 
+const ZONE_PRINT_LABELS: Record<string, string> = {
+  "P-RB-L": "R Base Lat", "P-RB-M": "R Base Med",
+  "P-LB-M": "L Base Med", "P-LB-L": "L Base Lat",
+  "P-RM-L": "R Mid Lat",  "P-RM-M": "R Mid Med",
+  "P-LM-M": "L Mid Med",  "P-LM-L": "L Mid Lat",
+  "P-RA":   "R Apex",     "P-LA":   "L Apex",
+  "A-RB":   "R Ant Base", "A-LB":   "L Ant Base",
+  "A-RM":   "R Ant Mid",  "A-LM":   "L Ant Mid",
+};
+
 export function buildPrintHtml(): string | null {
-  const { patients, activeId, predictions } = usePatientStore.getState();
+  const { patients, activeId, predictions, threeZones } = usePatientStore.getState();
 
   const entry = patients.find((p) => p.id === activeId);
   if (!entry || !predictions) return null;
@@ -412,6 +439,27 @@ export function buildPrintHtml(): string | null {
     <tbody>${nsRows}</tbody>
   </table>`;
 
+  // ── Zone cancer probability table ─────────────────────────────────────────
+  const zoneCancerItems = threeZones
+    .filter((z) => (z.cancer ?? 0) > 0.05 && ZONE_PRINT_LABELS[z.id])
+    .sort((a, b) => (b.cancer ?? 0) - (a.cancer ?? 0))
+    .map((z) => {
+      const v = z.cancer ?? 0;
+      const bg = riskBgColor(v);
+      const border = riskBorderColor(v);
+      const col = riskColor(v);
+      return `<tr>
+        <td>${ZONE_PRINT_LABELS[z.id]}</td>
+        <td style="text-align:right;font-weight:700;color:${col};background:${bg};border-left:3px solid ${border}">${pct(v)}</td>
+      </tr>`;
+    });
+  const zoneCancerHtml = zoneCancerItems.length > 0
+    ? `<table>
+        <thead><tr><th>Zone</th><th style="text-align:right">csPCa Probability</th></tr></thead>
+        <tbody>${zoneCancerItems.join("")}</tbody>
+      </table>`
+    : `<p style="font-size:10px;color:#999">No zones above 5%</p>`;
+
   const allAlerts: string[] = [];
   (L.alerts ?? []).forEach((a) => allAlerts.push("L — " + a.message));
   (R.alerts ?? []).forEach((a) => allAlerts.push("R — " + a.message));
@@ -516,6 +564,9 @@ ${sideEceHtml}
   </div>
   <div style="padding:10px 8px 4px">${prostateMapSVG}</div>
 </div>
+
+<h2>Zone Cancer Probability</h2>
+${zoneCancerHtml}
 
 <h2>Nerve Sparing — 5-Zone Analysis</h2>
 ${nsHtml}
