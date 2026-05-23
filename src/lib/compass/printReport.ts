@@ -2,10 +2,10 @@ import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "./clinicalFromRecord";
+import { COMPASS_TO_3D } from "./constants";
 
-// ── Three-column sector map with heatmap coloring ────────────────────────────
-// MRI / MUS / PET columns; positive sectors colored by zone cancer probability
-// using the same green→orange→red ramp as the 3D model's overlayColor("cancer").
+// ── Sector map: positive sectors colored by cancer probability (green→red) ───
+// Same ramp as the 3D model's overlayColor("cancer").
 
 function lesionRowToSectors(row: import("@/types/lesion").LesionRow): string[] {
   const pos = row.zone || "";
@@ -54,7 +54,11 @@ function cancerColor(val: number): string {
   return `#${h(r)}${h(g)}${h(b)}`;
 }
 
-function buildZoneHeatmapSVG(lesionRows: import("@/types/lesion").LesionRow[]): string {
+function buildZoneHeatmapSVG(
+  lesionRows: import("@/types/lesion").LesionRow[],
+  threeZones: import("@/types/prediction").ThreeZoneRuntime[],
+  sviProbs: { L: number; R: number },
+): string {
   const f = (n: number) => n.toFixed(1);
 
   type Col = "MRI" | "MUS" | "PET";
@@ -66,6 +70,7 @@ function buildZoneHeatmapSVG(lesionRows: import("@/types/lesion").LesionRow[]): 
   const svR: Record<Col, boolean> = { MRI: false, MUS: false, PET: false };
 
   for (const row of lesionRows) {
+    if (row.source === "Bx") continue; // biopsy is not an imaging modality — shown in lesion table
     const grp: Col = row.source === "MRI" ? "MRI" : row.source === "PSMA" ? "PET" : "MUS";
     if (row.svi) {
       if (row.side === "L" || row.side === "") svL[grp] = true;
@@ -74,9 +79,13 @@ function buildZoneHeatmapSVG(lesionRows: import("@/types/lesion").LesionRow[]): 
     lesionRowToSectors(row).forEach((z) => pos[grp].add(z));
   }
 
+  // Only render columns that have at least one finding
+  const activeCols = cols.filter((c) => pos[c].size > 0 || svL[c] || svR[c]);
+  if (activeCols.length === 0) return "";
+
   const colW = 218;
   const pad  = 8;
-  const svgW = cols.length * colW + pad * 2;
+  const svgW = activeCols.length * colW + pad * 2;
 
   const svTop = 36;
   const svH   = 26;
@@ -109,22 +118,20 @@ function buildZoneHeatmapSVG(lesionRows: import("@/types/lesion").LesionRow[]): 
     PET: "#ede9fe",
   };
 
-  // L sectors: 1a–3a, 1p–5p  |  R sectors: 4a–6a, 6p–10p
-  function isLeftSector(s: string): boolean {
-    const n = parseInt(s);
-    return s.endsWith("a") ? n <= 3 : n <= 5;
+  // Look up cancer probability for a sector via COMPASS_TO_3D zone id
+  function sectorProb(sector: string): number {
+    const zoneId = COMPASS_TO_3D[sector];
+    return zoneId ? (threeZones.find((z) => z.id === zoneId)?.cancer ?? 0.25) : 0.25;
   }
 
-  // Per-modality colors matching OR document: MRI red, MUS blue(L)/gold(R), PET gold
+  // Positive sectors use cancer-probability color (green→red); negative = white
   function fill(col: Col, sector: string): string {
     if (!pos[col].has(sector)) return NEG_FILL;
-    if (col === "MRI") return "#C0392B";
-    if (col === "MUS") return isLeftSector(sector) ? "#2471A3" : "#D4AC0D";
-    return "#D4AC0D";
+    return cancerColor(sectorProb(sector));
   }
 
   let defs = "<defs>";
-  cols.forEach((_c, idx) => {
+  activeCols.forEach((_c, idx) => {
     const cx = pad + idx * colW + colW / 2;
     defs += `<clipPath id="cb${idx}"><ellipse cx="${f(cx)}" cy="${f(baseY)}" rx="${fRx}" ry="${fRy}"/></clipPath>`;
     defs += `<clipPath id="cm${idx}"><ellipse cx="${f(cx)}" cy="${f(midY)}"  rx="${fRx}" ry="${fRy}"/></clipPath>`;
@@ -140,12 +147,12 @@ function buildZoneHeatmapSVG(lesionRows: import("@/types/lesion").LesionRow[]): 
 
   let s = `<rect width="${svgW}" height="${svgH}" fill="#f9f9f9" rx="4"/>`;
 
-  for (let i = 1; i < cols.length; i++) {
+  for (let i = 1; i < activeCols.length; i++) {
     const lx = pad + i * colW;
     s += `<line x1="${lx}" y1="8" x2="${lx}" y2="${legY - 8}" stroke="#d8d8d8" stroke-width="1"/>`;
   }
 
-  cols.forEach((col, idx) => {
+  activeCols.forEach((col, idx) => {
     const px  = pad + idx * colW;
     const cx  = px + colW / 2;
     const lbl = `text-anchor="middle" ${FA}`;
@@ -162,12 +169,7 @@ function buildZoneHeatmapSVG(lesionRows: import("@/types/lesion").LesionRow[]): 
       [svLx, svL[col], "SV-L", true],
       [svRx, svR[col], "SV-R", false],
     ] as [number, boolean, string, boolean][]) {
-      let fc = NEG_FILL;
-      if (hasPos) {
-        if (col === "MRI") fc = "#C0392B";
-        else if (col === "MUS") fc = isLeft ? "#2471A3" : "#D4AC0D";
-        else fc = "#D4AC0D";
-      }
+      const fc = hasPos ? cancerColor(isLeft ? sviProbs.L : sviProbs.R) : NEG_FILL;
       s += `<rect x="${x}" y="${svTop}" width="${svW}" height="${svH}" rx="9" fill="${fc}" stroke="${BORDER}" stroke-width="1.3"/>`;
       s += `<text x="${x + svW / 2}" y="${svTop + svH / 2 + 4}" ${lbl} font-size="9" font-weight="700" fill="${LABEL_C}">${lbTxt}</text>`;
     }
@@ -250,16 +252,14 @@ function buildZoneHeatmapSVG(lesionRows: import("@/types/lesion").LesionRow[]): 
     s += `<text x="${f(cx + fRx * 0.45)}" y="${lrY}" ${lrTl}>R</text>`;
   });
 
-  // Legend — one chip per modality + Negative
-  const legItems: [string, string][] = [
-    ["#C0392B", "MRI"], ["#2471A3", "MUS-L"], ["#D4AC0D", "MUS-R / PET"], [NEG_FILL, "Negative"],
-  ];
-  let legX = 12;
-  legItems.forEach(([color, label]) => {
-    s += `<rect x="${legX}" y="${legY - 9}" width="9" height="9" rx="1" fill="${color}" stroke="${BORDER}" stroke-width="0.8"/>`;
-    s += `<text x="${legX + 11}" y="${legY - 1}" ${FA} font-size="7.5" fill="#777">${label}</text>`;
-    legX += label.length * 5 + 18;
-  });
+  // Legend — gradient bar (Low→High cancer probability) + No finding chip
+  const legBarW = Math.min(svgW - 80, 160);
+  s += `<text x="12" y="${legY - 1}" ${FA} font-size="7.5" fill="#777">Low</text>`;
+  s += `<rect x="34" y="${legY - 9}" width="${legBarW}" height="9" fill="url(#leg)" rx="2" stroke="${BORDER}" stroke-width="0.5"/>`;
+  s += `<text x="${34 + legBarW + 3}" y="${legY - 1}" ${FA} font-size="7.5" fill="#777">High</text>`;
+  const negX = 34 + legBarW + 32;
+  s += `<rect x="${negX}" y="${legY - 9}" width="9" height="9" rx="1" fill="${NEG_FILL}" stroke="${BORDER}" stroke-width="0.8"/>`;
+  s += `<text x="${negX + 11}" y="${legY - 1}" ${FA} font-size="7.5" fill="#777">No finding</text>`;
 
   return `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;max-width:${svgW}px">${defs}${s}</svg>`;
 }
@@ -299,8 +299,12 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
   const riskBorderColor = (v: number) =>
     v >= 0.3 ? "#F1948A" : v >= 0.15 ? "#F8C471" : "#82E0AA";
 
-  // ── Zone heatmap (3 columns) ─────────────────────────────────────────────
-  const prostateMapSVG = buildZoneHeatmapSVG(entry.lesionRows);
+  // ── Zone heatmap (columns per modality, colored by cancer probability) ──────
+  const prostateMapSVG = buildZoneHeatmapSVG(
+    entry.lesionRows,
+    threeZones,
+    { L: predictions.sviL, R: predictions.sviR },
+  );
 
   // ── Prediction cards ──────────────────────────────────────────────────────
   const predFields = [
@@ -577,13 +581,13 @@ ${canvasDataUrl ? `<div class="map-box" style="margin-bottom:14px">
   </div>
 </div>` : ""}
 
-<div class="map-box">
+${prostateMapSVG ? `<div class="map-box">
   <div class="map-box-title">
     Prostate Sector Map — Imaging Findings by Modality
-    <span>Axial view · L on left · ANT = top · POST = bottom · Color = cancer probability (green → red) · White = no finding · Inner ellipse = PZpm</span>
+    <span>Axial view · L on left · ANT = top · POST = bottom · Color = cancer probability (green → red) · White = no finding</span>
   </div>
   <div style="padding:10px 8px 4px">${prostateMapSVG}</div>
-</div>
+</div>` : ""}
 
 <h2>Zone Cancer Probability</h2>
 ${zoneCancerHtml}
