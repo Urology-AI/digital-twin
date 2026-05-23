@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, CloudUpload, CloudDownload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydratePatientsFromCaseLog } from "@/store/patientStore";
+import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydratePatientsFromCaseLog, getPatientLibrary, mergePatientLibrary, syncPatientLibraryToStore } from "@/store/patientStore";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { cn } from "@/lib/utils";
@@ -138,7 +138,8 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
     setSyncStatus("Pushing…");
     try {
       const all = getCases();
-      const n = await pushCases(all);
+      const library = getPatientLibrary();
+      const n = await pushCases(all, library);
       setSyncStatus(`Pushed ${n} case${n !== 1 ? "s" : ""} ✓`);
     } catch (err) {
       setSyncStatus(`Push failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -152,7 +153,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
     setSyncStatus("Pulling…");
     try {
       const local = getCases();
-      const pulled = await pullCases(local);
+      const { records: pulled, library: pulledLibrary } = await pullCases(local);
       // Merge: cloud is authoritative for clinical/prediction/path fields;
       // local notes are preserved inside pullCases(). New cloud-only cases are added.
       const localIds = new Set(local.map((c) => c.id));
@@ -165,8 +166,16 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       const merged = [...newFromCloud, ...updated];
       saveCases(merged);
       setCases(merged);
-      // Add newly pulled cases to the patient store so they can be loaded.
-      hydratePatientsFromCaseLog();
+      // Restore full patient entries (zones, lesions, demographics) from cloud.
+      // mergePatientLibrary upserts into localStorage; syncPatientLibraryToStore
+      // then upserts into the live store (updating existing patients, not just adding).
+      if (pulledLibrary.length) {
+        mergePatientLibrary(pulledLibrary);
+        syncPatientLibraryToStore();
+      } else {
+        // Fallback: reconstruct minimal entries from flat case records.
+        hydratePatientsFromCaseLog();
+      }
       setSyncStatus(`Pulled ${pulled.length} case${pulled.length !== 1 ? "s" : ""} ✓`);
     } catch (err) {
       setSyncStatus(`Pull failed: ${err instanceof Error ? err.message : String(err)}`);

@@ -531,6 +531,27 @@ export function hydratePatientsFromCaseLog(): void {
   }
 }
 
+/** Return all entries from the persistent patient library. */
+export function getPatientLibrary(): PatientEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(PATIENT_LIBRARY_KEY) || "[]") as PatientEntry[];
+  } catch {
+    return [];
+  }
+}
+
+/** Merge entries into the persistent patient library (replaces by id). */
+export function mergePatientLibrary(entries: PatientEntry[]): void {
+  try {
+    const existing = getPatientLibrary();
+    const byId = new Map(existing.map((e) => [e.id, e]));
+    for (const e of entries) byId.set(e.id, e);
+    localStorage.setItem(PATIENT_LIBRARY_KEY, JSON.stringify([...byId.values()]));
+  } catch {
+    /* noop */
+  }
+}
+
 /** Load library patients into the store (patients not already present by id). */
 export function hydratePatientLibrary(): void {
   try {
@@ -551,6 +572,42 @@ export function hydratePatientLibrary(): void {
       usePatientStore.setState({ patients: [...patients, ...newOnes] });
       usePatientStore.getState().recompute();
     }
+  } catch {
+    /* noop */
+  }
+}
+
+/**
+ * Upsert all library entries into the store — updates existing patients AND
+ * adds new ones. Use after a cloud pull so incoming data overwrites stale local state.
+ * Preserves the current display name for any patient already in the store.
+ */
+export function syncPatientLibraryToStore(): void {
+  try {
+    const raw = localStorage.getItem(PATIENT_LIBRARY_KEY);
+    if (!raw) return;
+    const library = JSON.parse(raw) as PatientEntry[];
+    if (!library.length) return;
+    const { patients } = usePatientStore.getState();
+    const storeById = new Map(patients.map((p) => [p.id, p]));
+
+    const upserted = library.map((e) => {
+      const existing = storeById.get(e.id);
+      return {
+        ...e,
+        // Keep existing display name so the dropdown label doesn't reset
+        name: existing?.name ?? e.name,
+        record: { ...e.record, zones: mergeZones(e.record.zones || {}) },
+        lesionRows: ensureLesionIds(e.lesionRows || []),
+      };
+    });
+
+    // Append any store patients that weren't in the pulled library
+    const libraryIds = new Set(library.map((e) => e.id));
+    const storeOnly = patients.filter((p) => !libraryIds.has(p.id));
+
+    usePatientStore.setState({ patients: [...upserted, ...storeOnly] });
+    usePatientStore.getState().recompute();
   } catch {
     /* noop */
   }

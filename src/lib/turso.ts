@@ -1,5 +1,6 @@
 import { createClient } from "@libsql/client/web";
 import type { CaseRecord } from "@/components/CaseLog";
+import type { PatientEntry } from "@/store/patientStore";
 
 const COLS: (keyof CaseRecord)[] = [
   "id","date","psa","vol","psad","gg","cores","maxcore","linear","pirads","laterality",
@@ -25,8 +26,12 @@ const CREATE_SQL = `CREATE TABLE IF NOT EXISTS case_log (
   path_ece INTEGER, path_ece_l INTEGER, path_ece_r INTEGER, path_svi INTEGER,
   path_upgrade INTEGER, path_psm INTEGER, path_lni INTEGER, path_gg INTEGER,
   path_ns_l INTEGER, path_ns_r INTEGER,
-  notes TEXT
+  notes TEXT,
+  full_record TEXT
 )`;
+
+// Migrate existing tables that predate the full_record column.
+const MIGRATE_SQL = `ALTER TABLE case_log ADD COLUMN full_record TEXT`;
 
 async function sha256hex(s: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
@@ -46,6 +51,42 @@ function getClient() {
   return createClient({ url: url.replace(/^libsql:\/\//, "https://"), authToken });
 }
 
+/**
+ * Strip all HIPAA Safe Harbor identifiers before the record goes to the cloud.
+ *  - id       → replaced with the cloud hash by the caller
+ *  - name     → replaced with a non-identifying clinical label
+ *  - age > 89 → capped at 89 (ages over 89 are PHI under Safe Harbor)
+ *  - media    → stripped (data URLs may contain scanned documents / patient photos)
+ */
+function deidentifyEntry(entry: PatientEntry, cloudId: string): PatientEntry {
+  const patient = { ...entry.record.patient };
+  if (patient.age !== null && patient.age !== undefined && patient.age > 89) {
+    patient.age = 89;
+  }
+
+  // Build a safe clinical label from the record so the entry is still useful on pull
+  const gg = entry.record.biopsy?.max_grade_group ?? "?";
+  const psa = entry.record.patient?.psa ?? "?";
+  const safeLabel = `GG${gg} PSA ${psa}`;
+
+  const record = { ...entry.record, patient };
+  // Remove media — images are not required for model computation and may contain PHI
+  delete record.media;
+
+  return {
+    id: cloudId,
+    name: safeLabel,
+    record,
+    lesionRows: entry.lesionRows,
+  };
+}
+
+async function ensureSchema(client: ReturnType<typeof getClient>) {
+  await client.execute(CREATE_SQL);
+  // Best-effort migration — silently ignore "duplicate column" error on existing tables.
+  try { await client.execute(MIGRATE_SQL); } catch { /* column already exists */ }
+}
+
 /** Map local id → cloud id (SHA-256 prefix). Cached in localStorage. */
 const CLOUD_ID_KEY = "compass_cloud_id_map";
 function loadIdMap(): Record<string, string> {
@@ -55,10 +96,13 @@ function saveIdMap(m: Record<string, string>) {
   localStorage.setItem(CLOUD_ID_KEY, JSON.stringify(m));
 }
 
-export async function pushCases(cases: CaseRecord[]): Promise<number> {
+export async function pushCases(
+  cases: CaseRecord[],
+  library: PatientEntry[],
+): Promise<number> {
   if (!cases.length) return 0;
   const client = getClient();
-  await client.execute(CREATE_SQL);
+  await ensureSchema(client);
 
   // Build / update local→cloud id mapping
   const idMap = loadIdMap();
@@ -67,14 +111,29 @@ export async function pushCases(cases: CaseRecord[]): Promise<number> {
   }));
   saveIdMap(idMap);
 
-  const cols = COLS.join(", ");
-  const ph = COLS.map(() => "?").join(", ");
+  // Index library by local id for quick lookup
+  const libraryById = new Map(library.map((e) => [e.id, e]));
+
+  const allCols = [...COLS, "full_record" as const];
+  const cols = allCols.join(", ");
+  const ph = allCols.map(() => "?").join(", ");
+
   const stmts = cases.map((c) => {
+    const cloudId = idMap[c.id]!;
     // De-identify: swap id for its hash, strip free-text notes (PHI risk)
-    const row: Record<string, unknown> = { ...c, id: idMap[c.id], notes: "" };
+    const row: Record<string, unknown> = { ...c, id: cloudId, notes: "" };
+
+    // Embed de-identified full patient record for complete restoration on pull.
+    const entry = libraryById.get(c.id);
+    let fullRecord: string | null = null;
+    if (entry) {
+      fullRecord = JSON.stringify(deidentifyEntry(entry, cloudId));
+    }
+    row["full_record"] = fullRecord;
+
     return {
       sql: `INSERT OR REPLACE INTO case_log (${cols}) VALUES (${ph})`,
-      args: COLS.map((k) => (row[k] === undefined ? null : row[k])) as (string | number | null)[],
+      args: allCols.map((k) => (row[k] === undefined ? null : row[k])) as (string | number | null)[],
     };
   });
 
@@ -82,9 +141,11 @@ export async function pushCases(cases: CaseRecord[]): Promise<number> {
   return stmts.length;
 }
 
-export async function pullCases(localCases: CaseRecord[]): Promise<CaseRecord[]> {
+export async function pullCases(
+  localCases: CaseRecord[],
+): Promise<{ records: CaseRecord[]; library: PatientEntry[] }> {
   const client = getClient();
-  await client.execute(CREATE_SQL);
+  await ensureSchema(client);
 
   const result = await client.execute("SELECT * FROM case_log ORDER BY date DESC");
   const idMap = loadIdMap();
@@ -96,18 +157,50 @@ export async function pullCases(localCases: CaseRecord[]): Promise<CaseRecord[]>
     if (cid) cloudToLocal[cid] = lc;
   }
 
-  const pulled: CaseRecord[] = result.rows.map((row) => {
+  const restoredLibrary: PatientEntry[] = [];
+  let idMapDirty = false;
+
+  const records: CaseRecord[] = result.rows.map((row) => {
     const r: Record<string, unknown> = {};
     result.columns.forEach((col, i) => { r[col] = row[i]; });
     const cloudId = r["id"] as string;
     const local = cloudToLocal[cloudId];
-    // Keep local notes (never in cloud); restore original local id if known
+
+    // Determine the local id for this row.
+    // If this device originated the case, we already have local→cloud in idMap.
+    // If this case came from another device, use cloudId as the local id and
+    // register an identity mapping so future pushes from this device reuse the
+    // same cloud row instead of creating a duplicate.
+    const localId = local?.id ?? cloudId;
+    if (!local) {
+      idMap[localId] = cloudId;
+      idMapDirty = true;
+    }
+
+    // Restore full patient entry (zones, lesions, demographics) if available
+    const rawFull = r["full_record"] as string | null | undefined;
+    if (rawFull) {
+      try {
+        const entry = JSON.parse(rawFull) as PatientEntry;
+        restoredLibrary.push({
+          ...entry,
+          id: localId,
+          // entry.name is already a safe clinical label (set by deidentifyEntry on push)
+          lesionRows: entry.lesionRows ?? [],
+        });
+      } catch { /* malformed blob — skip */ }
+    }
+
+    // Keep local notes (never in cloud); restore original local id
     return {
       ...(r as unknown as CaseRecord),
-      id: local?.id ?? cloudId,
+      id: localId,
       notes: local?.notes ?? "",
     };
   });
 
-  return pulled;
+  // Persist any new id mappings learned from this pull
+  if (idMapDirty) saveIdMap(idMap);
+
+  return { records, library: restoredLibrary };
 }
