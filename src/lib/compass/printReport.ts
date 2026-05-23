@@ -287,6 +287,60 @@ export function buildPrintHtml(): string | null {
     })
     .join("");
 
+  // ── DA Sparing helper ────────────────────────────────────────────────────
+  function daLabel(grade: number): string {
+    if (grade === 1) return "Regular drop";
+    if (grade === 2) return "Modified hood";
+    return "Wide excision";
+  }
+  const daText =
+    predictions.nsL === predictions.nsR
+      ? daLabel(predictions.nsL)
+      : `${daLabel(predictions.nsL)}, ${daLabel(predictions.nsR)}`;
+
+  // ── Surgical summary table (OR-style) ─────────────────────────────────────
+  // Mirrors the compact table surgeons use intraoperatively: ECE (standard +
+  // extensive), SVI, PLND, NS grade, and DA sparing technique.
+  const surgSummaryHtml = `
+  <table style="border-collapse:collapse;width:100%;margin:0 0 14px;font-size:11.5px">
+    <thead>
+      <tr>
+        <th style="border:1.5px solid #000;padding:4px 8px;background:#e8eaf0;width:22%"></th>
+        <th colspan="2" style="border:1.5px solid #000;padding:4px 8px;background:#e8eaf0;text-align:center;font-weight:800">LEFT</th>
+        <th colspan="2" style="border:1.5px solid #000;padding:4px 8px;background:#ddeedd;text-align:center;font-weight:800">RIGHT</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="border:1.5px solid #000;padding:4px 8px;font-weight:700">Prob of ECE (%)</td>
+        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.eceL)}">${Math.round(predictions.eceL * 100)}&nbsp;%</td>
+        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.extensive)}">${Math.round(predictions.extensive * 100)}&nbsp;%</td>
+        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.eceR)}">${Math.round(predictions.eceR * 100)}&nbsp;%</td>
+        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.extensive)}">${Math.round(predictions.extensive * 100)}&nbsp;%</td>
+      </tr>
+      <tr>
+        <td style="border:1.5px solid #000;padding:4px 8px;font-weight:700">Prob of SVI (%)</td>
+        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.sviL)}">${Math.round(predictions.sviL * 100)}&nbsp;%</td>
+        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;color:#999">-</td>
+        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.sviR)}">${Math.round(predictions.sviR * 100)}&nbsp;%</td>
+        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;color:#999">-</td>
+      </tr>
+      <tr>
+        <td style="border:1.5px solid #000;padding:4px 8px;font-weight:700"><span style="text-decoration:underline">PLND</span>(%)</td>
+        <td colspan="4" style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.lni)}">${Math.round(predictions.lni * 100)}&nbsp;%</td>
+      </tr>
+      <tr>
+        <td style="border:1.5px solid #000;padding:4px 8px;font-weight:700">Grade of NS</td>
+        <td colspan="2" style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:900;font-size:15px;background:#fffacd;color:#333">${predictions.nsL}</td>
+        <td colspan="2" style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:900;font-size:15px;background:#fffacd;color:#333">${predictions.nsR}</td>
+      </tr>
+      <tr>
+        <td style="border:1.5px solid #000;padding:4px 8px;font-weight:700">DA Sparing</td>
+        <td colspan="4" style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700">${daText}</td>
+      </tr>
+    </tbody>
+  </table>`;
+
   // ── Side ECE row ─────────────────────────────────────────────────────────
   const sideEceHtml = `
     <div style="display:flex;gap:12px;margin:0 0 10px">
@@ -451,6 +505,7 @@ export function buildPrintHtml(): string | null {
 ${patHtml}
 
 <h2>COMPASS Predictions</h2>
+${surgSummaryHtml}
 <div class="pred-row">${predCards}</div>
 ${sideEceHtml}
 
