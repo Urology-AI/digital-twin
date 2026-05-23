@@ -506,6 +506,11 @@ export function ZoneInputWizard() {
   const volWarn = !isNaN(volNum) && volNum > 0 && (volNum < 10 || volNum > 250);
 
   const totalFilled = ALL_ZONES.filter((z) => hasData(zoneData[z.id])).length;
+  const filledZones = ALL_ZONES.filter((z) => hasData(zoneData[z.id]));
+  const hasMri  = filledZones.some((z) => (zoneData[z.id]?.pirads ?? 0) > 0);
+  const hasMus  = filledZones.some((z) => (zoneData[z.id]?.primus ?? 0) > 0);
+  const hasPsma = filledZones.some((z) => (zoneData[z.id]?.suv ?? 0) > 0);
+  const hasBx   = filledZones.some((z) => (zoneData[z.id]?.gg ?? 0) > 0);
   const getCancer   = (id: string) => threeZones.find((z) => z.id === id)?.cancer ?? 0.02;
   const selDef      = selectedZone ? ALL_ZONES.find((z) => z.id === selectedZone) : null;
   const toggle      = (id: string) => setSelectedZone(selectedZone === id ? null : id);
@@ -676,7 +681,18 @@ export function ZoneInputWizard() {
               </div>
             </div>
 
-            <div className="flex justify-end pt-2">
+            <div className="flex items-center justify-between pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setAge(""); setPsa(""); setVol(""); setDecipher(""); setShim(""); setIpss("");
+                  setHeightVal(""); setWeightVal("");
+                  updateClinicalForm({ age: undefined, psa: 0, vol: 45, dec: null, shim: undefined, ipss: undefined, bmi: undefined });
+                }}
+                className="text-xs font-medium text-muted-foreground/60 hover:text-destructive transition-colors"
+              >
+                Clear all fields
+              </button>
               <Button type="button" size="lg" onClick={() => setActiveTab(2)}>
                 Next: Zone Locations →
               </Button>
@@ -787,6 +803,47 @@ export function ZoneInputWizard() {
                 })}
               </div>
             </div>
+
+            {/* Location summary table */}
+            {totalFilled > 0 && (
+              <div className="shrink-0 rounded-lg border border-border bg-muted/10 p-3">
+                <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground sm:tracking-widest">Location Summary</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-[10px] sm:text-xs">
+                    <thead>
+                      <tr>
+                        <th className="border-b border-border/40 pb-1 pr-3 text-left font-semibold text-foreground/70" rowSpan={2}>Zone</th>
+                        {hasMri  && <th className="border-b border-border/40 pb-1 pr-1 text-center font-semibold text-blue-500"   colSpan={4}>MRI</th>}
+                        {hasMus  && <th className="border-b border-border/40 pb-1 pr-1 text-center font-semibold text-teal-500"   colSpan={2}>MUS</th>}
+                        {hasPsma && <th className="border-b border-border/40 pb-1 pr-1 text-center font-semibold text-purple-500" colSpan={2}>PSMA</th>}
+                        {hasBx   && <th className="border-b border-border/40 pb-1    text-center font-semibold text-amber-600"    colSpan={4}>Bx</th>}
+                      </tr>
+                      <tr className="text-[9px] text-muted-foreground/60">
+                        {hasMri  && <><th className="pb-1 pr-1 text-center font-medium">PI-RADS</th><th className="pb-1 pr-1 text-center font-medium">Sz(mm)</th><th className="pb-1 pr-1 text-center font-medium">EPE</th><th className="pb-1 pr-2 text-center font-medium">SVI</th></>}
+                        {hasMus  && <><th className="pb-1 pr-1 text-center font-medium">PRIMUS</th><th className="pb-1 pr-2 text-center font-medium">ECE</th></>}
+                        {hasPsma && <><th className="pb-1 pr-1 text-center font-medium">SUV</th><th className="pb-1 pr-2 text-center font-medium">EPE</th></>}
+                        {hasBx   && <><th className="pb-1 pr-1 text-center font-medium">GG</th><th className="pb-1 pr-1 text-center font-medium">Core%</th><th className="pb-1 pr-1 text-center font-medium">mm</th><th className="pb-1 text-center font-medium">Flags</th></>}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filledZones.map((z) => {
+                        const d = zoneData[z.id];
+                        const flags = [d?.cribriform && "Crib", d?.idc && "IDC", d?.pni && "PNI"].filter(Boolean).join(" ");
+                        return (
+                          <tr key={z.id} className="border-b border-border/20 last:border-0 hover:bg-muted/20 cursor-pointer" onClick={() => toggle(z.id)}>
+                            <td className="py-1 pr-3 font-semibold text-foreground/80">{z.label}</td>
+                            {hasMri  && <><td className="py-1 pr-1 text-center text-foreground/80">{d?.pirads  ?? "—"}</td><td className="py-1 pr-1 text-center text-foreground/60">{d?.mriSize  ? d.mriSize  : "—"}</td><td className="py-1 pr-1 text-center">{d?.mriEpe  ? <span className="font-bold text-amber-500">✓</span> : <span className="text-muted-foreground/30">—</span>}</td><td className="py-1 pr-2 text-center">{d?.mriSvi  ? <span className="font-bold text-red-500">✓</span>   : <span className="text-muted-foreground/30">—</span>}</td></>}
+                            {hasMus  && <><td className="py-1 pr-1 text-center text-foreground/80">{d?.primus  ?? "—"}</td><td className="py-1 pr-2 text-center">{d?.musEce  ? <span className="font-bold text-amber-500">✓</span> : <span className="text-muted-foreground/30">—</span>}</td></>}
+                            {hasPsma && <><td className="py-1 pr-1 text-center text-foreground/80">{d?.suv     ?? "—"}</td><td className="py-1 pr-2 text-center">{d?.psmaEpe ? <span className="font-bold text-amber-500">✓</span> : <span className="text-muted-foreground/30">—</span>}</td></>}
+                            {hasBx   && <><td className="py-1 pr-1 text-center text-foreground/80">{d?.gg      ?? "—"}</td><td className="py-1 pr-1 text-center text-foreground/60">{d?.corePct  ? `${d.corePct}%`  : "—"}</td><td className="py-1 pr-1 text-center text-foreground/60">{d?.linearMm ? d.linearMm : "—"}</td><td className="py-1 text-center text-foreground/60">{flags || "—"}</td></>}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Zone detail — side panel on lg+, stacks below grids on narrower */}

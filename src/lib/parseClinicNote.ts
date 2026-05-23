@@ -129,33 +129,39 @@ function parseBiopsyLines(lines: string[], warnings: string[]): LesionRow[] {
   const result: LesionRow[] = [];
   for (const line of lines) {
     const before = result.length;
-    // Split tab-separated entries so multiple Gleason values on one line are each parsed
-    for (const seg of line.split(/\t+/)) {
-      const t = seg.trim();
-      const m = t.match(/gleason\s*\d+\s*\((\d+)\+(\d+)\)/i);
-      if (!m) continue;
-      const gg = gleasonToGG(parseInt(m[1] ?? "0"), parseInt(m[2] ?? "0"));
-      const pct = t.match(/(\d+(?:\.\d+)?)\s*%/);
-      if (!pct) {
-        warnings.push(`Biopsy: "${m[0]}" has no core % — defaulted to 0%`);
+    // First split on tabs; then within each tab-segment split at Gleason boundaries
+    // so "Gleason 7 (4+3) 5% Right  Gleason 6 (3+3) 50% Left" produces two entries
+    const tabSegs = line.split(/\t+/);
+    for (const tabSeg of tabSegs) {
+      const gleasonRe = /(?=gleason\s*\d+\s*\(\d+\+\d+\))/i;
+      const subsegs = tabSeg.split(gleasonRe).filter((s) => s.trim().length > 0);
+      for (const seg of subsegs) {
+        const t = seg.trim();
+        const m = t.match(/gleason\s*\d+\s*\((\d+)\+(\d+)\)/i);
+        if (!m) continue;
+        const gg = gleasonToGG(parseInt(m[1] ?? "0"), parseInt(m[2] ?? "0"));
+        const pct = t.match(/(\d+(?:\.\d+)?)\s*%/);
+        if (!pct) {
+          warnings.push(`Biopsy: "${m[0]}" has no core % — defaulted to 0%`);
+        }
+        const side = parseSide(t);
+        const pos = parseZone(t);
+        const levels = parseLevelRange(t);
+        const base = {
+          source: "Bx" as const,
+          zone: pos,
+          score: String(gg),
+          corePct: pct ? parseFloat(pct[1] ?? "0") : 0,
+          linear: 0,
+        };
+        const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
+        if (levelFallback) {
+          warnings.push(
+            `Biopsy: "${m[0]}" — ${pos} ${levels[0]} is not a zone grid cell; mapped to ${pos} ${levelFallback}`,
+          );
+        }
+        result.push(...rows);
       }
-      const side = parseSide(t);
-      const pos = parseZone(t);
-      const levels = parseLevelRange(t);
-      const base = {
-        source: "Bx" as const,
-        zone: pos,
-        score: String(gg),
-        corePct: pct ? parseFloat(pct[1] ?? "0") : 0,
-        linear: 0,
-      };
-      const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
-      if (levelFallback) {
-        warnings.push(
-          `Biopsy: "${m[0]}" — ${pos} ${levels[0]} is not a zone grid cell; mapped to ${pos} ${levelFallback}`,
-        );
-      }
-      result.push(...rows);
     }
     // Warn for lines that had content but produced no rows
     const trimmed = line.trim();
@@ -174,44 +180,51 @@ function parseMriLines(
   let volumeCc: number | undefined;
   for (const line of lines) {
     const t = line.trim();
+    // Extract volume from the full line before splitting at PIRADS boundaries
     const vol = t.match(/(\d+(?:\.\d+)?)\s*cc/i);
     if (vol && !volumeCc) volumeCc = parseFloat(vol[1] ?? "0");
-    const pm = t.match(/pirads\s*(\d+)/i);
-    if (!pm) {
-      // Only warn if the line looks like it was meant to describe a lesion
+
+    // Split at PIRADS boundaries so "PIRADS 5 ... No EPE PIRADS 4 ..." → two entries
+    const piradsRe = /(?=pirads\s*\d)/i;
+    const subsegs = t.split(piradsRe).filter((s) => /pirads/i.test(s));
+    if (subsegs.length === 0) {
       if (t.length >= 6 && !vol) {
         warnings.push(`MRI: no PIRADS score found — line skipped: "${truncate(t)}"`);
       }
       continue;
     }
-    const pirads = parseInt(pm[1] ?? "0");
-    if (pirads < 1 || pirads > 5) {
-      warnings.push(`MRI: PIRADS ${pirads} is out of range (1–5) — check the value`);
+    for (const seg of subsegs) {
+      const pm = seg.match(/pirads\s*(\d+)/i);
+      if (!pm) continue;
+      const pirads = parseInt(pm[1] ?? "0");
+      if (pirads < 1 || pirads > 5) {
+        warnings.push(`MRI: PIRADS ${pirads} is out of range (1–5) — check the value`);
+      }
+      const side = parseSide(seg);
+      const pos = parseZone(seg);
+      const levels = parseLevelRange(seg);
+      const abut = parseAbutment(seg);
+      const epe = parseEpe(seg);
+      if (abut === -1) {
+        warnings.push(`MRI: PIRADS ${pirads} — no capsular contact info found (abutment set to unknown)`);
+      }
+      const base = {
+        source: "MRI" as const,
+        zone: pos,
+        score: String(pirads),
+        pirads,
+        mriAbutment: abut,
+        epe,
+        svi: false,
+      };
+      const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
+      if (levelFallback) {
+        warnings.push(
+          `MRI: PIRADS ${pirads} — ${pos} ${levels[0]} is not a zone grid cell; mapped to ${pos} ${levelFallback}`,
+        );
+      }
+      lesions.push(...rows);
     }
-    const side = parseSide(t);
-    const pos = parseZone(t);
-    const levels = parseLevelRange(t);
-    const abut = parseAbutment(t);
-    const epe = parseEpe(t);
-    if (abut === -1) {
-      warnings.push(`MRI: PIRADS ${pirads} — no capsular contact info found (abutment set to unknown)`);
-    }
-    const base = {
-      source: "MRI" as const,
-      zone: pos,
-      score: String(pirads),
-      pirads,
-      mriAbutment: abut,
-      epe,
-      svi: false,
-    };
-    const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
-    if (levelFallback) {
-      warnings.push(
-        `MRI: PIRADS ${pirads} — ${pos} ${levels[0]} is not a zone grid cell; mapped to ${pos} ${levelFallback}`,
-      );
-    }
-    lesions.push(...rows);
   }
   return { lesions, volumeCc };
 }
@@ -296,6 +309,14 @@ export interface ParsedNote {
 }
 
 export function parseClinicNote(text: string): ParsedNote {
+  // Normalize: insert newlines before section keywords that appear mid-line
+  // (only when followed by a digit, volume, or known score keyword — avoids
+  // false splits on phrases like "on MRI" or "pre-MRI PSA")
+  const normalized = text.replace(
+    /(?<=\S[ \t]+)(?=(biopsy|mri|mus|psma)\s+(?:\d|pirads|primus|suv|gleason|left|right))/gi,
+    "\n",
+  );
+
   const sections = {
     biopsy: [] as string[],
     mri: [] as string[],
@@ -307,7 +328,7 @@ export function parseClinicNote(text: string): ParsedNote {
 
   const warnings: string[] = [];
 
-  for (const raw of text.split(/\n/)) {
+  for (const raw of normalized.split(/\n/)) {
     const trimmed = raw.trim();
     if (/^biopsy\b/i.test(trimmed)) {
       current = "biopsy";
