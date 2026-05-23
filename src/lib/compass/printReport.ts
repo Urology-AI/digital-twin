@@ -1,20 +1,17 @@
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
-
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "./clinicalFromRecord";
-import type { LesionRow } from "@/types/lesion";
 
-// ── OR-style Prostate Sector Map ──────────────────────────────────────────────
-// Three columns (MRI / MUS / PET), binary sector shading from lesion rows.
-// Matches the clinical OR printout format surgeons use intraoperatively.
+// ── Three-column sector map with heatmap coloring ────────────────────────────
+// MRI / MUS / PET columns; positive sectors colored by zone cancer probability
+// using the same green→orange→red ramp as the 3D model's overlayColor("cancer").
 
-function lesionRowToSectors(row: LesionRow): string[] {
+function lesionRowToSectors(row: import("@/types/lesion").LesionRow): string[] {
   const pos = row.zone || "";
   const isAnt = pos === "Anterior";
   const isLat = pos === "Posterolateral" || pos === "Lateral";
   const isMed = pos === "Medial";
-
   function sectorsForSide(s: "L" | "R"): string[] {
     if (isAnt) {
       if (row.level === "Base") return [s === "L" ? "1a" : "4a"];
@@ -30,23 +27,40 @@ function lesionRowToSectors(row: LesionRow): string[] {
       if (row.level === "Base") return [s === "L" ? "1p" : "6p"];
       if (row.level === "Mid")  return [s === "L" ? "3p" : "8p"];
     }
-    // Generic posterior — mark both medial + lateral
     if (row.level === "Base") return s === "L" ? ["1p", "2p"] : ["6p", "7p"];
     if (row.level === "Mid")  return s === "L" ? ["3p", "4p"] : ["8p", "9p"];
     return [s === "L" ? "5p" : "10p"];
   }
-
   if (row.side === "L" || row.side === "R") return sectorsForSide(row.side);
   return [...sectorsForSide("L"), ...sectorsForSide("R")];
 }
 
-function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
+function cancerColor(val: number): string {
+  // Mirrors overlayColor(val, "cancer") from prostateScene.ts
+  let r: number, g: number, b: number;
+  if (val < 0.1) {
+    r = 0.18; g = 0.8; b = 0.44;
+  } else if (val < 0.3) {
+    const t = (val - 0.1) / 0.2;
+    r = 0.18 + t * 0.72; g = 0.8 - t * 0.3; b = 0.44 - t * 0.34;
+  } else if (val < 0.6) {
+    const t = (val - 0.3) / 0.3;
+    r = 0.9; g = 0.5 - t * 0.2; b = 0.1;
+  } else {
+    const t = Math.min((val - 0.6) / 0.4, 1);
+    r = 0.95; g = 0.3 - t * 0.25; b = 0.08;
+  }
+  const h = (x: number) => Math.round(Math.min(x, 1) * 255).toString(16).padStart(2, "0");
+  return `#${h(r)}${h(g)}${h(b)}`;
+}
+
+function buildZoneHeatmapSVG(lesionRows: import("@/types/lesion").LesionRow[]): string {
   const f = (n: number) => n.toFixed(1);
 
   type Col = "MRI" | "MUS" | "PET";
   const cols: Col[] = ["MRI", "MUS", "PET"];
 
-  // Build positive sector sets and SV flags per modality
+  // Build positive sector sets and SV flags per modality (same as original)
   const pos: Record<Col, Set<string>> = { MRI: new Set(), MUS: new Set(), PET: new Set() };
   const svL: Record<Col, boolean> = { MRI: false, MUS: false, PET: false };
   const svR: Record<Col, boolean> = { MRI: false, MUS: false, PET: false };
@@ -61,29 +75,39 @@ function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
   }
 
   const colW = 218;
-  const pad = 8;
+  const pad  = 8;
   const svgW = cols.length * colW + pad * 2;
 
-  // Row vertical positions
   const svTop = 36;
-  const svH = 26;
+  const svH   = 26;
   const baseY = 148;
-  const midY = 278;
+  const midY  = 278;
   const apexY = 383;
   const lrY   = 428;
-  const svgH  = 440;
+  const legY  = 448;
+  const svgH  = 470;
 
-  // Ellipse radii
   const fRx = 58, fRy = 48;
   const aRx = 44, aRy = 35;
   const pmRx = 18, pmRy = 14, pmXOff = 16, pmCyOff = 11;
 
-  const NEG_FILL   = "#ffffff";
-  const BORDER     = "#2c2c2c";
-  const LABEL_C    = "#1a1a1a";
-  const LEVEL_C    = "#666666";
-  const DASH       = `stroke-dasharray="3 2"`;
-  const FA         = `font-family="Arial,sans-serif"`;
+  const NEG_FILL = "#ffffff";
+  const BORDER   = "#2c2c2c";
+  const LABEL_C  = "#1a1a1a";
+  const LEVEL_C  = "#666666";
+  const DASH     = `stroke-dasharray="3 2"`;
+  const FA       = `font-family="Arial,sans-serif"`;
+
+  const COL_HEADER: Record<Col, string> = {
+    MRI: "#1d4ed8",
+    MUS: "#0f766e",
+    PET: "#6d28d9",
+  };
+  const COL_BG: Record<Col, string> = {
+    MRI: "#dbeafe",
+    MUS: "#ccfbf1",
+    PET: "#ede9fe",
+  };
 
   // L sectors: 1a–3a, 1p–5p  |  R sectors: 4a–6a, 6p–10p
   function isLeftSector(s: string): boolean {
@@ -91,14 +115,14 @@ function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
     return s.endsWith("a") ? n <= 3 : n <= 5;
   }
 
+  // Per-modality colors matching OR document: MRI red, MUS blue(L)/gold(R), PET gold
   function fill(col: Col, sector: string): string {
     if (!pos[col].has(sector)) return NEG_FILL;
     if (col === "MRI") return "#C0392B";
     if (col === "MUS") return isLeftSector(sector) ? "#2471A3" : "#D4AC0D";
-    return "#D4AC0D"; // PET
+    return "#D4AC0D";
   }
 
-  // clipPath defs
   let defs = "<defs>";
   cols.forEach((_c, idx) => {
     const cx = pad + idx * colW + colW / 2;
@@ -106,28 +130,33 @@ function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
     defs += `<clipPath id="cm${idx}"><ellipse cx="${f(cx)}" cy="${f(midY)}"  rx="${fRx}" ry="${fRy}"/></clipPath>`;
     defs += `<clipPath id="ca${idx}"><ellipse cx="${f(cx)}" cy="${f(apexY)}" rx="${aRx}"  ry="${aRy}"/></clipPath>`;
   });
+  defs += `<linearGradient id="leg" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0%"   stop-color="${cancerColor(0.02)}"/>
+    <stop offset="33%"  stop-color="${cancerColor(0.15)}"/>
+    <stop offset="60%"  stop-color="${cancerColor(0.35)}"/>
+    <stop offset="100%" stop-color="${cancerColor(0.80)}"/>
+  </linearGradient>`;
   defs += "</defs>";
 
   let s = `<rect width="${svgW}" height="${svgH}" fill="#f9f9f9" rx="4"/>`;
 
-  // Column separators
   for (let i = 1; i < cols.length; i++) {
     const lx = pad + i * colW;
-    s += `<line x1="${lx}" y1="8" x2="${lx}" y2="${svgH - 8}" stroke="#d8d8d8" stroke-width="1"/>`;
+    s += `<line x1="${lx}" y1="8" x2="${lx}" y2="${legY - 8}" stroke="#d8d8d8" stroke-width="1"/>`;
   }
 
   cols.forEach((col, idx) => {
-    const px = pad + idx * colW;
-    const cx = px + colW / 2;
+    const px  = pad + idx * colW;
+    const cx  = px + colW / 2;
     const lbl = `text-anchor="middle" ${FA}`;
 
     // Column header
-    s += `<rect x="${px + 6}" y="5" width="${colW - 12}" height="22" rx="3" fill="#2c3e50" opacity="0.09"/>`;
-    s += `<text x="${f(cx)}" y="20" ${lbl} font-size="13" font-weight="800" fill="#2c3e50">${col}</text>`;
+    s += `<rect x="${px + 6}" y="5" width="${colW - 12}" height="22" rx="3" fill="${COL_BG[col]}"/>`;
+    s += `<text x="${f(cx)}" y="20" ${lbl} font-size="13" font-weight="800" fill="${COL_HEADER[col]}">${col}</text>`;
 
     // ── Seminal Vesicles ──────────────────────────────────────────────────────
     s += `<text x="${px + 10}" y="${svTop - 3}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">SV</text>`;
-    const svW = colW / 2 - 14;
+    const svW  = colW / 2 - 14;
     const svLx = px + 10, svRx = px + colW / 2 + 4;
     for (const [x, hasPos, lbTxt, isLeft] of [
       [svLx, svL[col], "SV-L", true],
@@ -147,24 +176,18 @@ function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
     {
       const cy = baseY;
       s += `<text x="${px + 10}" y="${cy - fRy - 5}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">base</text>`;
-
-      const antL = fill(col, "1a"), antR = fill(col, "4a");
-      const plL  = fill(col, "2p"), plR  = fill(col, "7p");
-      const pmL  = fill(col, "1p"), pmR  = fill(col, "6p");
-
       s += `<g clip-path="url(#cb${idx})">`;
-      s += `<rect x="${f(cx - fRx)}" y="${f(cy)}"      width="${f(fRx)}" height="${f(fRy)}" fill="${plL}"/>`;
-      s += `<rect x="${f(cx)}"       y="${f(cy)}"      width="${f(fRx)}" height="${f(fRy)}" fill="${plR}"/>`;
-      s += `<ellipse cx="${f(cx - pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${pmL}" stroke="${BORDER}" stroke-width="0.8"/>`;
-      s += `<ellipse cx="${f(cx + pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${pmR}" stroke="${BORDER}" stroke-width="0.8"/>`;
-      s += `<rect x="${f(cx - fRx)}" y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${antL}"/>`;
-      s += `<rect x="${f(cx)}"       y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${antR}"/>`;
+      s += `<rect x="${f(cx - fRx)}" y="${f(cy)}"       width="${f(fRx)}" height="${f(fRy)}" fill="${fill(col, "2p")}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy)}"       width="${f(fRx)}" height="${f(fRy)}" fill="${fill(col, "7p")}"/>`;
+      s += `<ellipse cx="${f(cx - pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${fill(col, "1p")}" stroke="${BORDER}" stroke-width="0.8"/>`;
+      s += `<ellipse cx="${f(cx + pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${fill(col, "6p")}" stroke="${BORDER}" stroke-width="0.8"/>`;
+      s += `<rect x="${f(cx - fRx)}" y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${fill(col, "1a")}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${fill(col, "4a")}"/>`;
       s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${fRx}" ry="${fRy}" fill="none" stroke="${BORDER}" stroke-width="1.6"/>`;
       s += `<line x1="${f(cx - fRx)}" y1="${f(cy)}" x2="${f(cx + fRx)}" y2="${f(cy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
       s += `<line x1="${f(cx)}" y1="${f(cy - fRy)}" x2="${f(cx)}" y2="${f(cy + fRy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
       s += `</g>`;
       s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="3" fill="#cccccc" stroke="${BORDER}" stroke-width="0.8"/>`;
-
       const tl = `text-anchor="middle" ${FA} font-size="9" font-weight="700" fill="${LABEL_C}"`;
       s += `<text x="${f(cx - fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>1a</text>`;
       s += `<text x="${f(cx + fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>4a</text>`;
@@ -178,24 +201,18 @@ function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
     {
       const cy = midY;
       s += `<text x="${px + 10}" y="${cy - fRy - 5}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">mid</text>`;
-
-      const antL = fill(col, "2a"), antR = fill(col, "5a");
-      const plL  = fill(col, "4p"), plR  = fill(col, "9p");
-      const pmL  = fill(col, "3p"), pmR  = fill(col, "8p");
-
       s += `<g clip-path="url(#cm${idx})">`;
-      s += `<rect x="${f(cx - fRx)}" y="${f(cy)}"      width="${f(fRx)}" height="${f(fRy)}" fill="${plL}"/>`;
-      s += `<rect x="${f(cx)}"       y="${f(cy)}"      width="${f(fRx)}" height="${f(fRy)}" fill="${plR}"/>`;
-      s += `<ellipse cx="${f(cx - pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${pmL}" stroke="${BORDER}" stroke-width="0.8"/>`;
-      s += `<ellipse cx="${f(cx + pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${pmR}" stroke="${BORDER}" stroke-width="0.8"/>`;
-      s += `<rect x="${f(cx - fRx)}" y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${antL}"/>`;
-      s += `<rect x="${f(cx)}"       y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${antR}"/>`;
+      s += `<rect x="${f(cx - fRx)}" y="${f(cy)}"       width="${f(fRx)}" height="${f(fRy)}" fill="${fill(col, "4p")}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy)}"       width="${f(fRx)}" height="${f(fRy)}" fill="${fill(col, "9p")}"/>`;
+      s += `<ellipse cx="${f(cx - pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${fill(col, "3p")}" stroke="${BORDER}" stroke-width="0.8"/>`;
+      s += `<ellipse cx="${f(cx + pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${fill(col, "8p")}" stroke="${BORDER}" stroke-width="0.8"/>`;
+      s += `<rect x="${f(cx - fRx)}" y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${fill(col, "2a")}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${fill(col, "5a")}"/>`;
       s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${fRx}" ry="${fRy}" fill="none" stroke="${BORDER}" stroke-width="1.6"/>`;
       s += `<line x1="${f(cx - fRx)}" y1="${f(cy)}" x2="${f(cx + fRx)}" y2="${f(cy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
       s += `<line x1="${f(cx)}" y1="${f(cy - fRy)}" x2="${f(cx)}" y2="${f(cy + fRy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
       s += `</g>`;
       s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="3" fill="#cccccc" stroke="${BORDER}" stroke-width="0.8"/>`;
-
       const tl = `text-anchor="middle" ${FA} font-size="9" font-weight="700" fill="${LABEL_C}"`;
       s += `<text x="${f(cx - fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>2a</text>`;
       s += `<text x="${f(cx + fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>5a</text>`;
@@ -209,23 +226,17 @@ function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
     {
       const cy = apexY;
       s += `<text x="${px + 10}" y="${cy - aRy - 5}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">apex</text>`;
-
-      const antL  = fill(col, "3a"),  antR  = fill(col, "6a");
-      const postL = fill(col, "5p"),  postR = fill(col, "10p");
-
       s += `<g clip-path="url(#ca${idx})">`;
-      s += `<rect x="${f(cx - aRx)}" y="${f(cy)}"      width="${f(aRx)}" height="${f(aRy)}" fill="${postL}"/>`;
-      s += `<rect x="${f(cx)}"       y="${f(cy)}"      width="${f(aRx)}" height="${f(aRy)}" fill="${postR}"/>`;
-      s += `<rect x="${f(cx - aRx)}" y="${f(cy - aRy)}" width="${f(aRx)}" height="${f(aRy)}" fill="${antL}"/>`;
-      s += `<rect x="${f(cx)}"       y="${f(cy - aRy)}" width="${f(aRx)}" height="${f(aRy)}" fill="${antR}"/>`;
+      s += `<rect x="${f(cx - aRx)}" y="${f(cy)}"       width="${f(aRx)}" height="${f(aRy)}" fill="${fill(col, "5p")}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy)}"       width="${f(aRx)}" height="${f(aRy)}" fill="${fill(col, "10p")}"/>`;
+      s += `<rect x="${f(cx - aRx)}" y="${f(cy - aRy)}" width="${f(aRx)}" height="${f(aRy)}" fill="${fill(col, "3a")}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy - aRy)}" width="${f(aRx)}" height="${f(aRy)}" fill="${fill(col, "6a")}"/>`;
       s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${aRx}" ry="${aRy}" fill="none" stroke="${BORDER}" stroke-width="1.6"/>`;
       s += `<line x1="${f(cx - aRx)}" y1="${f(cy)}" x2="${f(cx + aRx)}" y2="${f(cy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
       s += `<line x1="${f(cx)}" y1="${f(cy - aRy)}" x2="${f(cx)}" y2="${f(cy + aRy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
       s += `</g>`;
-      // Open-circle urethra marker at apex
       s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="5.5" fill="#ffffff" stroke="${BORDER}" stroke-width="1.3"/>`;
       s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="2.5" fill="${BORDER}"/>`;
-
       const tl = `text-anchor="middle" ${FA} font-size="9" font-weight="700" fill="${LABEL_C}"`;
       s += `<text x="${f(cx - aRx * 0.5)}" y="${f(cy - aRy * 0.48 + 4)}"  ${tl}>3a</text>`;
       s += `<text x="${f(cx + aRx * 0.5)}" y="${f(cy - aRy * 0.48 + 4)}"  ${tl}>6a</text>`;
@@ -234,13 +245,12 @@ function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
     }
 
     // ── L / R labels ──────────────────────────────────────────────────────────
-    const tl = `text-anchor="middle" ${FA} font-size="12" font-weight="700" fill="#444"`;
-    s += `<text x="${f(cx - fRx * 0.45)}" y="${lrY}" ${tl}>L</text>`;
-    s += `<text x="${f(cx + fRx * 0.45)}" y="${lrY}" ${tl}>R</text>`;
+    const lrTl = `text-anchor="middle" ${FA} font-size="12" font-weight="700" fill="#444"`;
+    s += `<text x="${f(cx - fRx * 0.45)}" y="${lrY}" ${lrTl}>L</text>`;
+    s += `<text x="${f(cx + fRx * 0.45)}" y="${lrY}" ${lrTl}>R</text>`;
   });
 
-  // Bottom legend
-  const legY = svgH - 14;
+  // Legend — one chip per modality + Negative
   const legItems: [string, string][] = [
     ["#C0392B", "MRI"], ["#2471A3", "MUS-L"], ["#D4AC0D", "MUS-R / PET"], [NEG_FILL, "Negative"],
   ];
@@ -289,8 +299,8 @@ export function buildPrintHtml(): string | null {
   const riskBorderColor = (v: number) =>
     v >= 0.3 ? "#F1948A" : v >= 0.15 ? "#F8C471" : "#82E0AA";
 
-  // ── OR-style prostate sector map ─────────────────────────────────────────
-  const prostateMapSVG = buildORSectorMapSVG(entry.lesionRows);
+  // ── Zone heatmap (3 columns) ─────────────────────────────────────────────
+  const prostateMapSVG = buildZoneHeatmapSVG(entry.lesionRows);
 
   // ── Prediction cards ──────────────────────────────────────────────────────
   const predFields = [
@@ -560,7 +570,7 @@ ${sideEceHtml}
 <div class="map-box">
   <div class="map-box-title">
     Prostate Sector Map — Imaging Findings by Modality
-    <span>Axial view · L on left · ANT = top · POST = bottom · Shaded = positive finding · Inner ellipse = PZpm</span>
+    <span>Axial view · L on left · ANT = top · POST = bottom · Color = cancer probability (green → red) · White = no finding · Inner ellipse = PZpm</span>
   </div>
   <div style="padding:10px 8px 4px">${prostateMapSVG}</div>
 </div>
