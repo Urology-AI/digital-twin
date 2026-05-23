@@ -276,7 +276,7 @@ const ZONE_PRINT_LABELS: Record<string, string> = {
   "A-RM":   "R Ant Mid",  "A-LM":   "L Ant Mid",
 };
 
-export function buildPrintHtml(): string | null {
+export function buildPrintHtml(canvasDataUrl?: string): string | null {
   const { patients, activeId, predictions, threeZones } = usePatientStore.getState();
 
   const entry = patients.find((p) => p.id === activeId);
@@ -543,7 +543,7 @@ export function buildPrintHtml(): string | null {
     .risk-c-mod  { color: #7D6608; }
     .risk-c-high { color: #922B21; }
     .alert-item { color: #922B21; font-size: 10px; display: flex; align-items: center; gap: 4px; padding: 1px 0; }
-    @media print { .print-btn { display: none; } .map-box { page-break-inside: avoid; } }
+    @media print { .print-btn { display: none; } .map-box { page-break-inside: avoid; } .model-dark { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
   `;
 
   // ── Compose HTML ──────────────────────────────────────────────────────────
@@ -570,6 +570,16 @@ ${patHtml}
 ${surgSummaryHtml}
 <div class="pred-row">${predCards}</div>
 ${sideEceHtml}
+
+${canvasDataUrl ? `<div class="map-box" style="margin-bottom:14px">
+  <div class="map-box-title">
+    3D Prostate Model — csPCa Heatmap
+    <span>Cancer probability overlay · Green &lt;10% · Amber 10–25% · Red &gt;25% · Rotate model before printing to capture preferred angle</span>
+  </div>
+  <div class="model-dark" style="padding:8px;background:#0d1220;text-align:center">
+    <img src="${canvasDataUrl}" style="max-width:100%;max-height:320px;object-fit:contain;border-radius:3px" alt="3D prostate model — cancer probability heatmap" />
+  </div>
+</div>` : ""}
 
 ${prostateMapSVG ? `<div class="map-box">
   <div class="map-box-title">
