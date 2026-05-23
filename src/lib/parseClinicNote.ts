@@ -34,6 +34,10 @@ const VALID_ZONE_COMBOS: { side: "L" | "R"; pos: string; level: "Base" | "Mid" |
 
 type Level = "Base" | "Mid" | "Apex";
 
+function truncate(s: string, n = 60) {
+  return s.length > n ? s.slice(0, n) + "…" : s;
+}
+
 /** Returns every level the lesion text covers. Unspecified → all levels. */
 function parseLevelRange(text: string): Level[] {
   const m = text.match(/\b(base|mid|apex|apical)\s+to\s+(base|mid|apex)\b/i);
@@ -82,14 +86,16 @@ function parseEpe(text: string): boolean {
 
 /**
  * Expand one parsed lesion into one row per zone grid cell it covers.
- * Filters to only (side, pos, level) combos that actually exist in the grid.
+ * Falls back to the nearest valid level (e.g. Posterior+Apex → Posterior+Mid)
+ * when the exact combo doesn't exist. Returns rows plus the fallback level used
+ * (null if no fallback was needed), so callers can warn the user.
  */
 function expandToZoneRows(
   base: Partial<Omit<LesionRow, "id" | "side" | "level">>,
   side: "L" | "R" | "",
   pos: string,
   levels: Level[],
-): LesionRow[] {
+): { rows: LesionRow[]; levelFallback: Level | null } {
   const sides: ("L" | "R")[] = side === "" ? ["L", "R"] : [side];
   const rows: LesionRow[] = [];
   for (const s of sides) {
@@ -98,37 +104,72 @@ function expandToZoneRows(
       rows.push({ ...emptyLesion(uid()), ...base, side: s, zone: pos, level: lv });
     }
   }
-  // If no valid zone combo matched (e.g. biopsy without explicit zone), keep one unzoned row
-  if (rows.length === 0 && side !== "") {
-    rows.push({ ...emptyLesion(uid()), ...base, side, zone: pos, level: "" });
+  if (rows.length > 0) return { rows, levelFallback: null };
+
+  // Level fallback: if none of the requested levels exist for this pos, try Mid → Base → Apex
+  const fallbackOrder: Level[] = ["Mid", "Base", "Apex"];
+  for (const fb of fallbackOrder) {
+    if (levels.includes(fb)) continue; // already tried
+    for (const s of sides) {
+      if (VALID_ZONE_COMBOS.some((c) => c.side === s && c.pos === pos && c.level === fb)) {
+        rows.push({ ...emptyLesion(uid()), ...base, side: s, zone: pos, level: fb });
+      }
+    }
+    if (rows.length > 0) return { rows, levelFallback: fb };
   }
-  return rows;
+
+  // Final fallback: keep an unzoned row so the lesion is never silently dropped
+  for (const s of sides) {
+    rows.push({ ...emptyLesion(uid()), ...base, side: s, zone: pos, level: "" });
+  }
+  return { rows, levelFallback: null };
 }
 
-function parseBiopsyLines(lines: string[]): LesionRow[] {
+function parseBiopsyLines(lines: string[], warnings: string[]): LesionRow[] {
   const result: LesionRow[] = [];
   for (const line of lines) {
-    const t = line.trim();
-    const m = t.match(/gleason\s*\d+\s*\((\d+)\+(\d+)\)/i);
-    if (!m) continue;
-    const gg = gleasonToGG(parseInt(m[1] ?? "0"), parseInt(m[2] ?? "0"));
-    const pct = t.match(/(\d+(?:\.\d+)?)\s*%/);
-    const side = parseSide(t);
-    const pos = parseZone(t);
-    const levels = parseLevelRange(t);
-    const base = {
-      source: "Bx" as const,
-      zone: pos,
-      score: String(gg),
-      corePct: pct ? parseFloat(pct[1] ?? "0") : 0,
-      linear: 0,
-    };
-    result.push(...expandToZoneRows(base, side, pos, levels));
+    const before = result.length;
+    // Split tab-separated entries so multiple Gleason values on one line are each parsed
+    for (const seg of line.split(/\t+/)) {
+      const t = seg.trim();
+      const m = t.match(/gleason\s*\d+\s*\((\d+)\+(\d+)\)/i);
+      if (!m) continue;
+      const gg = gleasonToGG(parseInt(m[1] ?? "0"), parseInt(m[2] ?? "0"));
+      const pct = t.match(/(\d+(?:\.\d+)?)\s*%/);
+      if (!pct) {
+        warnings.push(`Biopsy: "${m[0]}" has no core % — defaulted to 0%`);
+      }
+      const side = parseSide(t);
+      const pos = parseZone(t);
+      const levels = parseLevelRange(t);
+      const base = {
+        source: "Bx" as const,
+        zone: pos,
+        score: String(gg),
+        corePct: pct ? parseFloat(pct[1] ?? "0") : 0,
+        linear: 0,
+      };
+      const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
+      if (levelFallback) {
+        warnings.push(
+          `Biopsy: "${m[0]}" — ${pos} ${levels[0]} is not a zone grid cell; mapped to ${pos} ${levelFallback}`,
+        );
+      }
+      result.push(...rows);
+    }
+    // Warn for lines that had content but produced no rows
+    const trimmed = line.trim();
+    if (result.length === before && trimmed.length >= 6) {
+      warnings.push(`Biopsy: no Gleason score found — line skipped: "${truncate(trimmed)}"`);
+    }
   }
   return result;
 }
 
-function parseMriLines(lines: string[]): { lesions: LesionRow[]; volumeCc?: number } {
+function parseMriLines(
+  lines: string[],
+  warnings: string[],
+): { lesions: LesionRow[]; volumeCc?: number } {
   const lesions: LesionRow[] = [];
   let volumeCc: number | undefined;
   for (const line of lines) {
@@ -136,13 +177,25 @@ function parseMriLines(lines: string[]): { lesions: LesionRow[]; volumeCc?: numb
     const vol = t.match(/(\d+(?:\.\d+)?)\s*cc/i);
     if (vol && !volumeCc) volumeCc = parseFloat(vol[1] ?? "0");
     const pm = t.match(/pirads\s*(\d+)/i);
-    if (!pm) continue;
+    if (!pm) {
+      // Only warn if the line looks like it was meant to describe a lesion
+      if (t.length >= 6 && !vol) {
+        warnings.push(`MRI: no PIRADS score found — line skipped: "${truncate(t)}"`);
+      }
+      continue;
+    }
     const pirads = parseInt(pm[1] ?? "0");
+    if (pirads < 1 || pirads > 5) {
+      warnings.push(`MRI: PIRADS ${pirads} is out of range (1–5) — check the value`);
+    }
     const side = parseSide(t);
     const pos = parseZone(t);
     const levels = parseLevelRange(t);
     const abut = parseAbutment(t);
     const epe = parseEpe(t);
+    if (abut === -1) {
+      warnings.push(`MRI: PIRADS ${pirads} — no capsular contact info found (abutment set to unknown)`);
+    }
     const base = {
       source: "MRI" as const,
       zone: pos,
@@ -152,17 +205,28 @@ function parseMriLines(lines: string[]): { lesions: LesionRow[]; volumeCc?: numb
       epe,
       svi: false,
     };
-    lesions.push(...expandToZoneRows(base, side, pos, levels));
+    const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
+    if (levelFallback) {
+      warnings.push(
+        `MRI: PIRADS ${pirads} — ${pos} ${levels[0]} is not a zone grid cell; mapped to ${pos} ${levelFallback}`,
+      );
+    }
+    lesions.push(...rows);
   }
   return { lesions, volumeCc };
 }
 
-function parseMusLines(lines: string[]): LesionRow[] {
+function parseMusLines(lines: string[], warnings: string[]): LesionRow[] {
   const result: LesionRow[] = [];
   for (const line of lines) {
     const t = line.trim();
     const pm = t.match(/primus\s*(\d+)/i);
-    if (!pm) continue;
+    if (!pm) {
+      if (t.length >= 6) {
+        warnings.push(`MUS: no PRIMUS score found — line skipped: "${truncate(t)}"`);
+      }
+      continue;
+    }
     const primus = parseInt(pm[1] ?? "0");
     const side = parseSide(t);
     const pos = parseZone(t);
@@ -178,20 +242,30 @@ function parseMusLines(lines: string[]): LesionRow[] {
       epe,
       svi: false,
     };
-    result.push(...expandToZoneRows(base, side, pos, levels));
+    const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
+    if (levelFallback) {
+      warnings.push(
+        `MUS: PRIMUS ${primus} — ${pos} ${levels[0]} is not a zone grid cell; mapped to ${pos} ${levelFallback}`,
+      );
+    }
+    result.push(...rows);
   }
   return result;
 }
 
-function parsePsmaLines(lines: string[]): LesionRow[] {
+function parsePsmaLines(lines: string[], warnings: string[]): LesionRow[] {
   const result: LesionRow[] = [];
   for (const line of lines) {
     const t = line.trim();
     const sm = t.match(/suv\s*(\d+(?:\.\d+)?)/i);
-    if (!sm) continue;
+    if (!sm) {
+      if (t.length >= 6) {
+        warnings.push(`PSMA: no SUV value found — line skipped: "${truncate(t)}"`);
+      }
+      continue;
+    }
     const suv = parseFloat(sm[1] ?? "0");
     const side = parseSide(t);
-    // PSMA without a zone spec → distribute across both sides, Posterior + Posterolateral
     const pos = parseZone(t);
     const levels = parseLevelRange(t);
     const base = {
@@ -201,7 +275,13 @@ function parsePsmaLines(lines: string[]): LesionRow[] {
       suv,
       svi: false,
     };
-    result.push(...expandToZoneRows(base, side, pos, levels));
+    const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
+    if (levelFallback) {
+      warnings.push(
+        `PSMA: SUV ${suv} — ${pos} ${levels[0]} is not a zone grid cell; mapped to ${pos} ${levelFallback}`,
+      );
+    }
+    result.push(...rows);
   }
   return result;
 }
@@ -212,6 +292,7 @@ export interface ParsedNote {
   biopsyTotalCores?: number;
   biopsyMaxCorePct?: number;
   biopsyGG?: number;
+  warnings: string[];
 }
 
 export function parseClinicNote(text: string): ParsedNote {
@@ -223,6 +304,8 @@ export function parseClinicNote(text: string): ParsedNote {
   };
   type SectionKey = keyof typeof sections;
   let current: SectionKey | null = null;
+
+  const warnings: string[] = [];
 
   for (const raw of text.split(/\n/)) {
     const trimmed = raw.trim();
@@ -244,13 +327,16 @@ export function parseClinicNote(text: string): ParsedNote {
       if (rest) sections.psma.push(rest);
     } else if (current && trimmed) {
       sections[current].push(trimmed);
+    } else if (!current && trimmed.length >= 6 && /gleason|pirads|primus|suv\b/i.test(trimmed)) {
+      // Data-like content before any section header was reached
+      warnings.push(`Line ignored (no section header yet): "${truncate(trimmed)}"`);
     }
   }
 
-  const bxLesions = parseBiopsyLines(sections.biopsy);
-  const { lesions: mriLesions, volumeCc } = parseMriLines(sections.mri);
-  const musLesions = parseMusLines(sections.mus);
-  const psmaLesions = parsePsmaLines(sections.psma);
+  const bxLesions = parseBiopsyLines(sections.biopsy, warnings);
+  const { lesions: mriLesions, volumeCc } = parseMriLines(sections.mri, warnings);
+  const musLesions = parseMusLines(sections.mus, warnings);
+  const psmaLesions = parsePsmaLines(sections.psma, warnings);
 
   const biopsyText = sections.biopsy.join(" ");
   const coresMatch = biopsyText.match(/(\d+)\s+\d+(?:st|nd|rd|th)\b/i);
@@ -269,5 +355,6 @@ export function parseClinicNote(text: string): ParsedNote {
     biopsyTotalCores,
     biopsyMaxCorePct: maxCorePct,
     biopsyGG: maxGG,
+    warnings,
   };
 }
