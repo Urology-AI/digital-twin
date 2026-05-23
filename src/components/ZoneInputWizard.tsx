@@ -400,6 +400,13 @@ export function ZoneInputWizard() {
     setSelectedZone(null);
   }, [updateLesionRows]);
 
+  const clearAllZones = useCallback(() => {
+    if (!window.confirm("Clear all zone locations? This cannot be undone until you apply a new checkpoint.")) return;
+    setZoneData({});
+    updateLesionRows([]);
+    setSelectedZone(null);
+  }, [updateLesionRows]);
+
   const handleAgeChange      = (v: string) => { setAge(v);      updateClinicalForm({ age: parseInt(v) || undefined }); };
   const handlePsaChange      = (v: string) => { setPsa(v);      updateClinicalForm({ psa: parseFloat(v) || 0 }); };
   const handleVolChange      = (v: string) => { setVol(v);      updateClinicalForm({ vol: parseFloat(v) || 45 }); };
@@ -693,13 +700,33 @@ export function ZoneInputWizard() {
                 <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-purple-500 text-[8px] font-bold text-white">P</span> PSMA</span>
                 <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-amber-600 text-[8px] font-bold text-white">B</span> Bx</span>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowNoteImport(true)}
-                className="flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-border/80 hover:bg-muted/50 hover:text-foreground"
-              >
-                ↑ Import note
-              </button>
+              <div className="flex items-center gap-2">
+                {selectedZone && hasData(zoneData[selectedZone]) && (
+                  <button
+                    type="button"
+                    onClick={() => clearZone(selectedZone)}
+                    className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-1 text-xs font-semibold text-destructive/80 transition-colors hover:border-destructive/70 hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    Clear zone
+                  </button>
+                )}
+                {totalFilled > 0 && (
+                  <button
+                    type="button"
+                    onClick={clearAllZones}
+                    className="flex items-center gap-1.5 rounded-md border border-destructive/40 bg-destructive/5 px-2.5 py-1 text-xs font-semibold text-destructive/80 transition-colors hover:border-destructive/70 hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    Clear all locations
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowNoteImport(true)}
+                  className="flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-border/80 hover:bg-muted/50 hover:text-foreground"
+                >
+                  ↑ Import note
+                </button>
+              </div>
             </div>
 
             {showNoteImport && (

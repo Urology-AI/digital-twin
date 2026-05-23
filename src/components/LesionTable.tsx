@@ -360,6 +360,21 @@ export function LesionTable() {
           >
             Import from note
           </Button>
+          {rows.length > 0 && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => {
+                if (!window.confirm("Clear all lesions?")) return;
+                updateLesionRows([]);
+                pushHistory();
+              }}
+            >
+              Clear all
+            </Button>
+          )}
         </div>
         {showImport && <ParseNoteModal onClose={() => setShowImport(false)} />}
       </CardContent>
