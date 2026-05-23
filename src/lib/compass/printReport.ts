@@ -3,205 +3,236 @@ import { useUiStore } from "@/store/uiStore";
 
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "./clinicalFromRecord";
-import { COMPASS_TO_3D } from "./constants";
-import type { ZoneMap } from "@/types/patient";
-import type { ThreeZoneRuntime } from "@/types/prediction";
+import type { LesionRow } from "@/types/lesion";
 
-// ── SVG Prostate Sector Map ───────────────────────────────────────────────────
-// Anatomically-shaped: elliptical cross-sections, PZpl/PZpm/TZ zones clipped to outline
+// ── OR-style Prostate Sector Map ──────────────────────────────────────────────
+// Three columns (MRI / MUS / PET), binary sector shading from lesion rows.
+// Matches the clinical OR printout format surgeons use intraoperatively.
 
-function buildProstateMapSVG(zones: ZoneMap, threeZones: ThreeZoneRuntime[]): string {
+function lesionRowToSectors(row: LesionRow): string[] {
+  const pos = row.zone || "";
+  const isAnt = pos === "Anterior";
+  const isLat = pos === "Posterolateral" || pos === "Lateral";
+  const isMed = pos === "Medial";
+
+  function sectorsForSide(s: "L" | "R"): string[] {
+    if (isAnt) {
+      if (row.level === "Base") return [s === "L" ? "1a" : "4a"];
+      if (row.level === "Mid")  return [s === "L" ? "2a" : "5a"];
+      return [s === "L" ? "3a" : "6a"];
+    }
+    if (row.level === "Apex") return [s === "L" ? "5p" : "10p"];
+    if (isLat) {
+      if (row.level === "Base") return [s === "L" ? "2p" : "7p"];
+      if (row.level === "Mid")  return [s === "L" ? "4p" : "9p"];
+    }
+    if (isMed) {
+      if (row.level === "Base") return [s === "L" ? "1p" : "6p"];
+      if (row.level === "Mid")  return [s === "L" ? "3p" : "8p"];
+    }
+    // Generic posterior — mark both medial + lateral
+    if (row.level === "Base") return s === "L" ? ["1p", "2p"] : ["6p", "7p"];
+    if (row.level === "Mid")  return s === "L" ? ["3p", "4p"] : ["8p", "9p"];
+    return [s === "L" ? "5p" : "10p"];
+  }
+
+  if (row.side === "L" || row.side === "R") return sectorsForSide(row.side);
+  return [...sectorsForSide("L"), ...sectorsForSide("R")];
+}
+
+function buildORSectorMapSVG(lesionRows: LesionRow[]): string {
   const f = (n: number) => n.toFixed(1);
 
-  function fillC(v: number) {
-    if (v >= 0.5) return "#FADADD";
-    if (v >= 0.3) return "#FDECEA";
-    if (v >= 0.15) return "#FEF3CD";
-    if (v >= 0.08) return "#DFF0D8";
-    return "#EEF8EE";
-  }
-  function strokeC(v: number) {
-    if (v >= 0.3) return "#C0392B";
-    if (v >= 0.15) return "#D4811E";
-    return "#27AE60";
-  }
-  function txtC(v: number) {
-    if (v >= 0.3) return "#922B21";
-    if (v >= 0.15) return "#7D6608";
-    return "#1A6B2F";
-  }
-  function gzv(key: string, ov: string): number {
-    const pd = zones[key as keyof typeof zones];
-    if (pd) {
-      const raw = pd[ov as keyof typeof pd] as number | undefined;
-      if (raw !== undefined && raw > 0.03) return raw;
+  type Col = "MRI" | "MUS" | "PET";
+  const cols: Col[] = ["MRI", "MUS", "PET"];
+
+  // Build positive sector sets and SV flags per modality
+  const pos: Record<Col, Set<string>> = { MRI: new Set(), MUS: new Set(), PET: new Set() };
+  const svL: Record<Col, boolean> = { MRI: false, MUS: false, PET: false };
+  const svR: Record<Col, boolean> = { MRI: false, MUS: false, PET: false };
+
+  for (const row of lesionRows) {
+    const grp: Col = row.source === "MRI" ? "MRI" : row.source === "PSMA" ? "PET" : "MUS";
+    if (row.svi) {
+      if (row.side === "L" || row.side === "") svL[grp] = true;
+      if (row.side === "R" || row.side === "") svR[grp] = true;
     }
-    const z3dId = COMPASS_TO_3D[key];
-    if (!z3dId) return 0.02;
-    const z3d = threeZones.find((z) => z.id === z3dId);
-    if (!z3d) return 0.02;
-    return (z3d[ov as keyof ThreeZoneRuntime] as number) ?? 0.02;
+    lesionRowToSectors(row).forEach((z) => pos[grp].add(z));
   }
 
-  const overlays = ["cancer", "ece", "svi", "psm"];
-  const ovLabels = ["csPCa", "ECE", "SVI", "PSM"];
+  const colW = 218;
+  const pad = 8;
+  const svgW = cols.length * colW + pad * 2;
 
-  const panelW = 162;
-  const pad = 6;
-  const svgW = overlays.length * panelW + pad * 2;
-  const svgH = 445;
+  // Row vertical positions
+  const svTop = 36;
+  const svH = 26;
+  const baseY = 148;
+  const midY = 278;
+  const apexY = 383;
+  const lrY   = 428;
+  const svgH  = 440;
 
-  // BASE and MID: 6-zone levels (PZpl-L, PZpm-L, ANT-L, PZpl-R, PZpm-R, ANT-R)
-  const fullLevels = [
-    { label: "BASE", cy: 92,  rx: 50, ry: 40, antL: "1a", antR: "4a", pmL: "1p", plL: "2p", pmR: "6p", plR: "7p", pmRx: 17, pmRy: 13, pmXOff: 13, pmCyOff: 8 },
-    { label: "MID",  cy: 228, rx: 50, ry: 40, antL: "2a", antR: "5a", pmL: "3p", plL: "4p", pmR: "8p", plR: "9p", pmRx: 17, pmRy: 13, pmXOff: 13, pmCyOff: 8 },
-  ] as const;
+  // Ellipse radii
+  const fRx = 58, fRy = 48;
+  const aRx = 44, aRy = 35;
+  const pmRx = 18, pmRy = 14, pmXOff = 16, pmCyOff = 11;
 
-  // APEX: 4-zone (no PZpm distinction)
-  const apexCy = 346;
-  const apexRx = 34;
-  const apexRy = 27;
+  const POS_FILL   = "#c0c0c0";
+  const NEG_FILL   = "#ffffff";
+  const BORDER     = "#2c2c2c";
+  const LABEL_C    = "#1a1a1a";
+  const LEVEL_C    = "#666666";
+  const DASH       = `stroke-dasharray="3 2"`;
+  const FA         = `font-family="Arial,sans-serif"`;
 
-  // Build clipPath defs first (one ellipse per panel × level)
+  function fill(col: Col, sector: string) {
+    return pos[col].has(sector) ? POS_FILL : NEG_FILL;
+  }
+
+  // clipPath defs
   let defs = "<defs>";
-  overlays.forEach((_ov, idx) => {
-    const px = pad + idx * panelW;
-    const cx = px + panelW / 2;
-    for (const { label, cy, rx, ry } of fullLevels) {
-      defs += `<clipPath id="cp-${idx}-${label}"><ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${rx}" ry="${ry}"/></clipPath>`;
-    }
-    defs += `<clipPath id="cp-${idx}-APEX"><ellipse cx="${f(cx)}" cy="${f(apexCy)}" rx="${apexRx}" ry="${apexRy}"/></clipPath>`;
+  cols.forEach((_c, idx) => {
+    const cx = pad + idx * colW + colW / 2;
+    defs += `<clipPath id="cb${idx}"><ellipse cx="${f(cx)}" cy="${f(baseY)}" rx="${fRx}" ry="${fRy}"/></clipPath>`;
+    defs += `<clipPath id="cm${idx}"><ellipse cx="${f(cx)}" cy="${f(midY)}"  rx="${fRx}" ry="${fRy}"/></clipPath>`;
+    defs += `<clipPath id="ca${idx}"><ellipse cx="${f(cx)}" cy="${f(apexY)}" rx="${aRx}"  ry="${aRy}"/></clipPath>`;
   });
   defs += "</defs>";
 
-  let s = "";
-
-  // Background
-  s += `<rect width="${svgW}" height="${svgH}" fill="#fafafa" rx="4"/>`;
+  let s = `<rect width="${svgW}" height="${svgH}" fill="#f9f9f9" rx="4"/>`;
 
   // Column separators
-  for (let i = 1; i < overlays.length; i++) {
-    const lx = pad + i * panelW;
-    s += `<line x1="${lx}" y1="8" x2="${lx}" y2="${svgH - 8}" stroke="#e4e4e4" stroke-width="1"/>`;
+  for (let i = 1; i < cols.length; i++) {
+    const lx = pad + i * colW;
+    s += `<line x1="${lx}" y1="8" x2="${lx}" y2="${svgH - 8}" stroke="#d8d8d8" stroke-width="1"/>`;
   }
 
-  overlays.forEach((ov, idx) => {
-    const px = pad + idx * panelW;
-    const cx = px + panelW / 2;
-    const ovLabel = ovLabels[idx] ?? ov;
-    const pt = `text-anchor="middle" font-family="Arial,sans-serif" font-size="7.5" font-weight="700"`;
+  cols.forEach((col, idx) => {
+    const px = pad + idx * colW;
+    const cx = px + colW / 2;
+    const lbl = `text-anchor="middle" ${FA}`;
 
-    // Panel heading
-    s += `<rect x="${px + 4}" y="6" width="${panelW - 8}" height="20" rx="3" fill="#1a5276" opacity="0.08"/>`;
-    s += `<text x="${f(cx)}" y="20" text-anchor="middle" font-family="Arial,sans-serif" font-size="10.5" font-weight="700" fill="#1a5276">${ovLabel}</text>`;
-
-    // ── BASE & MID (6-zone, anatomical ellipse) ───────────────────────────────
-    for (const { label, cy, rx, ry, antL, antR, pmL, plL, pmR, plR, pmRx, pmRy, pmXOff, pmCyOff } of fullLevels) {
-      const cpId = `cp-${idx}-${label}`;
-      const plLv = gzv(plL, ov);
-      const plRv = gzv(plR, ov);
-      const pmLv = gzv(pmL, ov);
-      const pmRv = gzv(pmR, ov);
-      const antLv = gzv(antL, ov);
-      const antRv = gzv(antR, ov);
-
-      s += `<text x="${px + 8}" y="${cy - ry - 6}" font-family="Arial,sans-serif" font-size="8" font-weight="700" fill="#888" letter-spacing="1.5">${label}</text>`;
-
-      s += `<g clip-path="url(#${cpId})">`;
-        // PZpl (outer posterior zone) — fills bottom half, clipped to ellipse
-        s += `<rect x="${f(cx - rx - 1)}" y="${f(cy - 1)}" width="${f(rx + 1)}" height="${f(ry + 1)}" fill="${fillC(plLv)}"/>`;
-        s += `<rect x="${f(cx)}" y="${f(cy - 1)}" width="${f(rx + 1)}" height="${f(ry + 1)}" fill="${fillC(plRv)}"/>`;
-        // PZpm (inner medial posterior) — small ellipse overlaid on PZpl
-        s += `<ellipse cx="${f(cx - pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${fillC(pmLv)}" stroke="${strokeC(pmLv)}" stroke-width="0.7"/>`;
-        s += `<ellipse cx="${f(cx + pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${fillC(pmRv)}" stroke="${strokeC(pmRv)}" stroke-width="0.7"/>`;
-        // ANT / TZ — fills top half, drawn over posterior to clean up center
-        s += `<rect x="${f(cx - rx - 1)}" y="${f(cy - ry - 1)}" width="${f(rx + 1)}" height="${f(ry + 1)}" fill="${fillC(antLv)}"/>`;
-        s += `<rect x="${f(cx)}" y="${f(cy - ry - 1)}" width="${f(rx + 1)}" height="${f(ry + 1)}" fill="${fillC(antRv)}"/>`;
-        // Outer ellipse border
-        s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${rx}" ry="${ry}" fill="none" stroke="#999" stroke-width="1.5"/>`;
-        // ANT/POST anatomical boundary: bezier curving slightly into posterior
-        s += `<path d="M${f(cx - rx)},${f(cy)} C${f(cx - rx * 0.38)},${f(cy + 8)} ${f(cx + rx * 0.38)},${f(cy + 8)} ${f(cx + rx)},${f(cy)}" fill="none" stroke="#aaa" stroke-width="0.9"/>`;
-        // L/R midline
-        s += `<line x1="${f(cx)}" y1="${f(cy - ry)}" x2="${f(cx)}" y2="${f(cy + ry)}" stroke="#aaa" stroke-width="0.8"/>`;
-      s += `</g>`;
-
-      // Urethra dot (rendered above clip group)
-      s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="2.5" fill="#d4d4d4" stroke="#bbb" stroke-width="0.7"/>`;
-
-      // Risk percentage labels
-      s += `<text x="${f(cx - rx * 0.5)}" y="${f(cy - ry * 0.48 + 3)}" ${pt} fill="${txtC(antLv)}">${Math.round(antLv * 100)}%</text>`;
-      s += `<text x="${f(cx + rx * 0.5)}" y="${f(cy - ry * 0.48 + 3)}" ${pt} fill="${txtC(antRv)}">${Math.round(antRv * 100)}%</text>`;
-      s += `<text x="${f(cx - pmXOff)}" y="${f(cy + pmCyOff + 3)}" ${pt} fill="${txtC(pmLv)}">${Math.round(pmLv * 100)}%</text>`;
-      s += `<text x="${f(cx + pmXOff)}" y="${f(cy + pmCyOff + 3)}" ${pt} fill="${txtC(pmRv)}">${Math.round(pmRv * 100)}%</text>`;
-      s += `<text x="${f(cx - rx * 0.68)}" y="${f(cy + ry * 0.7 + 3)}" ${pt} fill="${txtC(plLv)}">${Math.round(plLv * 100)}%</text>`;
-      s += `<text x="${f(cx + rx * 0.68)}" y="${f(cy + ry * 0.7 + 3)}" ${pt} fill="${txtC(plRv)}">${Math.round(plRv * 100)}%</text>`;
-
-      // Micro anatomy labels (first panel only to avoid clutter)
-      if (idx === 0) {
-        const ml = `text-anchor="middle" font-family="Arial,sans-serif" font-size="6" fill="#b0b0b0"`;
-        s += `<text x="${f(cx - rx * 0.5)}" y="${f(cy - ry + 9)}" ${ml}>TZ</text>`;
-        s += `<text x="${f(cx + rx * 0.5)}" y="${f(cy - ry + 9)}" ${ml}>TZ</text>`;
-        s += `<text x="${f(cx - rx * 0.72)}" y="${f(cy + ry - 4)}" ${ml}>PZpl</text>`;
-        s += `<text x="${f(cx + rx * 0.72)}" y="${f(cy + ry - 4)}" ${ml}>PZpl</text>`;
-      }
-    }
-
-    // ── APEX (4-zone) ─────────────────────────────────────────────────────────
-    {
-      const antLv  = gzv("3a",  ov);
-      const antRv  = gzv("6a",  ov);
-      const postLv = gzv("5p",  ov);
-      const postRv = gzv("10p", ov);
-
-      s += `<text x="${px + 8}" y="${apexCy - apexRy - 6}" font-family="Arial,sans-serif" font-size="8" font-weight="700" fill="#888" letter-spacing="1.5">APEX</text>`;
-
-      s += `<g clip-path="url(#cp-${idx}-APEX)">`;
-        s += `<rect x="${f(cx - apexRx - 1)}" y="${f(apexCy - 1)}" width="${f(apexRx + 1)}" height="${f(apexRy + 1)}" fill="${fillC(postLv)}"/>`;
-        s += `<rect x="${f(cx)}" y="${f(apexCy - 1)}" width="${f(apexRx + 1)}" height="${f(apexRy + 1)}" fill="${fillC(postRv)}"/>`;
-        s += `<rect x="${f(cx - apexRx - 1)}" y="${f(apexCy - apexRy - 1)}" width="${f(apexRx + 1)}" height="${f(apexRy + 1)}" fill="${fillC(antLv)}"/>`;
-        s += `<rect x="${f(cx)}" y="${f(apexCy - apexRy - 1)}" width="${f(apexRx + 1)}" height="${f(apexRy + 1)}" fill="${fillC(antRv)}"/>`;
-        s += `<ellipse cx="${f(cx)}" cy="${f(apexCy)}" rx="${apexRx}" ry="${apexRy}" fill="none" stroke="#999" stroke-width="1.5"/>`;
-        s += `<path d="M${f(cx - apexRx)},${f(apexCy)} C${f(cx - apexRx * 0.4)},${f(apexCy + 6)} ${f(cx + apexRx * 0.4)},${f(apexCy + 6)} ${f(cx + apexRx)},${f(apexCy)}" fill="none" stroke="#aaa" stroke-width="0.9"/>`;
-        s += `<line x1="${f(cx)}" y1="${f(apexCy - apexRy)}" x2="${f(cx)}" y2="${f(apexCy + apexRy)}" stroke="#aaa" stroke-width="0.8"/>`;
-      s += `</g>`;
-
-      s += `<circle cx="${f(cx)}" cy="${f(apexCy)}" r="2.5" fill="#d4d4d4" stroke="#bbb" stroke-width="0.7"/>`;
-
-      s += `<text x="${f(cx - apexRx * 0.5)}" y="${f(apexCy - apexRy * 0.45 + 3)}" ${pt} fill="${txtC(antLv)}">${Math.round(antLv * 100)}%</text>`;
-      s += `<text x="${f(cx + apexRx * 0.5)}" y="${f(apexCy - apexRy * 0.45 + 3)}" ${pt} fill="${txtC(antRv)}">${Math.round(antRv * 100)}%</text>`;
-      s += `<text x="${f(cx - apexRx * 0.5)}" y="${f(apexCy + apexRy * 0.55 + 3)}" ${pt} fill="${txtC(postLv)}">${Math.round(postLv * 100)}%</text>`;
-      s += `<text x="${f(cx + apexRx * 0.5)}" y="${f(apexCy + apexRy * 0.55 + 3)}" ${pt} fill="${txtC(postRv)}">${Math.round(postRv * 100)}%</text>`;
-    }
+    // Column header
+    s += `<rect x="${px + 6}" y="5" width="${colW - 12}" height="22" rx="3" fill="#2c3e50" opacity="0.09"/>`;
+    s += `<text x="${f(cx)}" y="20" ${lbl} font-size="13" font-weight="800" fill="#2c3e50">${col}</text>`;
 
     // ── Seminal Vesicles ──────────────────────────────────────────────────────
-    const svTop = 388;
-    s += `<text x="${px + 8}" y="${svTop - 5}" font-family="Arial,sans-serif" font-size="7.5" font-weight="700" fill="#888" letter-spacing="1">SV</text>`;
-    const svCells = [
-      { key: "SV-L", label: "SV-L", x: px + 8, w: panelW / 2 - 12 },
-      { key: "SV-R", label: "SV-R", x: px + panelW / 2 + 4, w: panelW / 2 - 12 },
-    ];
-    for (const { key, label, x, w } of svCells) {
-      const v = gzv(key, ov);
-      const pct = Math.round(v * 100);
-      s += `<rect x="${x}" y="${svTop}" width="${w}" height="22" rx="3" fill="${fillC(v)}" stroke="${strokeC(v)}" stroke-width="0.8"/>`;
-      s += `<text x="${x + w / 2}" y="${svTop + 9}" text-anchor="middle" font-size="7" font-weight="700" fill="#666" font-family="Arial">${label}</text>`;
-      s += `<text x="${x + w / 2}" y="${svTop + 19}" text-anchor="middle" font-size="8" font-weight="700" fill="${txtC(v)}" font-family="Arial">${pct}%</text>`;
+    s += `<text x="${px + 10}" y="${svTop - 3}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">SV</text>`;
+    const svW = colW / 2 - 14;
+    const svLx = px + 10, svRx = px + colW / 2 + 4;
+    for (const [x, hasPos, lbTxt] of [
+      [svLx, svL[col], "SV-L"],
+      [svRx, svR[col], "SV-R"],
+    ] as [number, boolean, string][]) {
+      const fc = hasPos ? POS_FILL : NEG_FILL;
+      s += `<rect x="${x}" y="${svTop}" width="${svW}" height="${svH}" rx="9" fill="${fc}" stroke="${BORDER}" stroke-width="1.3"/>`;
+      s += `<text x="${x + svW / 2}" y="${svTop + svH / 2 + 4}" ${lbl} font-size="9" font-weight="700" fill="${LABEL_C}">${lbTxt}</text>`;
     }
 
-    // ── Per-panel legend ──────────────────────────────────────────────────────
-    const legY = svgH - 20;
-    const legItems = [
-      { label: "<8%",    fill: "#EEF8EE", stroke: "#27AE60" },
-      { label: "8–15%",  fill: "#DFF0D8", stroke: "#27AE60" },
-      { label: "15–30%", fill: "#FEF3CD", stroke: "#D4811E" },
-      { label: "≥30%",   fill: "#FDECEA", stroke: "#C0392B" },
-    ];
-    legItems.forEach(({ label, fill, stroke }, i) => {
-      const lx = px + 4 + i * (panelW / 4);
-      s += `<rect x="${lx}" y="${legY}" width="8" height="8" rx="1" fill="${fill}" stroke="${stroke}" stroke-width="0.7"/>`;
-      s += `<text x="${lx + 10}" y="${legY + 7}" font-size="6.5" fill="#888" font-family="Arial">${label}</text>`;
-    });
+    // ── BASE ──────────────────────────────────────────────────────────────────
+    {
+      const cy = baseY;
+      s += `<text x="${px + 10}" y="${cy - fRy - 5}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">base</text>`;
+
+      const antL = fill(col, "1a"), antR = fill(col, "4a");
+      const plL  = fill(col, "2p"), plR  = fill(col, "7p");
+      const pmL  = fill(col, "1p"), pmR  = fill(col, "6p");
+
+      s += `<g clip-path="url(#cb${idx})">`;
+      s += `<rect x="${f(cx - fRx)}" y="${f(cy)}"      width="${f(fRx)}" height="${f(fRy)}" fill="${plL}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy)}"      width="${f(fRx)}" height="${f(fRy)}" fill="${plR}"/>`;
+      s += `<ellipse cx="${f(cx - pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${pmL}" stroke="${BORDER}" stroke-width="0.8"/>`;
+      s += `<ellipse cx="${f(cx + pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${pmR}" stroke="${BORDER}" stroke-width="0.8"/>`;
+      s += `<rect x="${f(cx - fRx)}" y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${antL}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${antR}"/>`;
+      s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${fRx}" ry="${fRy}" fill="none" stroke="${BORDER}" stroke-width="1.6"/>`;
+      s += `<line x1="${f(cx - fRx)}" y1="${f(cy)}" x2="${f(cx + fRx)}" y2="${f(cy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
+      s += `<line x1="${f(cx)}" y1="${f(cy - fRy)}" x2="${f(cx)}" y2="${f(cy + fRy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
+      s += `</g>`;
+      s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="3" fill="#cccccc" stroke="${BORDER}" stroke-width="0.8"/>`;
+
+      const tl = `text-anchor="middle" ${FA} font-size="9" font-weight="700" fill="${LABEL_C}"`;
+      s += `<text x="${f(cx - fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>1a</text>`;
+      s += `<text x="${f(cx + fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>4a</text>`;
+      s += `<text x="${f(cx - pmXOff)}"      y="${f(cy + pmCyOff + 4)}"    ${tl}>1p</text>`;
+      s += `<text x="${f(cx + pmXOff)}"      y="${f(cy + pmCyOff + 4)}"    ${tl}>6p</text>`;
+      s += `<text x="${f(cx - fRx * 0.82)}" y="${f(cy + fRy * 0.75 + 3)}" ${tl}>2p</text>`;
+      s += `<text x="${f(cx + fRx * 0.82)}" y="${f(cy + fRy * 0.75 + 3)}" ${tl}>7p</text>`;
+    }
+
+    // ── MID ───────────────────────────────────────────────────────────────────
+    {
+      const cy = midY;
+      s += `<text x="${px + 10}" y="${cy - fRy - 5}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">mid</text>`;
+
+      const antL = fill(col, "2a"), antR = fill(col, "5a");
+      const plL  = fill(col, "4p"), plR  = fill(col, "9p");
+      const pmL  = fill(col, "3p"), pmR  = fill(col, "8p");
+
+      s += `<g clip-path="url(#cm${idx})">`;
+      s += `<rect x="${f(cx - fRx)}" y="${f(cy)}"      width="${f(fRx)}" height="${f(fRy)}" fill="${plL}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy)}"      width="${f(fRx)}" height="${f(fRy)}" fill="${plR}"/>`;
+      s += `<ellipse cx="${f(cx - pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${pmL}" stroke="${BORDER}" stroke-width="0.8"/>`;
+      s += `<ellipse cx="${f(cx + pmXOff)}" cy="${f(cy + pmCyOff)}" rx="${pmRx}" ry="${pmRy}" fill="${pmR}" stroke="${BORDER}" stroke-width="0.8"/>`;
+      s += `<rect x="${f(cx - fRx)}" y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${antL}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy - fRy)}" width="${f(fRx)}" height="${f(fRy)}" fill="${antR}"/>`;
+      s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${fRx}" ry="${fRy}" fill="none" stroke="${BORDER}" stroke-width="1.6"/>`;
+      s += `<line x1="${f(cx - fRx)}" y1="${f(cy)}" x2="${f(cx + fRx)}" y2="${f(cy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
+      s += `<line x1="${f(cx)}" y1="${f(cy - fRy)}" x2="${f(cx)}" y2="${f(cy + fRy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
+      s += `</g>`;
+      s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="3" fill="#cccccc" stroke="${BORDER}" stroke-width="0.8"/>`;
+
+      const tl = `text-anchor="middle" ${FA} font-size="9" font-weight="700" fill="${LABEL_C}"`;
+      s += `<text x="${f(cx - fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>2a</text>`;
+      s += `<text x="${f(cx + fRx * 0.52)}" y="${f(cy - fRy * 0.5 + 4)}"  ${tl}>5a</text>`;
+      s += `<text x="${f(cx - pmXOff)}"      y="${f(cy + pmCyOff + 4)}"    ${tl}>3p</text>`;
+      s += `<text x="${f(cx + pmXOff)}"      y="${f(cy + pmCyOff + 4)}"    ${tl}>8p</text>`;
+      s += `<text x="${f(cx - fRx * 0.82)}" y="${f(cy + fRy * 0.75 + 3)}" ${tl}>4p</text>`;
+      s += `<text x="${f(cx + fRx * 0.82)}" y="${f(cy + fRy * 0.75 + 3)}" ${tl}>9p</text>`;
+    }
+
+    // ── APEX ──────────────────────────────────────────────────────────────────
+    {
+      const cy = apexY;
+      s += `<text x="${px + 10}" y="${cy - aRy - 5}" ${FA} font-size="8" font-weight="700" fill="${LEVEL_C}" letter-spacing="1">apex</text>`;
+
+      const antL  = fill(col, "3a"),  antR  = fill(col, "6a");
+      const postL = fill(col, "5p"),  postR = fill(col, "10p");
+
+      s += `<g clip-path="url(#ca${idx})">`;
+      s += `<rect x="${f(cx - aRx)}" y="${f(cy)}"      width="${f(aRx)}" height="${f(aRy)}" fill="${postL}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy)}"      width="${f(aRx)}" height="${f(aRy)}" fill="${postR}"/>`;
+      s += `<rect x="${f(cx - aRx)}" y="${f(cy - aRy)}" width="${f(aRx)}" height="${f(aRy)}" fill="${antL}"/>`;
+      s += `<rect x="${f(cx)}"       y="${f(cy - aRy)}" width="${f(aRx)}" height="${f(aRy)}" fill="${antR}"/>`;
+      s += `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${aRx}" ry="${aRy}" fill="none" stroke="${BORDER}" stroke-width="1.6"/>`;
+      s += `<line x1="${f(cx - aRx)}" y1="${f(cy)}" x2="${f(cx + aRx)}" y2="${f(cy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
+      s += `<line x1="${f(cx)}" y1="${f(cy - aRy)}" x2="${f(cx)}" y2="${f(cy + aRy)}" stroke="${BORDER}" stroke-width="0.9" ${DASH}/>`;
+      s += `</g>`;
+      // Open-circle urethra marker at apex
+      s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="5.5" fill="#ffffff" stroke="${BORDER}" stroke-width="1.3"/>`;
+      s += `<circle cx="${f(cx)}" cy="${f(cy)}" r="2.5" fill="${BORDER}"/>`;
+
+      const tl = `text-anchor="middle" ${FA} font-size="9" font-weight="700" fill="${LABEL_C}"`;
+      s += `<text x="${f(cx - aRx * 0.5)}" y="${f(cy - aRy * 0.48 + 4)}"  ${tl}>3a</text>`;
+      s += `<text x="${f(cx + aRx * 0.5)}" y="${f(cy - aRy * 0.48 + 4)}"  ${tl}>6a</text>`;
+      s += `<text x="${f(cx - aRx * 0.5)}" y="${f(cy + aRy * 0.68 + 3)}"  ${tl}>5p</text>`;
+      s += `<text x="${f(cx + aRx * 0.5)}" y="${f(cy + aRy * 0.68 + 3)}"  ${tl}>10p</text>`;
+    }
+
+    // ── L / R labels ──────────────────────────────────────────────────────────
+    const tl = `text-anchor="middle" ${FA} font-size="12" font-weight="700" fill="#444"`;
+    s += `<text x="${f(cx - fRx * 0.45)}" y="${lrY}" ${tl}>L</text>`;
+    s += `<text x="${f(cx + fRx * 0.45)}" y="${lrY}" ${tl}>R</text>`;
   });
+
+  // Bottom legend (single, centered)
+  const legY = svgH - 14;
+  const legCx = svgW / 2;
+  s += `<rect x="${legCx - 52}" y="${legY - 9}" width="9" height="9" rx="1" fill="${POS_FILL}" stroke="${BORDER}" stroke-width="0.8"/>`;
+  s += `<text x="${legCx - 41}" y="${legY - 1}" ${FA} font-size="7.5" fill="#777">Positive finding</text>`;
+  s += `<rect x="${legCx + 40}" y="${legY - 9}" width="9" height="9" rx="1" fill="${NEG_FILL}" stroke="${BORDER}" stroke-width="0.8"/>`;
+  s += `<text x="${legCx + 51}" y="${legY - 1}" ${FA} font-size="7.5" fill="#777">Negative</text>`;
 
   return `<svg width="${svgW}" height="${svgH}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;max-width:${svgW}px">${defs}${s}</svg>`;
 }
@@ -209,7 +240,7 @@ function buildProstateMapSVG(zones: ZoneMap, threeZones: ThreeZoneRuntime[]): st
 // ── HTML builder (exported for modal use) ────────────────────────────────────
 
 export function buildPrintHtml(): string | null {
-  const { patients, activeId, predictions, threeZones } = usePatientStore.getState();
+  const { patients, activeId, predictions } = usePatientStore.getState();
 
   const entry = patients.find((p) => p.id === activeId);
   if (!entry || !predictions) return null;
@@ -231,8 +262,8 @@ export function buildPrintHtml(): string | null {
   const riskBorderColor = (v: number) =>
     v >= 0.3 ? "#F1948A" : v >= 0.15 ? "#F8C471" : "#82E0AA";
 
-  // ── Prostate map SVG ──────────────────────────────────────────────────────
-  const prostateMapSVG = buildProstateMapSVG(entry.record.zones ?? {}, threeZones);
+  // ── OR-style prostate sector map ─────────────────────────────────────────
+  const prostateMapSVG = buildORSectorMapSVG(entry.lesionRows);
 
   // ── Prediction cards ──────────────────────────────────────────────────────
   const predFields = [
@@ -425,8 +456,8 @@ ${sideEceHtml}
 
 <div class="map-box">
   <div class="map-box-title">
-    Prostate Sector Map — Zone Risk Distribution
-    <span>Axial view · Patient L on left · ANT = top · POST = bottom · Inner ellipse = PZpm · Outer post = PZpl</span>
+    Prostate Sector Map — Imaging Findings by Modality
+    <span>Axial view · L on left · ANT = top · POST = bottom · Shaded = positive finding · Inner ellipse = PZpm</span>
   </div>
   <div style="padding:10px 8px 4px">${prostateMapSVG}</div>
 </div>
