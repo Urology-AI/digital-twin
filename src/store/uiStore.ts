@@ -25,6 +25,7 @@ interface UiState {
   caseLogOpen: boolean;
   printReportOpen: boolean;
   referenceOpen: boolean;
+  creditsOpen: boolean;
   chatOpen: boolean;
   welcomeOpen: boolean;
   explainKey: string | null;
@@ -43,6 +44,7 @@ interface UiState {
   setCaseLogOpen: (v: boolean) => void;
   setPrintReportOpen: (v: boolean) => void;
   setReferenceOpen: (v: boolean) => void;
+  setCreditsOpen: (v: boolean) => void;
   setChatOpen: (v: boolean) => void;
   setWelcomeOpen: (v: boolean) => void;
   dismissWelcome: () => void;
@@ -66,6 +68,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   caseLogOpen: false,
   printReportOpen: false,
   referenceOpen: false,
+  creditsOpen: false,
   chatOpen: false,
   welcomeOpen: !readWelcomeSeen(),
   explainKey: null,
@@ -85,6 +88,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setCaseLogOpen: (v) => set({ caseLogOpen: v }),
   setPrintReportOpen: (v) => set({ printReportOpen: v }),
   setReferenceOpen: (v) => set({ referenceOpen: v }),
+  setCreditsOpen: (v) => set({ creditsOpen: v }),
   setChatOpen: (v) => set({ chatOpen: v }),
   setWelcomeOpen: (v) => set({ welcomeOpen: v }),
   dismissWelcome: () => {
