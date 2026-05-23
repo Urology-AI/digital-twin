@@ -14,6 +14,7 @@ import { PredictionPanel } from "@/components/PredictionPanel";
 import { WelcomeScreen } from "@/components/WelcomeScreen";
 import { TutorialOverlay } from "@/components/TutorialOverlay";
 import { PrintReportModal } from "@/components/PrintReportModal";
+import { CreditsModal } from "@/components/CreditsModal";
 import { ZoneInputWizard } from "@/components/ZoneInputWizard";
 import { PREDICTION_EXPLANATIONS } from "@/lib/compass/explainPrediction";
 import {
@@ -82,6 +83,8 @@ export default function App() {
   const explainKey = useUiStore((s) => s.explainKey);
   const setExplainKey = useUiStore((s) => s.setExplainKey);
   const welcomeOpen = useUiStore((s) => s.welcomeOpen);
+  const creditsOpen = useUiStore((s) => s.creditsOpen);
+  const setCreditsOpen = useUiStore((s) => s.setCreditsOpen);
   const dark = useUiStore((s) => s.dark);
   const desktopTab = useUiStore((s) => s.desktopTab);
 
@@ -183,6 +186,20 @@ export default function App() {
 
       <MobileTabBar />
 
+      {/* Desktop-only footer */}
+      <footer className="hidden lg:flex h-7 shrink-0 items-center justify-end gap-3 border-t border-border/50 bg-card/60 px-4">
+        <span className="text-[10px] text-muted-foreground/50">
+          COMPASS · Tewari Lab · Mount Sinai · Research Use Only
+        </span>
+        <button
+          type="button"
+          onClick={() => setCreditsOpen(true)}
+          className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground underline-offset-2 hover:underline transition-colors"
+        >
+          Credits
+        </button>
+      </footer>
+
       <ChatWidget />
 
       {infoOpen && (
@@ -198,6 +215,7 @@ export default function App() {
       )}
 
       {welcomeOpen && <WelcomeScreen />}
+      {creditsOpen && <CreditsModal onClose={() => setCreditsOpen(false)} />}
       <TutorialOverlay />
       <PrintReportModal />
 
