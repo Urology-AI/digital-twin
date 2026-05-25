@@ -536,7 +536,7 @@ export function ZoneInputWizard() {
             type="button"
             onClick={() => { setActiveTab(tab.n); setSelectedZone(null); }}
             className={cn(
-              "flex flex-1 items-center justify-center gap-3 border-b-[3px] py-[18px] text-base font-bold transition-colors",
+              "flex flex-1 items-center justify-center gap-2 border-b-[3px] py-3 text-sm font-bold transition-colors sm:gap-3 sm:py-[18px] sm:text-base",
               activeTab === tab.n
                 ? "border-primary bg-primary/5 text-primary"
                 : "border-transparent text-muted-foreground hover:bg-muted/20 hover:text-foreground",
@@ -559,30 +559,30 @@ export function ZoneInputWizard() {
       {/* ── Tab 1: Demographics ── */}
       {activeTab === 1 && (
         <div className="flex-1 overflow-y-auto" data-tutorial="clinical-form">
-          <div className="mx-auto max-w-2xl space-y-7 p-8">
+          <div className="mx-auto max-w-2xl space-y-5 p-4 sm:space-y-7 sm:p-8">
             <div>
-              <h3 className="text-2xl font-bold text-foreground">Demographics &amp; Labs</h3>
+              <h3 className="text-xl font-bold text-foreground sm:text-2xl">Demographics &amp; Labs</h3>
               <p className="mt-1 text-sm text-muted-foreground">Baseline parameters for risk calibration</p>
             </div>
 
-            <div className="grid grid-cols-3 gap-5">
-              <div className="space-y-2">
+            <div className="grid grid-cols-3 gap-3 sm:gap-5">
+              <div className="space-y-1.5 sm:space-y-2">
                 <label className="text-sm font-semibold text-foreground" htmlFor="wiz-age">Age <span className="font-normal text-muted-foreground">(years)</span></label>
                 <Input id="wiz-age" type="number" min={18} max={120} inputMode="numeric" placeholder="65" value={age} onChange={(e) => handleAgeChange(e.target.value)} className="h-11 text-base" />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 <label className="text-sm font-semibold text-foreground" htmlFor="wiz-psa">PSA <span className="font-normal text-muted-foreground">(ng/mL)</span></label>
                 <Input id="wiz-psa" type="number" step="0.1" inputMode="decimal" placeholder="6.5" value={psa} onChange={(e) => handlePsaChange(e.target.value)} className="h-11 text-base" />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-1.5 sm:space-y-2">
                 <label className="text-sm font-semibold text-foreground" htmlFor="wiz-vol">Volume <span className="font-normal text-muted-foreground">(cc)</span></label>
                 <Input id="wiz-vol" type="number" step="0.1" inputMode="decimal" placeholder="45" value={vol} onChange={(e) => handleVolChange(e.target.value)} className="h-11 text-base" />
               </div>
             </div>
 
-            <div className="flex items-center gap-4 rounded-xl border border-border/60 bg-muted/40 px-5 py-4">
-              <span className="text-sm font-bold uppercase tracking-wider text-muted-foreground">PSAD</span>
-              <span className="text-3xl font-black tabular-nums text-primary">{psad}</span>
+            <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/40 px-4 py-3 sm:gap-4 sm:px-5 sm:py-4">
+              <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground sm:text-sm">PSAD</span>
+              <span className="text-2xl font-black tabular-nums text-primary sm:text-3xl">{psad}</span>
               <span className="text-sm text-muted-foreground">ng/mL/cc</span>
             </div>
 
@@ -595,17 +595,19 @@ export function ZoneInputWizard() {
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-5">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground" htmlFor="wiz-dec">Decipher <span className="font-normal text-muted-foreground">(0–1)</span></label>
+            <div className="grid grid-cols-3 gap-3 sm:gap-5">
+              <div className="space-y-1.5 sm:space-y-2">
+                <label className="text-sm font-semibold text-foreground" htmlFor="wiz-dec">
+                  Decipher <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–1)</span>
+                </label>
                 <Input id="wiz-dec" type="text" inputMode="decimal" placeholder="0.52" value={decipher} onChange={(e) => handleDecipherChange(e.target.value)} className="h-11 text-base" />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground" htmlFor="wiz-shim">SHIM <span className="font-normal text-muted-foreground">(0–25)</span></label>
+              <div className="space-y-1.5 sm:space-y-2">
+                <label className="text-sm font-semibold text-foreground" htmlFor="wiz-shim">SHIM <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–25)</span></label>
                 <Input id="wiz-shim" type="number" min={0} max={25} inputMode="numeric" placeholder="21" value={shim} onChange={(e) => handleShimChange(e.target.value)} className="h-11 text-base" />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground" htmlFor="wiz-ipss">IPSS <span className="font-normal text-muted-foreground">(0–35)</span></label>
+              <div className="space-y-1.5 sm:space-y-2">
+                <label className="text-sm font-semibold text-foreground" htmlFor="wiz-ipss">IPSS <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–35)</span></label>
                 <Input id="wiz-ipss" type="number" min={0} max={35} inputMode="numeric" placeholder="8" value={ipss} onChange={(e) => handleIpssChange(e.target.value)} className="h-11 text-base" />
               </div>
             </div>

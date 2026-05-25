@@ -32,13 +32,6 @@ import {
 import { useUiStore } from "@/store/uiStore";
 import { cn } from "@/lib/utils";
 
-/**
- * Offset above mobile chrome (tab bar h-16 + control pills h-9 + small gap + safe area).
- * Used so the dim/info readout doesn't collide with the bottom-anchored pill cluster.
- */
-const MOBILE_CHROME_BOTTOM =
-  "max-lg:bottom-[calc(0.5rem+4rem+2.5rem+env(safe-area-inset-bottom,0px))]";
-
 function DimOverlay() {
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
@@ -51,13 +44,9 @@ function DimOverlay() {
   );
   const vol = entry.record.prostate.volume_cc ?? S.vol;
   const d = entry.record.prostate.dimensions_cm;
+  const psadValid = isFinite(S.psad) && S.psad > 0;
   return (
-    <div
-      className={cn(
-        "pointer-events-none absolute left-2 z-10 rounded-lg border border-border/60 bg-black/75 px-2.5 py-1.5 text-[10px] text-muted-foreground backdrop-blur sm:px-3 sm:py-2 sm:text-[11px] lg:bottom-3 lg:left-3",
-        MOBILE_CHROME_BOTTOM,
-      )}
-    >
+    <div className="pointer-events-none absolute left-2 z-10 rounded-lg border border-border/60 bg-black/75 px-2.5 py-1.5 text-[10px] text-muted-foreground backdrop-blur sm:px-3 sm:py-2 sm:text-[11px] max-lg:top-2 lg:bottom-3 lg:left-3">
       <span className="font-semibold text-primary">{vol} cc</span>
       {d && (
         <>
@@ -66,8 +55,9 @@ function DimOverlay() {
           <span className="hidden opacity-70 sm:inline">(AP × TR × CC)</span>
         </>
       )}
-      {" | "}
-      PSAD <span className="text-primary">{S.psad.toFixed(3)}</span>
+      {psadValid && (
+        <> {" | "}PSAD <span className="text-primary">{S.psad.toFixed(3)}</span></>
+      )}
     </div>
   );
 }
@@ -135,7 +125,7 @@ export default function App() {
             "absolute z-0 bg-muted/20",
             "inset-0",
             onPredictions && "lg:left-1/2",
-            onPredictions && "max-lg:top-1/2",
+            onPredictions && "max-lg:top-[42%]",
           )}
         >
           <div className="absolute inset-0 min-h-0 min-w-0" data-tutorial="three-canvas">
@@ -166,7 +156,7 @@ export default function App() {
             onPredictions ? "block" : "hidden",
             // Desktop: left half. Mobile: top half.
             "lg:left-0 lg:right-1/2 lg:top-0 lg:bottom-0",
-            "max-lg:top-0 max-lg:bottom-1/2 max-lg:left-0 max-lg:right-0",
+            "max-lg:top-0 max-lg:bottom-[58%] max-lg:left-0 max-lg:right-0",
           )}
         >
           <PredictionPanel />
