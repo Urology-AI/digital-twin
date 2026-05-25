@@ -613,33 +613,86 @@ export function syncPatientLibraryToStore(): void {
   }
 }
 
-function b64encode(str: string): string {
-  return btoa(Array.from(new TextEncoder().encode(str), (b) => String.fromCharCode(b)).join(""));
+// URL-safe base64 (no +, /, = padding issues in hash)
+function b64uEncode(bytes: Uint8Array): string {
+  return btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(""))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
-function b64decode(b64: string): string {
-  return new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+function b64uDecode(b64u: string): Uint8Array {
+  const b64 = b64u.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+  return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
 }
 
-/** Build a shareable URL containing the active patient's full record in the hash. */
-export function buildShareUrl(): string | null {
+async function compressToB64u(str: string): Promise<string> {
+  const bytes = new TextEncoder().encode(str);
+  const cs = new CompressionStream("gzip");
+  const writer = cs.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const chunks: Uint8Array[] = [];
+  const reader = cs.readable.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) { out.set(c, offset); offset += c.length; }
+  return b64uEncode(out);
+}
+
+async function decompressFromB64u(b64u: string): Promise<string> {
+  const bytes = b64uDecode(b64u);
+  const ds = new DecompressionStream("gzip");
+  const writer = ds.writable.getWriter();
+  writer.write(bytes);
+  writer.close();
+  const chunks: Uint8Array[] = [];
+  const reader = ds.readable.getReader();
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const total = chunks.reduce((n, c) => n + c.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) { out.set(c, offset); offset += c.length; }
+  return new TextDecoder().decode(out);
+}
+
+/** Build a shareable URL containing the active patient's full record in the hash (gzip compressed). */
+export async function buildShareUrl(): Promise<string | null> {
   const { activeId, patients } = usePatientStore.getState();
   const p = patients.find((x) => x.id === activeId);
   if (!p) return null;
   const data = { ...p.record, lesions: p.lesionRows };
-  const encoded = b64encode(JSON.stringify(data));
+  const encoded = await compressToB64u(JSON.stringify(data));
   return `${window.location.origin}${window.location.pathname}#case=${encoded}`;
 }
 
 /**
- * If the URL hash contains `#case=<base64json>`, parse it, add the patient to
+ * If the URL hash contains `#case=<encoded>`, parse it, add the patient to
  * the store as the active entry, and strip the hash from the URL.
+ * Supports both gzip-compressed (new) and plain base64 (legacy) payloads.
  */
-export function loadSharedCaseFromUrl(): void {
+export async function loadSharedCaseFromUrl(): Promise<void> {
   const match = window.location.hash.match(/^#case=(.+)$/);
   if (!match) return;
   try {
-    const json = b64decode(match[1]!);
+    let json: string;
+    try {
+      json = await decompressFromB64u(match[1]!);
+    } catch {
+      // Legacy plain base64 fallback
+      json = new TextDecoder().decode(Uint8Array.from(atob(match[1]!), (c) => c.charCodeAt(0)));
+    }
     const data = JSON.parse(json) as Prostate3DInputV1;
     if (data._schema !== "prostate-3d-input-v1") return;
     data.zones = mergeZones(data.zones || {});

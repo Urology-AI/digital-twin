@@ -209,11 +209,12 @@ export function AppHeader() {
           aria-label="Copy share link"
           title={copied ? "Link copied!" : "Copy share link"}
           onClick={() => {
-            const url = buildShareUrl();
-            if (!url) return;
-            navigator.clipboard.writeText(url).then(() => {
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
+            buildShareUrl().then((url) => {
+              if (!url) return;
+              navigator.clipboard.writeText(url).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              });
             });
           }}
         >
