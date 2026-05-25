@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Info,
   Layers,
+  Link2,
   MessageCircle,
   Moon,
   Printer,
@@ -14,7 +15,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { usePatientStore } from "@/store/patientStore";
+import { usePatientStore, buildShareUrl } from "@/store/patientStore";
 import { useUiStore, type DesktopTab } from "@/store/uiStore";
 import { printReport } from "@/lib/compass/printReport";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ export function AppHeader() {
   const chatOpen = useUiStore((s) => s.chatOpen);
   const setChatOpen = useUiStore((s) => s.setChatOpen);
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const dark = useUiStore((s) => s.dark);
   const setDark = useUiStore((s) => s.setDark);
@@ -194,6 +196,28 @@ export function AppHeader() {
           onClick={() => setCaseLogOpen(true)}
         >
           <BookOpen className="h-[15px] w-[15px]" />
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className={cn(
+            "h-8 w-8 transition-colors",
+            copied ? "text-emerald-500" : "text-muted-foreground hover:text-foreground",
+          )}
+          aria-label="Copy share link"
+          title={copied ? "Link copied!" : "Copy share link"}
+          onClick={() => {
+            const url = buildShareUrl();
+            if (!url) return;
+            navigator.clipboard.writeText(url).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            });
+          }}
+        >
+          <Link2 className="h-[15px] w-[15px]" />
         </Button>
 
         <Button

@@ -612,3 +612,45 @@ export function syncPatientLibraryToStore(): void {
     /* noop */
   }
 }
+
+function b64encode(str: string): string {
+  return btoa(Array.from(new TextEncoder().encode(str), (b) => String.fromCharCode(b)).join(""));
+}
+
+function b64decode(b64: string): string {
+  return new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+}
+
+/** Build a shareable URL containing the active patient's full record in the hash. */
+export function buildShareUrl(): string | null {
+  const { activeId, patients } = usePatientStore.getState();
+  const p = patients.find((x) => x.id === activeId);
+  if (!p) return null;
+  const data = { ...p.record, lesions: p.lesionRows };
+  const encoded = b64encode(JSON.stringify(data));
+  return `${window.location.origin}${window.location.pathname}#case=${encoded}`;
+}
+
+/**
+ * If the URL hash contains `#case=<base64json>`, parse it, add the patient to
+ * the store as the active entry, and strip the hash from the URL.
+ */
+export function loadSharedCaseFromUrl(): void {
+  const match = window.location.hash.match(/^#case=(.+)$/);
+  if (!match) return;
+  try {
+    const json = b64decode(match[1]!);
+    const data = JSON.parse(json) as Prostate3DInputV1;
+    if (data._schema !== "prostate-3d-input-v1") return;
+    data.zones = mergeZones(data.zones || {});
+    const id = `shared-${Date.now()}`;
+    const lesionRows = ensureLesionIds((data.lesions as LesionRow[]) || []);
+    const entry: PatientEntry = { id, name: "Shared Case", record: data, lesionRows };
+    const { patients } = usePatientStore.getState();
+    usePatientStore.setState({ patients: [...patients, entry], activeId: id, loading: false });
+    usePatientStore.getState().recompute();
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+  } catch {
+    /* malformed hash — ignore */
+  }
+}

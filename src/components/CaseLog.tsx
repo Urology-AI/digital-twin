@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, CloudUpload, CloudDownload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydratePatientsFromCaseLog, getPatientLibrary, mergePatientLibrary, syncPatientLibraryToStore } from "@/store/patientStore";
+import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydratePatientsFromCaseLog, hydratePatientLibrary, getPatientLibrary, mergePatientLibrary, syncPatientLibraryToStore } from "@/store/patientStore";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { cn } from "@/lib/utils";
@@ -295,6 +295,9 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       record: entry.record,
       lesionRows: entry.lesionRows,
     });
+    // Sync the newly saved entry into the live store so the header dropdown updates
+    // without needing a page reload.
+    hydratePatientLibrary();
   };
 
   const updatePath = (idx: number, field: keyof CaseRecord, raw: string) => {
