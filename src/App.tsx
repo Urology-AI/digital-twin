@@ -102,7 +102,7 @@ export default function App() {
     hydratePatientLibrary();
     hydratePatientsFromCaseLog();
     // Load a case embedded in the URL hash (share links), overrides active selection.
-    loadSharedCaseFromUrl();
+    void loadSharedCaseFromUrl();
   }, [bootstrapFromJson]);
 
   const onPredictions = desktopTab === "predictions";
