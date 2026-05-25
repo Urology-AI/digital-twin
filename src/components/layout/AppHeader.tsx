@@ -224,7 +224,7 @@ export function AppHeader() {
           type="button"
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          className="hidden sm:inline-flex h-8 w-8 text-muted-foreground hover:text-foreground"
           aria-label="Print report"
           onClick={() => printReport()}
         >
@@ -235,7 +235,7 @@ export function AppHeader() {
           type="button"
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-primary"
+          className="hidden sm:inline-flex h-8 w-8 text-muted-foreground hover:text-primary"
           aria-label="About COMPASS"
           onClick={() => setInfoOpen(true)}
         >
@@ -245,7 +245,7 @@ export function AppHeader() {
         {/* AI status indicator — click to open settings */}
         <button
           type="button"
-          className="flex items-center gap-1.5 rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+          className="hidden sm:flex items-center gap-1.5 rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
           aria-label="AI settings"
           onClick={() => setAiSettingsOpen(true)}
           title="AI settings"

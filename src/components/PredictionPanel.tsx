@@ -175,13 +175,13 @@ export function PredictionPanel() {
   return (
     <TooltipProvider delayDuration={200}>
       <Card className="border-border/70" data-tutorial="prediction-panel">
-        <CardHeader className="border-b border-border/50 bg-gradient-to-br from-muted/40 to-transparent pb-4 dark:from-muted/25">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div className="space-y-1">
-              <CardTitle className="text-xl font-semibold text-foreground">
+        <CardHeader className="border-b border-border/50 bg-gradient-to-br from-muted/40 to-transparent pb-3 pt-3 dark:from-muted/25 sm:pb-4 sm:pt-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="text-sm font-semibold text-foreground sm:text-xl">
                 COMPASS predictions
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="hidden sm:block">
                 Preoperative outcome predictions at time of radical prostatectomy.
               </CardDescription>
             </div>
@@ -189,7 +189,7 @@ export function PredictionPanel() {
               type="button"
               variant="outline"
               size="sm"
-              className="h-9 shrink-0 text-sm"
+              className="h-7 shrink-0 px-2.5 text-xs sm:h-9 sm:px-3 sm:text-sm"
               onClick={() => setExplainKey("overview")}
             >
               Explain
@@ -199,7 +199,7 @@ export function PredictionPanel() {
         <CardContent className="pt-4">
           {/* 6 prediction value cards — extra top margin so floating overlays
               (e.g. CSPCA-by-zone popout from the 3D canvas) don't overlap. */}
-          <div className="mb-4 mt-4 grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="mb-3 mt-2 grid grid-cols-3 gap-2 sm:mb-4 sm:mt-4 sm:gap-3">
             {preds.map((p) => {
               const ci = computeCI(p.v);
               return (
