@@ -27,6 +27,7 @@ import {
   hydrateFromLocalStorage,
   hydratePatientsFromCaseLog,
   hydratePatientLibrary,
+  loadSharedCaseFromUrl,
   usePatientStore,
 } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
@@ -110,6 +111,8 @@ export default function App() {
     // Load saved library entries (full records) then fall back to case log snapshots.
     hydratePatientLibrary();
     hydratePatientsFromCaseLog();
+    // Load a case embedded in the URL hash (share links), overrides active selection.
+    loadSharedCaseFromUrl();
   }, [bootstrapFromJson]);
 
   const onPredictions = desktopTab === "predictions";
