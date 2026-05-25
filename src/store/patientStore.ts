@@ -672,7 +672,8 @@ export async function buildShareUrl(): Promise<string | null> {
   const { activeId, patients } = usePatientStore.getState();
   const p = patients.find((x) => x.id === activeId);
   if (!p) return null;
-  const data = { ...p.record, lesions: p.lesionRows };
+  const shareId = p.record._shareId ?? crypto.randomUUID();
+  const data = { ...p.record, _shareId: shareId, lesions: p.lesionRows };
   const encoded = await compressToB64u(JSON.stringify(data));
   return `${window.location.origin}${window.location.pathname}#case=${encoded}`;
 }
@@ -696,11 +697,15 @@ export async function loadSharedCaseFromUrl(): Promise<void> {
     const data = JSON.parse(json) as Prostate3DInputV1;
     if (data._schema !== "prostate-3d-input-v1") return;
     data.zones = mergeZones(data.zones || {});
-    const id = `shared-${Date.now()}`;
+    const id = data._shareId ?? `shared-${Date.now()}`;
     const lesionRows = ensureLesionIds((data.lesions as LesionRow[]) || []);
     const entry: PatientEntry = { id, name: "Shared Case", record: data, lesionRows };
     const { patients } = usePatientStore.getState();
-    usePatientStore.setState({ patients: [...patients, entry], activeId: id, loading: false });
+    const existing = patients.findIndex((p) => p.id === id);
+    const updated = existing >= 0
+      ? patients.map((p, i) => (i === existing ? entry : p))
+      : [...patients, entry];
+    usePatientStore.setState({ patients: updated, activeId: id, loading: false });
     usePatientStore.getState().recompute();
     history.replaceState(null, "", window.location.pathname + window.location.search);
   } catch {

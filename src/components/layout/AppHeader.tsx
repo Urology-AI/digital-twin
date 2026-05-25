@@ -108,6 +108,14 @@ export function AppHeader() {
             ))
           )}
         </select>
+        {active?.record._shareId && (
+          <span
+            title={`Share ID: ${active.record._shareId}`}
+            className="hidden shrink-0 cursor-default rounded bg-sky-500/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-sky-400 sm:inline"
+          >
+            Shared · {active.record._shareId.slice(0, 8)}
+          </span>
+        )}
       </div>
 
       {/* Desktop tab switcher */}
