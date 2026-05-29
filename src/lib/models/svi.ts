@@ -4,24 +4,14 @@ import {
   imagingFlagsForSide,
   type CollectedLesion,
 } from "@/lib/utils/normalization";
+import {
+  SVI_PATIENT as SVI_PATIENT_W,
+  SVI_SIDE as SVI_SIDE_W,
+  weightsToArrays,
+} from "./weights";
 
-/** Side-specific SVI — locked 2026-05-03 */
-const SVI_SIDE = {
-  i: -3.024,
-  c: [
-    // log_psad, gg(continuous proxy), mc_side, cores_side, linear_side,
-    // bilateral, pirads_side, mri_epe_side, mri_svi_side, mus_ece_side
-    0.3139, 0.35, 0.3156, 0.0324, 0.04, 0.1443, 0.2892, 0.0614, 0.4573, 0.0924,
-  ],
-  m: [
-    -1.634, 2.2902, 48.1988, 1.4226, 8.002, 0.2619, 2.9368, 0.0439, 0.0119,
-    0.0476,
-  ],
-  s: [
-    0.6788, 1.83, 33.8968, 1.8528, 12.0413, 0.4397, 1.0154, 0.2049, 0.1085,
-    0.213,
-  ],
-} as const;
+const SVI_SIDE          = weightsToArrays(SVI_SIDE_W);
+const SVI_PATIENT_W_ARRAYS = weightsToArrays(SVI_PATIENT_W);
 
 function linearPredict(
   intercept: number,
@@ -79,22 +69,8 @@ export function predictSviPatient(S: ClinicalState): number {
     dec_avail,
     S.cores,
   ];
-  // Standardized betas — locked 2026-05-03
-  const c = [
-    0.3139, 0.7981, 0.7700, 0.9954, 0.3156, 0.2892, 0.0614, 0.4573,
-    0.0924, 0.0492, 0.2707, 0.3033, 0.0324,
-  ];
-  // Means from ECE/PSM cohort (N=3,454 — identical dataset)
-  const m = [
-    -1.6174, 0.397, 0.2603, 0.2389, 51.1131, 4.0824, 0.1499, 0.0428,
-    0.1071, 0.0264, 0.6446, 0.2372, 6.1908,
-  ];
-  // Standard deviations
-  const s = [
-    0.7068, 0.4893, 0.4388, 0.4264, 32.2602, 0.8493, 0.357, 0.2025,
-    0.3092, 0.1602, 0.1175, 0.4254, 4.2325,
-  ];
-  return sigmoid(linearPredict(-3.189665, c, m, s, vals));
+  const { i, c, m, s } = SVI_PATIENT_W_ARRAYS;
+  return sigmoid(linearPredict(i, c, m, s, vals));
 }
 
 export function predictSviSide(

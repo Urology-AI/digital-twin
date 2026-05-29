@@ -4,59 +4,16 @@ import {
   imagingFlagsForSide,
   type CollectedLesion,
 } from "@/lib/utils/normalization";
+import {
+  ECE_PATIENT as ECE_PATIENT_W,
+  ECE_SIDE as ECE_SIDE_W,
+  EXTENSIVE_ECE as EXTENSIVE_ECE_W,
+  weightsToArrays,
+} from "./weights";
 
-/** Patient-level ECE (standardized logistic) — locked 2026-05-03 */
-const ECE_PATIENT = {
-  i: -0.7423,
-  c: [
-    // log_psad, gg2, gg3, gg45, mc, pirads, mri_epe, mri_svi, mus_ece,
-    // psma_epe, ece_conc, dec_imp, dec_avail
-    0.3285, 0.4091, 0.4912, 0.5948, 0.2019, 0.3922, 0.1399, 0.2352, 0.0435,
-    0.0062, 0.04, 0.2133, 0.4180,
-  ],
-  m: [
-    -1.6174, 0.397, 0.2603, 0.2389, 51.1131, 4.0824, 0.1499, 0.0428, 0.1071,
-    0.0264, 0.2834, 0.6446, 0.2372,
-  ],
-  s: [
-    0.7068, 0.4893, 0.4388, 0.4264, 32.2602, 0.8493, 0.357, 0.2025, 0.3092,
-    0.1602, 0.5672, 0.1175, 0.4254,
-  ],
-} as const;
-
-/** Side-specific ECE — locked 2026-05-03 */
-const ECE_SIDE = {
-  i: -1.6557,
-  c: [
-    // log_psad, gg2, gg3, gg45, mc_side, cores_side, pirads_side,
-    // mri_epe_side(PSMA EPE proxy), mus_ece_side, ece_conc_side, mri_svi, imaging_ipsi
-    0.38, 0.26, 0.36, 0.38, 0.14, 0.17, 0.19, -0.02, 0.11, 0.15, 0.20, 0.10,
-  ],
-  m: [
-    -1.6339, 0.2645, 0.1434, 0.1285, 37.0968, 1.4227, 2.9354, 0.0438, 0.0483,
-    0.0981, 0.0401, 0.6018,
-  ],
-  s: [
-    0.6811, 0.4411, 0.3505, 0.3347, 36.2759, 1.8524, 1.0145, 0.2047, 0.2144,
-    0.3191, 0.1962, 0.4895,
-  ],
-} as const;
-
-const EXTENSIVE_ECE = {
-  i: -0.1975,
-  c: [
-    0.3742, 0.094, 0.1132, 0.0391, -0.3013, 0.2486, 0.0412, -0.0677, 0.2421,
-    0.3411,
-  ],
-  m: [
-    -1.3727, 3.022, 66.4566, 7.2467, 14.1211, 0.2775, 4.3128, 0.2379, 0.1013,
-    0.1806,
-  ],
-  s: [
-    0.7027, 1.1124, 27.6234, 4.9687, 14.6296, 0.4478, 1.0213, 0.4258, 0.3018,
-    0.3847,
-  ],
-} as const;
+const ECE_PATIENT    = weightsToArrays(ECE_PATIENT_W);
+const ECE_SIDE       = weightsToArrays(ECE_SIDE_W);
+const EXTENSIVE_ECE  = weightsToArrays(EXTENSIVE_ECE_W);
 
 function linearPredict(
   intercept: number,
