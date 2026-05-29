@@ -147,12 +147,13 @@ function parseBiopsyLines(lines: string[], warnings: string[]): LesionRow[] {
         const side = parseSide(t);
         const pos = parseZone(t);
         const levels = parseLevelRange(t);
+        const linM = t.match(/(?:linear\s+)?(\d+(?:\.\d+)?)\s*mm/i);
         const base = {
           source: "Bx" as const,
           zone: pos,
           score: String(gg),
           corePct: pct ? parseFloat(pct[1] ?? "0") : 0,
-          linear: 0,
+          linear: linM ? parseFloat(linM[1] ?? "0") : 0,
         };
         const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
         if (levelFallback) {
@@ -208,11 +209,14 @@ function parseMriLines(
       if (abut === -1) {
         warnings.push(`MRI: PIRADS ${pirads} — no capsular contact info found (abutment set to unknown)`);
       }
+      const sizeM = seg.match(/(\d+(?:\.\d+)?)\s*x\s*\d+(?:\.\d+)?\s*mm|(\d+(?:\.\d+)?)\s*mm/i);
+      const mriSize = sizeM ? parseFloat(sizeM[1] ?? sizeM[2] ?? "0") : 0;
       const base = {
         source: "MRI" as const,
         zone: pos,
         score: String(pirads),
         pirads,
+        mriSize: mriSize > 0 ? mriSize : undefined,
         mriAbutment: abut,
         epe,
         svi: false,
