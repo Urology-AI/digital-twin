@@ -84,6 +84,31 @@ function parseEpe(text: string): boolean {
   return false;
 }
 
+function parseSvi(text: string): boolean {
+  if (/no\s+svi|svi\s*(absent|negative|no\b)|svi\s*:\s*no/i.test(text)) return false;
+  if (/\bsvi\b|\bseminal\s+vesicle\s+invasion/i.test(text)) return true;
+  return false;
+}
+
+/** Parse largest lesion dimension in mm. Handles: 17x16mm, 15mm, 1.5cm, 17x16x15mm */
+function parseSizeMm(text: string): number {
+  // Multi-dimensional: e.g. 17x16mm or 17x16x15mm — take the largest axis
+  const multi = text.match(/(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)(?:\s*[xX×]\s*(\d+(?:\.\d+)?))?\s*mm/i);
+  if (multi) {
+    const dims = [multi[1], multi[2], multi[3]]
+      .filter(Boolean)
+      .map((d) => parseFloat(d ?? "0"));
+    return Math.max(...dims);
+  }
+  // Single mm: e.g. 15mm or 15 mm
+  const single = text.match(/(\d+(?:\.\d+)?)\s*mm\b/i);
+  if (single) return parseFloat(single[1] ?? "0");
+  // cm: e.g. 1.5cm → 15mm
+  const cm = text.match(/(\d+(?:\.\d+)?)\s*cm\b/i);
+  if (cm) return parseFloat(cm[1] ?? "0") * 10;
+  return 0;
+}
+
 /**
  * Expand one parsed lesion into one row per zone grid cell it covers.
  * Falls back to the nearest valid level (e.g. Posterior+Apex → Posterior+Mid)
@@ -152,7 +177,7 @@ function parseBiopsyLines(lines: string[], warnings: string[]): LesionRow[] {
           zone: pos,
           score: String(gg),
           corePct: pct ? parseFloat(pct[1] ?? "0") : 0,
-          linear: 0,
+          linear: parseSizeMm(t),
         };
         const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
         if (levelFallback) {
@@ -205,6 +230,8 @@ function parseMriLines(
       const levels = parseLevelRange(seg);
       const abut = parseAbutment(seg);
       const epe = parseEpe(seg);
+      const svi = parseSvi(seg);
+      const mriSize = parseSizeMm(seg);
       if (abut === -1) {
         warnings.push(`MRI: PIRADS ${pirads} — no capsular contact info found (abutment set to unknown)`);
       }
@@ -214,8 +241,9 @@ function parseMriLines(
         score: String(pirads),
         pirads,
         mriAbutment: abut,
+        mriSize,
         epe,
-        svi: false,
+        svi,
       };
       const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
       if (levelFallback) {
