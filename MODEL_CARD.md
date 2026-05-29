@@ -151,7 +151,108 @@ For each patient, COMPASS returns:
 
 ---
 
-## 9. How to cite
+## 9. How predictions are calculated
+
+This section documents the exact math so that any clinician, auditor, or developer can reproduce a prediction from scratch without reading code.
+
+### 9.1 Formula
+
+Every COMPASS model is a **standardized logistic regression**:
+
+```
+logit  =  intercept  +  Σ [ coeff_k × (value_k − mean_k) / scale_k ]
+
+probability  =  1 / (1 + e^(−logit))
+```
+
+The `intercept`, `coeff`, `mean`, and `scale` for every feature of every model are stored in one place: `src/lib/models/weights.ts`. That file is the single source of truth — changing a number there changes the model.
+
+### 9.2 Feature engineering
+
+Raw clinical inputs are transformed before entering the formula:
+
+| Input | Transformation | Reason |
+|---|---|---|
+| PSA + prostate volume | `log(PSA/volume + 0.01)` | PSA density is right-skewed; log makes it approximately normal. `+0.01` prevents log(0). |
+| Max core % | If value ≤ 1 → multiply by 100 | Normalises fractional (0.60) and percentage (60) encodings to the same 0–100 scale. |
+| PI-RADS | `max(pirads, 2)` | PI-RADS 1 is clinically equivalent to 2 for EPE risk; floors the value to stay within training range. |
+| Grade group | Split into three binary flags: `gg2` (GG=2), `gg3` (GG=3), `gg45` (GG≥4) | One-hot encoding with GG1 as the reference. Allows each grade group to have an independent effect rather than assuming linearity. |
+| Decipher score | If missing → substitute 0.521 (training cohort mean) and set `decipher_available = 0` | Mean imputation so patients without genomic testing still receive a prediction. The `available` flag lets the model discount the imputed value. |
+| ECE concordance | `mri_epe + mus_ece + psma_epe` | Counts how many imaging modalities independently call EPE (0–3). Multi-modal agreement carries more weight than any single modality. |
+
+### 9.3 Standardisation (z-scoring)
+
+Every transformed value is z-scored using the **training cohort** mean and SD:
+
+```
+z_k  =  (value_k − mean_k) / scale_k
+```
+
+The `mean_k` and `scale_k` in `weights.ts` are the values from the Mount Sinai training cohort (N = 5,352). When applying COMPASS to an external cohort you use these same numbers — do not re-standardise on your own data, or the coefficients will no longer be on the same scale.
+
+### 9.4 ECE-only adjustments (delta terms)
+
+After the main logit is computed, three optional adjustments are added to the ECE patient and side models before the sigmoid is applied. These capture continuous detail that binary flags cannot:
+
+| Adjustment | Inputs required | Effect |
+|---|---|---|
+| MRI detail delta | `mri_lesion_size`, `mri_capsular_abutment`, `mri_adc` | Adds/subtracts from logit based on lesion size (mm), capsular contact grade (0–4), and ADC value (µm²/s). Abutment grade ≥ 3 without a positive EPE call adds +0.35. |
+| ExactVu abutment delta | `ev_abutment = 1` | Adds +0.30 logit when micro-ultrasound shows capsular abutment. Coefficient is estimated (not formally calibrated); flagged as such in the code. |
+| PSMA SUV delta | PSMA performed, `suv > 4.5`, `psma_epe` not already flagged | Adds `0.038 × (SUV − 4.5)`, capped at +0.60 (~SUV 20+). Prevents double-counting when the binary `psma_epe` flag is already set. |
+
+### 9.5 Output clamping
+
+To prevent the model from returning probabilities outside its validated range:
+
+| Model | Clamp range |
+|---|---|
+| ECE patient-level | 2% – 92% |
+| ECE side-specific | 2% – 90% |
+| All others | None (sigmoid output used directly) |
+
+### 9.6 Worked example — ECE patient
+
+**Inputs:** PSA 12, volume 30 cc, GG3, max core 60%, PI-RADS 4, MRI EPE positive, no Decipher
+
+| Feature | Raw → Transformed | z = (v − mean) / scale | × coeff | Contribution |
+|---|---|---|---|---|
+| log_psad | log(12/30 + 0.01) = −1.304 | (−1.304 − (−1.617)) / 0.707 | × 0.3285 | **+0.146** |
+| grade_group_2 | 0 | (0 − 0.397) / 0.489 | × 0.4091 | **−0.332** |
+| grade_group_3 | 1 | (1 − 0.260) / 0.439 | × 0.4912 | **+0.829** |
+| grade_group_4_5 | 0 | (0 − 0.239) / 0.426 | × 0.5948 | **−0.334** |
+| max_core_pct | 60% | (60 − 51.11) / 32.26 | × 0.2019 | **+0.056** |
+| pirads | max(4,2) = 4 | (4 − 4.082) / 0.849 | × 0.3922 | **−0.038** |
+| mri_epe | 1 | (1 − 0.150) / 0.357 | × 0.1399 | **+0.333** |
+| mri_svi | 0 | (0 − 0.043) / 0.203 | × 0.2352 | **−0.050** |
+| mus_ece | 0 | ≈ 0 | × 0.0435 | **0** |
+| psma_epe | 0 | ≈ 0 | × 0.0062 | **0** |
+| ece_concordance | 0+0+0 = 1 (mri_epe only) | (1 − 0.283) / 0.567 | × 0.0400 | **+0.051** |
+| decipher_imputed | missing → 0.521 | (0.521 − 0.645) / 0.118 | × 0.2133 | **−0.226** |
+| decipher_available | 0 (missing) | (0 − 0.237) / 0.425 | × 0.4180 | **−0.233** |
+
+```
+logit  =  −0.7423  +  0.146 − 0.332 + 0.829 − 0.334 + 0.056 − 0.038 + 0.333 − 0.050 + 0.051 − 0.226 − 0.233
+       =  −0.540
+
+probability  =  1 / (1 + e^0.540)  ≈  38%
+```
+
+This matches the pinned regression test value of **38.006%** in `src/test/modelOutputs.test.ts`.
+
+### 9.7 Where to find everything
+
+| Artefact | Location |
+|---|---|
+| All model weights (intercepts, coefficients, means, scales) | `src/lib/models/weights.ts` |
+| Model prediction functions | `src/lib/models/ece.ts`, `svi.ts`, `upgrade.ts`, `psm.ts`, `bcr.ts`, `lni.ts` |
+| Regression tests (pinned output values) | `src/test/modelOutputs.test.ts` |
+| Training script (for retraining on new data) | `models/train_compass.py` |
+| Simulation script (synthetic cohort, no data needed) | `models/simulate_compass.py` |
+| Input variable definitions | `DATA_DICTIONARY.md` |
+
+---
+
+## 10. How to cite
 
 Citation information is provided in `CITATION.cff` in the repository root. The peer-reviewed manuscript describing COMPASS is in preparation; this card will be updated with the published citation upon acceptance.
 

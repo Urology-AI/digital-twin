@@ -1,9 +1,10 @@
 import type { ClinicalState } from "@/types/patient";
 import { logPsad, sigmoid } from "@/lib/utils/math";
+import { BCR_PREOP as BCR_PREOP_W, weightsToArrays } from "./weights";
 
-/**
- * Preoperative BCR — second `predBCR_preop` in original file (overrides first).
- */
+const BCR_PREOP = weightsToArrays(BCR_PREOP_W);
+
+/** Preoperative BCR — second `predBCR_preop` in original file (overrides first). */
 export function predictBcrPreop(S: ClinicalState): number {
   const log_psad = logPsad(S.psa, S.vol);
   const gg2 = S.gg === 2 ? 1 : 0;
@@ -25,25 +26,12 @@ export function predictBcrPreop(S: ClinicalState): number {
     dec_imp,
     dec_avail,
   ];
-  // Locked 2026-05-03 — CV AUC 0.743 (N=2,399). See BCR tab for salvage-censoring caveat.
-  const c = [
-    0.2346, 0.2256, 0.3019, 0.4495, 0.0341, 0.1757, 0.1222, 0.0843, 0.2157,
-    0.4597,
-  ];
-  const m = [
-    -1.7865, 0.4328, 0.2451, 0.2171, 6.3653, 4.1834, 0.0447, 0.1463, 0.5528,
-    0.4185,
-  ];
-  const s = [
-    0.774, 0.4955, 0.4302, 0.4123, 3.7894, 0.6965, 0.2065, 0.3868, 0.1681,
-    0.4933,
-  ];
-  let L = -2.182256;
+  let L = BCR_PREOP.i;
   for (let k = 0; k < vals.length; k++) {
     const v = vals[k];
-    const sk = s[k] ?? 0;
+    const sk = BCR_PREOP.s[k] ?? 0;
     if (v != null && !Number.isNaN(v) && sk > 0) {
-      L += (c[k] ?? 0) * ((v - (m[k] ?? 0)) / sk);
+      L += (BCR_PREOP.c[k] ?? 0) * ((v - (BCR_PREOP.m[k] ?? 0)) / sk);
     }
   }
   return sigmoid(L);

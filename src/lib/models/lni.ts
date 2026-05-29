@@ -1,20 +1,8 @@
 import type { ClinicalState } from "@/types/patient";
 import { logPsad, sigmoid } from "@/lib/utils/math";
+import { LNI_PLND as LNI_PLND_W, weightsToArrays } from "./weights";
 
-/**
- * LNI parsimonious 4-feature model — locked 2026-05-03
- * Features: log_psad, gg_high (GG4-5 binary), pos_cores, psma_ln_pos
- * Verified CV AUC 0.842 (N=663, 35 events). Outperforms 17-feature expansion.
- */
-const LNI_PLND = {
-  i: -3.2892,
-  // log_psad, gg_high, pos_cores, psma_ln_pos
-  c: [0.5623, 0.4162, 0.1260, 0.5437],
-  // Approximate training means (PLND cohort N=663)
-  m: [-1.6174, 0.28, 5.3, 0.15],
-  // Approximate training standard deviations
-  s: [0.7068, 0.45, 4.2, 0.36],
-} as const;
+const LNI_PLND = weightsToArrays(LNI_PLND_W);
 
 /** LNI model — locked 2026-05-03 */
 export function predictLni(S: ClinicalState): number {
