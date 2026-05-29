@@ -84,6 +84,31 @@ function parseEpe(text: string): boolean {
   return false;
 }
 
+function parseSvi(text: string): boolean {
+  if (/no\s+svi|svi\s*(absent|negative|no\b)|svi\s*:\s*no/i.test(text)) return false;
+  if (/\bsvi\b|\bseminal\s+vesicle\s+invasion/i.test(text)) return true;
+  return false;
+}
+
+/** Parse largest lesion dimension in mm. Handles: 17x16mm, 15mm, 1.5cm, 17x16x15mm */
+function parseSizeMm(text: string): number {
+  // Multi-dimensional: e.g. 17x16mm or 17x16x15mm — take the largest axis
+  const multi = text.match(/(\d+(?:\.\d+)?)\s*[xX×]\s*(\d+(?:\.\d+)?)(?:\s*[xX×]\s*(\d+(?:\.\d+)?))?\s*mm/i);
+  if (multi) {
+    const dims = [multi[1], multi[2], multi[3]]
+      .filter(Boolean)
+      .map((d) => parseFloat(d ?? "0"));
+    return Math.max(...dims);
+  }
+  // Single mm: e.g. 15mm or 15 mm
+  const single = text.match(/(\d+(?:\.\d+)?)\s*mm\b/i);
+  if (single) return parseFloat(single[1] ?? "0");
+  // cm: e.g. 1.5cm → 15mm
+  const cm = text.match(/(\d+(?:\.\d+)?)\s*cm\b/i);
+  if (cm) return parseFloat(cm[1] ?? "0") * 10;
+  return 0;
+}
+
 /**
  * Expand one parsed lesion into one row per zone grid cell it covers.
  * Falls back to the nearest valid level (e.g. Posterior+Apex → Posterior+Mid)
@@ -167,13 +192,12 @@ function parseBiopsyLines(lines: string[], warnings: string[]): LesionRow[] {
         const side = parseSide(t);
         const pos = parseZone(t);
         const levels = parseLevelRange(t);
-        const linM = t.match(/(?:linear\s+)?(\d+(?:\.\d+)?)\s*mm/i);
         const base = {
           source: "Bx" as const,
           zone: pos,
           score: String(gg),
           corePct: pct ? parseFloat(pct[1] ?? "0") : 0,
-          linear: linM ? parseFloat(linM[1] ?? "0") : 0,
+          linear: parseSizeMm(t),
         };
         const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
         if (levelFallback) {
@@ -196,14 +220,18 @@ function parseBiopsyLines(lines: string[], warnings: string[]): LesionRow[] {
 function parseMriLines(
   lines: string[],
   warnings: string[],
-): { lesions: LesionRow[]; volumeCc?: number } {
+): { lesions: LesionRow[]; volumeCc?: number; psaFromHeader?: number } {
   const lesions: LesionRow[] = [];
   let volumeCc: number | undefined;
+  let psaFromHeader: number | undefined;
   for (const line of lines) {
     const t = line.trim();
     // Extract volume from the full line before splitting at PIRADS boundaries
     const vol = t.match(/(\d+(?:\.\d+)?)\s*cc/i);
     if (vol && !volumeCc) volumeCc = parseFloat(vol[1] ?? "0");
+    // Extract PSA if it appears on the MRI header line (e.g. "14.5cc PSA 7.3")
+    const psaM = t.match(/\bpsa\s+(\d+(?:\.\d+)?)/i);
+    if (psaM && !psaFromHeader) psaFromHeader = parseFloat(psaM[1] ?? "0");
 
     // Split at PIRADS boundaries so "PIRADS 5 ... No EPE PIRADS 4 ..." → two entries
     const piradsRe = /(?=pirads\s*\d)/i;
@@ -226,20 +254,20 @@ function parseMriLines(
       const levels = parseLevelRange(seg);
       const abut = parseAbutment(seg);
       const epe = parseEpe(seg);
+      const svi = parseSvi(seg);
+      const mriSize = parseSizeMm(seg);
       if (abut === -1) {
         warnings.push(`MRI: PIRADS ${pirads} — no capsular contact info found (abutment set to unknown)`);
       }
-      const sizeM = seg.match(/(\d+(?:\.\d+)?)\s*x\s*\d+(?:\.\d+)?\s*mm|(\d+(?:\.\d+)?)\s*mm/i);
-      const mriSize = sizeM ? parseFloat(sizeM[1] ?? sizeM[2] ?? "0") : 0;
       const base = {
         source: "MRI" as const,
         zone: pos,
         score: String(pirads),
         pirads,
-        mriSize: mriSize > 0 ? mriSize : undefined,
         mriAbutment: abut,
+        mriSize,
         epe,
-        svi: false,
+        svi,
       };
       const { rows, levelFallback } = expandToZoneRows(base, side, pos, levels);
       if (levelFallback) {
@@ -255,7 +283,7 @@ function parseMriLines(
       }
     }
   }
-  return { lesions, volumeCc };
+  return { lesions, volumeCc, psaFromHeader };
 }
 
 function parseMusLines(lines: string[], warnings: string[]): LesionRow[] {
@@ -408,7 +436,7 @@ export function parseClinicNote(text: string): ParsedNote {
   }
 
   const bxLesions = mergeBiopsyZones(parseBiopsyLines(sections.biopsy, warnings));
-  const { lesions: mriLesions, volumeCc } = parseMriLines(sections.mri, warnings);
+  const { lesions: mriLesions, volumeCc, psaFromHeader } = parseMriLines(sections.mri, warnings);
   const musLesions = parseMusLines(sections.mus, warnings);
   const psmaLesions = parsePsmaLines(sections.psma, warnings);
   const psaData = parsePsaLine(sections.psa);
@@ -432,7 +460,7 @@ export function parseClinicNote(text: string): ParsedNote {
     biopsyTotalCores,
     biopsyMaxCorePct: maxCorePct,
     biopsyGG: maxGG,
-    psa: psaData.psa,
+    psa: psaData.psa ?? psaFromHeader,
     shim: psaData.shim,
     warnings,
   };
