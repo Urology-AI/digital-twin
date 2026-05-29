@@ -125,6 +125,26 @@ function expandToZoneRows(
   return { rows, levelFallback: null };
 }
 
+function mergeBiopsyZones(rows: LesionRow[]): LesionRow[] {
+  const map = new Map<string, LesionRow>();
+  const nonBx: LesionRow[] = [];
+  for (const row of rows) {
+    if (row.source !== "Bx") { nonBx.push(row); continue; }
+    const key = `${row.side}-${row.level}-${row.zone}`;
+    const ex = map.get(key);
+    if (!ex) {
+      map.set(key, { ...row });
+    } else {
+      ex.corePct = Math.min(100, (ex.corePct ?? 0) + (row.corePct ?? 0));
+      const newGG = parseInt(row.score) || 0;
+      const exGG = parseInt(ex.score) || 0;
+      if (newGG > exGG) ex.score = row.score;
+      ex.linear = Math.max(ex.linear ?? 0, row.linear ?? 0);
+    }
+  }
+  return [...map.values(), ...nonBx];
+}
+
 function parseBiopsyLines(lines: string[], warnings: string[]): LesionRow[] {
   const result: LesionRow[] = [];
   for (const line of lines) {
@@ -387,7 +407,7 @@ export function parseClinicNote(text: string): ParsedNote {
     }
   }
 
-  const bxLesions = parseBiopsyLines(sections.biopsy, warnings);
+  const bxLesions = mergeBiopsyZones(parseBiopsyLines(sections.biopsy, warnings));
   const { lesions: mriLesions, volumeCc } = parseMriLines(sections.mri, warnings);
   const musLesions = parseMusLines(sections.mus, warnings);
   const psmaLesions = parsePsmaLines(sections.psma, warnings);
