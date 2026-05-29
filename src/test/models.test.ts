@@ -62,6 +62,15 @@ describe("parseClinicNote fixes", () => {
     expect(mri[0]!.svi).toBe(false);
   });
 
+  it("extracts PSA from MRI header line when no PSA section present", () => {
+    const r = parseClinicNote(
+      "MRI 14.5cc PSA 7.3\nPIRADS 5 Right PZ base to mid 17x16mm Abut yes No EPE Possible SVI",
+    );
+    expect(r.psa).toBe(7.3);
+    expect(r.prostateVolumeCc).toBe(14.5);
+    expect(r.lesions.filter((l) => l.source === "MRI")[0]?.mriSize).toBe(17);
+  });
+
   it("parses biopsy linear extent in mm", () => {
     const r = parseClinicNote("Biopsy Gleason 7 (4+3) 60% right 8mm");
     const bx = r.lesions.filter((l) => l.source === "Bx");

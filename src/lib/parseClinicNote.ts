@@ -220,14 +220,18 @@ function parseBiopsyLines(lines: string[], warnings: string[]): LesionRow[] {
 function parseMriLines(
   lines: string[],
   warnings: string[],
-): { lesions: LesionRow[]; volumeCc?: number } {
+): { lesions: LesionRow[]; volumeCc?: number; psaFromHeader?: number } {
   const lesions: LesionRow[] = [];
   let volumeCc: number | undefined;
+  let psaFromHeader: number | undefined;
   for (const line of lines) {
     const t = line.trim();
     // Extract volume from the full line before splitting at PIRADS boundaries
     const vol = t.match(/(\d+(?:\.\d+)?)\s*cc/i);
     if (vol && !volumeCc) volumeCc = parseFloat(vol[1] ?? "0");
+    // Extract PSA if it appears on the MRI header line (e.g. "14.5cc PSA 7.3")
+    const psaM = t.match(/\bpsa\s+(\d+(?:\.\d+)?)/i);
+    if (psaM && !psaFromHeader) psaFromHeader = parseFloat(psaM[1] ?? "0");
 
     // Split at PIRADS boundaries so "PIRADS 5 ... No EPE PIRADS 4 ..." → two entries
     const piradsRe = /(?=pirads\s*\d)/i;
@@ -279,7 +283,7 @@ function parseMriLines(
       }
     }
   }
-  return { lesions, volumeCc };
+  return { lesions, volumeCc, psaFromHeader };
 }
 
 function parseMusLines(lines: string[], warnings: string[]): LesionRow[] {
@@ -432,7 +436,7 @@ export function parseClinicNote(text: string): ParsedNote {
   }
 
   const bxLesions = mergeBiopsyZones(parseBiopsyLines(sections.biopsy, warnings));
-  const { lesions: mriLesions, volumeCc } = parseMriLines(sections.mri, warnings);
+  const { lesions: mriLesions, volumeCc, psaFromHeader } = parseMriLines(sections.mri, warnings);
   const musLesions = parseMusLines(sections.mus, warnings);
   const psmaLesions = parsePsmaLines(sections.psma, warnings);
   const psaData = parsePsaLine(sections.psa);
@@ -456,7 +460,7 @@ export function parseClinicNote(text: string): ParsedNote {
     biopsyTotalCores,
     biopsyMaxCorePct: maxCorePct,
     biopsyGG: maxGG,
-    psa: psaData.psa,
+    psa: psaData.psa ?? psaFromHeader,
     shim: psaData.shim,
     warnings,
   };
