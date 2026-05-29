@@ -18,6 +18,9 @@ interface ReviewEntry {
   score: string;
   mriAbutment: number;
   epe: boolean;
+  svi: boolean;
+  mriSize: number;
+  linear: number;
   corePct: number;
   pirads?: number;
   primus?: number;
@@ -46,6 +49,9 @@ function collapseToReviewEntries(lesions: LesionRow[]): ReviewEntry[] {
         score: l.score,
         mriAbutment: l.mriAbutment,
         epe: l.epe,
+        svi: l.svi,
+        mriSize: l.mriSize,
+        linear: l.linear,
         corePct: l.corePct,
         pirads: l.pirads,
         primus: l.primus,
@@ -72,11 +78,13 @@ function reviewEntriesToRows(entries: ReviewEntry[]): LesionRow[] {
           score: e.score,
           mriAbutment: e.mriAbutment,
           epe: e.epe,
+          svi: e.svi,
+          mriSize: e.mriSize,
+          linear: e.linear,
           corePct: e.corePct,
           pirads: e.pirads,
           primus: e.primus,
           suv: e.suv,
-          svi: false,
         });
       }
     }
