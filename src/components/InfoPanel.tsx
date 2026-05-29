@@ -256,6 +256,83 @@ function OverviewTab() {
       </section>
 
       <section>
+        <H2>How Predictions Are Calculated</H2>
+        <p className="text-muted-foreground text-[11px] mb-2">
+          Every COMPASS model is a <strong className="text-foreground">standardized logistic regression</strong>.
+          The same three-step formula applies to all six endpoints.
+        </p>
+        <Tbl>
+          <thead>
+            <tr className="border-b border-border"><Th>Step</Th><Th>Formula</Th><Th>Notes</Th></tr>
+          </thead>
+          <tbody className="text-muted-foreground">
+            {[
+              ["1 — Z-score each input", "z = (value − mean) / scale", "mean and scale are from the training cohort (N=5,352). Never re-standardise on external data."],
+              ["2 — Linear combination", "logit = intercept + Σ (coeff × z)", "Coefficients from L2 logistic regression. All weights are in src/lib/models/weights.ts."],
+              ["3 — Logistic function", "probability = 1 / (1 + e⁻ˡᵒᵍⁱᵗ)", "ECE is clamped to 2–92%. All other models use the raw sigmoid output."],
+            ].map(([step, formula, note]) => (
+              <tr key={step} className="border-b border-border/40">
+                <Td className="font-medium text-foreground whitespace-nowrap">{step}</Td>
+                <Td><code className="text-foreground text-[10px]">{formula}</code></Td>
+                <Td>{note}</Td>
+              </tr>
+            ))}
+          </tbody>
+        </Tbl>
+
+        <div className="mt-3 mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Feature engineering — transformations applied before z-scoring</div>
+        <Tbl>
+          <thead>
+            <tr className="border-b border-border"><Th>Input</Th><Th>Transformation</Th><Th>Reason</Th></tr>
+          </thead>
+          <tbody className="text-muted-foreground">
+            {[
+              ["PSA + Prostate Volume", "log(PSA / Volume + 0.01)", "PSA density is right-skewed; log compresses it. +0.01 prevents log(0)."],
+              ["Max Core %", "If ≤ 1 → multiply by 100", "Normalises fractional (0.60) and percentage (60) encodings to same 0–100 scale."],
+              ["PI-RADS", "max(pirads, 2)", "PI-RADS 1 is clinically equivalent to 2 for EPE risk; prevents extrapolation below training range."],
+              ["Grade Group", "Split into gg2 / gg3 / gg45 binary flags", "One-hot encoding with GG1 as reference. Each grade group gets an independent effect."],
+              ["Decipher score", "Missing → substitute 0.521 (cohort mean); set decipher_available = 0", "Mean imputation so patients without genomic testing still get a prediction. The available flag discounts the imputed value."],
+              ["ECE concordance", "mri_epe + mus_ece + psma_epe (0–3)", "Counts imaging modalities agreeing on EPE. Multi-modal agreement carries more weight than any single modality."],
+            ].map(([input, tx, reason]) => (
+              <tr key={input} className="border-b border-border/40">
+                <Td className="font-medium text-foreground whitespace-nowrap">{input}</Td>
+                <Td><code className="text-[10px] text-foreground">{tx}</code></Td>
+                <Td>{reason}</Td>
+              </tr>
+            ))}
+          </tbody>
+        </Tbl>
+
+        <div className="mt-3 mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Worked example — ECE patient (GG3, PSA 12, volume 30 cc, PI-RADS 4, MRI EPE+, no Decipher)</div>
+        <Tbl>
+          <thead>
+            <tr className="border-b border-border"><Th>Feature</Th><Th>Value → z-score</Th><Th>× coeff</Th><Th>Contribution</Th></tr>
+          </thead>
+          <tbody className="text-muted-foreground">
+            {[
+              ["log_psad",           "log(12/30+0.01)=−1.304 → +0.443", "× 0.3285", "+0.146"],
+              ["grade_group_2",      "0 → −0.812",                       "× 0.4091", "−0.332"],
+              ["grade_group_3",      "1 → +1.687",                       "× 0.4912", "+0.829"],
+              ["grade_group_4_5",    "0 → −0.561",                       "× 0.5948", "−0.334"],
+              ["max_core_pct",       "60 → +0.276",                      "× 0.2019", "+0.056"],
+              ["pirads",             "max(4,2)=4 → −0.097",              "× 0.3922", "−0.038"],
+              ["mri_epe",            "1 → +2.381",                       "× 0.1399", "+0.333"],
+              ["decipher_imputed",   "missing→0.521 → −1.059",           "× 0.2133", "−0.226"],
+              ["decipher_available", "0 (missing) → −0.558",             "× 0.4180", "−0.233"],
+            ].map(([feat, val, coeff, contrib]) => (
+              <tr key={feat} className="border-b border-border/40">
+                <Td className="font-mono text-[10px] text-foreground">{feat}</Td>
+                <Td className="font-mono text-[10px]">{val}</Td>
+                <Td className="font-mono text-[10px] tabular-nums">{coeff}</Td>
+                <Td className={`font-mono text-[10px] tabular-nums font-semibold ${(contrib ?? "").startsWith("+") ? "text-orange-500" : "text-blue-400"}`}>{contrib}</Td>
+              </tr>
+            ))}
+          </tbody>
+        </Tbl>
+        <Note>intercept −0.7423 + sum of contributions = logit −0.540 → probability 38.0%. Matches pinned regression test in src/test/modelOutputs.test.ts.</Note>
+      </section>
+
+      <section>
         <H2>Known Limitations</H2>
         <ul className="text-[11px] text-muted-foreground space-y-1 list-disc list-inside">
           <li>Single institution (Mount Sinai). External validation in progress.</li>
