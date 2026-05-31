@@ -65,9 +65,8 @@ function parseZone(text: string): string {
   // Order matters: check PL before PZ so "PL PZ" hits PL branch
   if (/\bpl\s+pz\b|\bpl\b/i.test(text)) return "Posterolateral";
   if (/\bpz\b/i.test(text)) return "Posterior";
-  if (/\btz\b/i.test(text)) return "Anterior";
+  if (/\btz\b|\baz\b|\banterior\b/i.test(text)) return "Anterior";
   if (/\bcz\b/i.test(text)) return "Medial";
-  if (/\baz\b/i.test(text)) return "Anterior";
   return "Posterior";
 }
 
