@@ -122,10 +122,13 @@ function expandToZoneRows(
 ): { rows: LesionRow[]; levelFallback: Level | null } {
   const sides: ("L" | "R")[] = side === "" ? ["L", "R"] : [side];
   const rows: LesionRow[] = [];
+  const apexOnlyInAnterior = pos === "Posterior" || pos === "Posterolateral";
   for (const s of sides) {
     for (const lv of levels) {
-      if (!VALID_ZONE_COMBOS.some((c) => c.side === s && c.pos === pos && c.level === lv)) continue;
-      rows.push({ ...emptyLesion(uid()), ...base, side: s, zone: pos, level: lv });
+      // Apex only exists in the Anterior zone; remap Posterior/Posterolateral+Apex → Anterior+Apex
+      const effectivePos = apexOnlyInAnterior && lv === "Apex" ? "Anterior" : pos;
+      if (!VALID_ZONE_COMBOS.some((c) => c.side === s && c.pos === effectivePos && c.level === lv)) continue;
+      rows.push({ ...emptyLesion(uid()), ...base, side: s, zone: effectivePos, level: lv });
     }
   }
   if (rows.length > 0) return { rows, levelFallback: null };
