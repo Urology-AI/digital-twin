@@ -13,6 +13,136 @@ import {
 } from "@/lib/compass/functionalOutcomes";
 import { cn } from "@/lib/utils";
 
+// ── Info modal ────────────────────────────────────────────────────────────────
+function InfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative z-10 w-full max-w-lg rounded-xl border border-border bg-card shadow-xl overflow-y-auto max-h-[85vh]"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="text-base font-semibold">How predictions are calculated</h2>
+          <button type="button" onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-lg leading-none">✕</button>
+        </div>
+        <div className="px-5 py-4 space-y-5 text-sm">
+
+          <section>
+            <h3 className="font-semibold mb-1.5">Nerve-Sparing Grade (1–3)</h3>
+            <p className="text-muted-foreground text-xs mb-2">
+              Assigned per side from biopsy, MRI, and ECE model output.
+            </p>
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-1 pr-3 font-semibold">Grade</th>
+                  <th className="text-left py-1 pr-3 font-semibold">Meaning</th>
+                  <th className="text-left py-1 font-semibold">When assigned</th>
+                </tr>
+              </thead>
+              <tbody className="text-muted-foreground">
+                <tr className="border-b border-border/40">
+                  <td className="py-1 pr-3 text-emerald-600 dark:text-emerald-400 font-bold">1 — Full</td>
+                  <td className="py-1 pr-3">Intrafascial</td>
+                  <td className="py-1">No cancer on side, or GG ≤ 2, ≤ 2 cores, ECE &lt; 10%</td>
+                </tr>
+                <tr className="border-b border-border/40">
+                  <td className="py-1 pr-3 text-amber-600 dark:text-amber-400 font-bold">2 — Partial</td>
+                  <td className="py-1 pr-3">Interfascial</td>
+                  <td className="py-1">Cancer present, moderate ECE risk</td>
+                </tr>
+                <tr>
+                  <td className="py-1 pr-3 text-red-600 dark:text-red-400 font-bold">3 — Sacrifice</td>
+                  <td className="py-1 pr-3">Wide excision</td>
+                  <td className="py-1">Posterolateral ECE ≥ 30%, base ECE, SVI ≥ 25%, or MRI EPE + posterior ECE</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section>
+            <h3 className="font-semibold mb-1.5">Recovery Trajectories</h3>
+            <p className="text-muted-foreground text-xs mb-2">
+              Base rates come from NS-grade lookup tables (COMPASS institutional cohort), then adjusted for individual factors.
+            </p>
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-1 pr-3 font-semibold">NS scenario</th>
+                  <th className="text-left py-1 pr-3 font-semibold">Potency 12 mo</th>
+                  <th className="text-left py-1 font-semibold">Continence 12 mo</th>
+                </tr>
+              </thead>
+              <tbody className="text-muted-foreground">
+                {[
+                  ["Both Grade 1", "90%", "96%"],
+                  ["One G1, one G2", "85%", "95%"],
+                  ["Both Grade 2", "81%", "94%"],
+                  ["One G3, one G1", "~82%", "~93%"],
+                  ["One G3, one G2", "84%", "93%"],
+                  ["Both Grade 3", "72%", "89%"],
+                ].map(([s, p, c]) => (
+                  <tr key={s} className="border-b border-border/40">
+                    <td className="py-1 pr-3">{s}</td>
+                    <td className="py-1 pr-3">{p}</td>
+                    <td className="py-1">{c}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <section>
+            <h3 className="font-semibold mb-1.5">Individual Adjustments</h3>
+            <p className="text-muted-foreground text-xs mb-2">
+              Applied as percentage-point deltas on top of the base rate. The <span className="font-semibold">adj</span> badge shows the net total.
+            </p>
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-1 pr-3 font-semibold">Factor</th>
+                  <th className="text-left py-1 pr-3 font-semibold">Potency</th>
+                  <th className="text-left py-1 font-semibold">Continence</th>
+                </tr>
+              </thead>
+              <tbody className="text-muted-foreground">
+                {[
+                  ["Age ≤ 50", "×1.10", "—"],
+                  ["Age 65–70", "×0.85–0.95", "×0.95"],
+                  ["SHIM 21–25 (required)", "×1.0", "—"],
+                  ["SHIM 12–16", "×0.85–0.92", "—"],
+                  ["SHIM < 12", "N/A (not shown)", "—"],
+                  ["Daily PDE5i", "+8 pp", "—"],
+                  ["Intensive PFMT", "+6 pp", "+10 pp"],
+                  ["Active exercise", "+4 pp", "+3 pp"],
+                  ["Obesity (BMI ≥ 30)", "−8 pp", "−5 pp"],
+                  ["Diabetes", "−8 pp", "−3 pp"],
+                  ["Current smoker", "−8 pp", "−2 pp"],
+                  ["Heavy alcohol", "−10 pp", "−2 pp"],
+                  ["High IPSS (>19)", "—", "−10 pp"],
+                ].map(([f, p, c]) => (
+                  <tr key={f} className="border-b border-border/40">
+                    <td className="py-1 pr-3">{f}</td>
+                    <td className="py-1 pr-3">{p}</td>
+                    <td className="py-1">{c}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          <p className="text-xs text-muted-foreground border-t border-border pt-3">
+            These are population-level probabilities from the COMPASS cohort (IRB STUDY-14-00050, Mount Sinai). Not a guarantee for any individual. Final NS grade may change intraoperatively.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── NS Grade selector ─────────────────────────────────────────────────────────
 const NS_GRADES = [
   { grade: 1, label: "Grade 1", desc: "Intrafascial" },
@@ -159,6 +289,7 @@ export function FunctionalOutcomesPanel() {
   // ── All hooks ─────────────────────────────────────────────────────────────
   const [nsOverrideL, setNsOverrideL] = useState<1|2|3|null>(null);
   const [nsOverrideR, setNsOverrideR] = useState<1|2|3|null>(null);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   // Reset NS overrides when the active patient changes
   const prevActiveId = useRef(activeId);
@@ -198,11 +329,18 @@ export function FunctionalOutcomesPanel() {
 
   return (
     <div className="flex flex-col gap-4">
+      <InfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
 
       {/* NS Grade selectors */}
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold">Nerve-Sparing Grade</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold">Nerve-Sparing Grade</CardTitle>
+            <button type="button" onClick={() => setInfoOpen(true)}
+              className="flex h-5 w-5 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 text-[11px] font-bold leading-none transition-colors"
+              title="How NS grade and outcomes are calculated"
+            >i</button>
+          </div>
           <p className="text-xs text-muted-foreground">
             Model-predicted by default — override to plan a specific approach
           </p>
@@ -281,7 +419,13 @@ export function FunctionalOutcomesPanel() {
       <Card>
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-semibold">Recovery Trajectories</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base font-semibold">Recovery Trajectories</CardTitle>
+              <button type="button" onClick={() => setInfoOpen(true)}
+                className="flex h-5 w-5 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 text-[11px] font-bold leading-none transition-colors"
+                title="How trajectories are calculated"
+              >i</button>
+            </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               {result.shimValid && (
                 <span className="flex items-center gap-1.5">
