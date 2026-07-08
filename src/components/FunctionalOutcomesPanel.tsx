@@ -13,6 +13,16 @@ import {
 } from "@/lib/compass/functionalOutcomes";
 import { cn } from "@/lib/utils";
 
+/** Approximate 90% CI on logit scale (SE ≈ 0.58 logit units, z = 1.64) */
+function computeCI(pct: number): { lo: number; hi: number } {
+  const p = pct / 100;
+  if (p <= 0.001 || p >= 0.999) return { lo: pct, hi: pct };
+  const L = Math.log(p / (1 - p));
+  const lo = 1 / (1 + Math.exp(-(L - 0.951)));
+  const hi = 1 / (1 + Math.exp(-(L + 0.951)));
+  return { lo: Math.round(Math.max(1, lo * 100)), hi: Math.round(Math.min(99, hi * 100)) };
+}
+
 // ── Info modal ────────────────────────────────────────────────────────────────
 function InfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
@@ -377,6 +387,9 @@ export function FunctionalOutcomesPanel() {
               <>
                 <div className="text-5xl font-bold text-blue-500">{result.potency12}%</div>
                 <div className="text-xs text-muted-foreground mt-0.5">SHIM ≥12</div>
+                {(() => { const ci = computeCI(result.potency12 ?? 0); return (
+                  <div className="text-[10px] leading-tight text-muted-foreground/60 mt-0.5">{ci.lo}–{ci.hi}%</div>
+                ); })()}
               </>
             ) : (
               <>
@@ -402,6 +415,9 @@ export function FunctionalOutcomesPanel() {
             </div>
             <div className="text-5xl font-bold text-violet-500">{result.continence12}%</div>
             <div className="text-xs text-muted-foreground mt-0.5">0–1 pad</div>
+            {(() => { const ci = computeCI(result.continence12); return (
+              <div className="text-[10px] leading-tight text-muted-foreground/60 mt-0.5">{ci.lo}–{ci.hi}%</div>
+            ); })()}
             {/* Delta badge */}
             <div className={cn(
               "absolute right-3 top-4 rounded-full px-2 py-0.5 text-xs font-bold",
