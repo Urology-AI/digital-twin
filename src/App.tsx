@@ -1,9 +1,12 @@
 import { useEffect } from "react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ControlsOverlay } from "@/components/ControlsOverlay";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import { OutcomesWorkspace } from "@/components/OutcomesWorkspace";
+import { InflammationWorkspace } from "@/components/InflammationWorkspace";
+import { PatientView, PatientViewHeader } from "@/components/PatientView";
 import { ThreeCanvas } from "@/components/ThreeCanvas";
 import { ZoneLabelsOverlay } from "@/components/ZoneLabelsOverlay";
 import { CaseLog } from "@/components/CaseLog";
@@ -27,6 +30,7 @@ import {
   hydrateFromLocalStorage,
   hydratePatientsFromCaseLog,
   hydratePatientLibrary,
+  loadSharedCaseFromPath,
   loadSharedCaseFromUrl,
   usePatientStore,
 } from "@/store/patientStore";
@@ -78,6 +82,7 @@ export default function App() {
   const setCreditsOpen = useUiStore((s) => s.setCreditsOpen);
   const dark = useUiStore((s) => s.dark);
   const desktopTab = useUiStore((s) => s.desktopTab);
+  const patientView = useUiStore((s) => s.patientView);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -101,15 +106,21 @@ export default function App() {
     // Load saved library entries (full records) then fall back to case log snapshots.
     hydratePatientLibrary();
     hydratePatientsFromCaseLog();
-    // Load a case embedded in the URL hash (share links), overrides active selection.
+    // Load a case embedded in the URL hash (clinical share links), or — if
+    // there's no hash — fetch it from Turso by the /patient/<id> path (short
+    // patient links). The path itself is deliberately left in place either
+    // way — see readPatientViewPath in uiStore for why.
     void loadSharedCaseFromUrl();
+    void loadSharedCaseFromPath();
   }, [bootstrapFromJson]);
 
   const onPredictions = desktopTab === "predictions";
+  const patientView3DOpen = useUiStore((s) => s.patientView3DOpen);
+  const setPatientView3DOpen = useUiStore((s) => s.setPatientView3DOpen);
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
-      <AppHeader />
+      {patientView ? <PatientViewHeader /> : <AppHeader />}
 
       {/*
         Single content area — ThreeCanvas mounted once here so the WebGL context
@@ -120,15 +131,16 @@ export default function App() {
 
         {/* ── ThreeCanvas background (always mounted, z-0) ──────────────── */}
         {/*
-          Default: full-screen (covered by panels on input/outcomes tabs).
-          Predictions tab: occupies the right half on desktop, bottom half on mobile.
+          Default: full-screen (covered by panels on input/outcomes/patient-view).
+          Predictions tab: right half desktop / bottom half mobile.
+          Patient view + "View 3D model" open: full-screen fixed overlay, above everything.
         */}
         <div
           className={cn(
-            "absolute z-0 bg-muted/20",
-            "inset-0",
-            onPredictions && "lg:left-1/2",
-            onPredictions && "max-lg:top-[42%]",
+            "bg-muted/20",
+            patientView && patientView3DOpen
+              ? "fixed inset-0 z-40"
+              : cn("absolute inset-0 z-0", onPredictions && "lg:left-1/2", onPredictions && "max-lg:top-[42%]"),
           )}
         >
           <div className="absolute inset-0 min-h-0 min-w-0" data-tutorial="three-canvas">
@@ -140,13 +152,30 @@ export default function App() {
             <ZoneLabelsOverlay />
             <DimOverlay />
           </div>
+          {patientView && patientView3DOpen && (
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="absolute right-4 top-4 z-50 gap-1.5 shadow-lg"
+                onClick={() => setPatientView3DOpen(false)}
+              >
+                <X className="h-4 w-4" /> Close 3D model
+              </Button>
+              <div className="pointer-events-none absolute inset-x-0 bottom-6 z-50 flex justify-center px-4">
+                <div className="rounded-lg bg-black/70 px-4 py-2.5 text-center text-sm text-white/90 backdrop-blur">
+                  This is a 3D model of your prostate, built from your own scan measurements. Drag to rotate.
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Input tab ────────────────────────────────────────────────── */}
         <div
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
-            desktopTab === "input" ? "flex flex-col" : "hidden",
+            !patientView && desktopTab === "input" ? "flex flex-col" : "hidden",
           )}
         >
           <ZoneInputWizard />
@@ -156,7 +185,7 @@ export default function App() {
         <div
           className={cn(
             "absolute z-10 overflow-y-auto overflow-x-hidden overscroll-contain bg-background app-scroll px-5 py-5",
-            onPredictions ? "block" : "hidden",
+            !patientView && onPredictions ? "block" : "hidden",
             // Desktop: left half. Mobile: top half.
             "lg:left-0 lg:right-1/2 lg:top-0 lg:bottom-0",
             "max-lg:top-0 max-lg:bottom-[58%] max-lg:left-0 max-lg:right-0",
@@ -169,15 +198,35 @@ export default function App() {
         <div
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
-            desktopTab === "outcomes" ? "flex" : "hidden",
+            !patientView && desktopTab === "outcomes" ? "flex" : "hidden",
           )}
         >
           <OutcomesWorkspace />
         </div>
 
+        {/* ── Experimental tab: standalone inflammation research instrument ── */}
+        <div
+          className={cn(
+            "absolute inset-0 z-10 overflow-hidden bg-background",
+            !patientView && desktopTab === "inflammation" ? "flex" : "hidden",
+          )}
+        >
+          <InflammationWorkspace />
+        </div>
+
+        {/* ── Patient view: full-width Inputs | Recovery, 3D model behind a button ── */}
+        <div
+          className={cn(
+            "absolute inset-0 z-10 overflow-hidden bg-background",
+            patientView ? "block" : "hidden",
+          )}
+        >
+          <PatientView />
+        </div>
+
       </div>
 
-      <MobileTabBar />
+      {!patientView && <MobileTabBar />}
 
       {/* Desktop-only footer */}
       <footer className="hidden lg:flex h-7 shrink-0 items-center justify-end gap-3 border-t border-border/50 bg-card/60 px-4">
@@ -207,9 +256,12 @@ export default function App() {
         <ReferencePanel modal onClose={() => setReferenceOpen(false)} />
       )}
 
-      {welcomeOpen && <WelcomeScreen />}
+      {/* Welcome screen and tutorial are clinical-onboarding UI — "Take the
+          Tour" drives desktopTab, which is hidden behind patient view, so
+          both are suppressed there rather than left to dead-end. */}
+      {welcomeOpen && !patientView && <WelcomeScreen />}
       {creditsOpen && <CreditsModal onClose={() => setCreditsOpen(false)} />}
-      <TutorialOverlay />
+      {!patientView && <TutorialOverlay />}
       <PrintReportModal />
 
       {explainKey && (

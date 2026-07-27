@@ -70,6 +70,8 @@ interface PatientState {
   addLesion: () => void;
   removeLesion: (id: string) => void;
   updateClinicalForm: (patch: Partial<import("@/types/patient").ClinicalState>) => void;
+  /** Wholesale-replaces one patient's record + lesions — used by patient view's "reset to original" after local-only edits (e.g. Modifiable Factors exploration). */
+  restorePatientRecord: (id: string, record: Prostate3DInputV1, lesionRows: LesionRow[]) => void;
   importJsonFile: (text: string, label?: string) => void;
   exportActiveJson: () => string;
   resetActiveToSeed: () => void;
@@ -211,6 +213,15 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       const threeZones = clone(createBaseThreeZones());
       const predictions = runCompassModels(S, working, entry.lesionRows, threeZones);
       set({ predictions, threeZones });
+    },
+
+    restorePatientRecord: (id, record, lesionRows) => {
+      const { patients } = get();
+      const next = patients.map((p) =>
+        p.id === id ? { ...p, record: clone(record), lesionRows: ensureLesionIds(clone(lesionRows)) } : p,
+      );
+      set({ patients: next });
+      get().recompute();
     },
 
     updateLesionRows: (rows) => {
@@ -667,21 +678,77 @@ async function decompressFromB64u(b64u: string): Promise<string> {
   return new TextDecoder().decode(out);
 }
 
-/** Build a shareable URL containing the active patient's full record in the hash (gzip compressed). */
-export async function buildShareUrl(): Promise<string | null> {
+/** Reuses (or generates and persists) the active patient's stable share id. */
+function getOrCreateShareId(): { id: string; entry: PatientEntry } | null {
   const { activeId, patients } = usePatientStore.getState();
   const p = patients.find((x) => x.id === activeId);
   if (!p) return null;
-  const shareId = p.record._shareId ?? crypto.randomUUID();
+  let shareId = p.record._shareId;
+  if (!shareId) {
+    // Persist once generated, so re-copying either link later for the same
+    // case reuses the same id instead of minting a new one each time.
+    shareId = crypto.randomUUID();
+    const next = patients.map((x) =>
+      x.id === activeId ? { ...x, record: { ...x.record, _shareId: shareId } } : x,
+    );
+    usePatientStore.setState({ patients: next });
+    return { id: shareId, entry: { ...p, record: { ...p.record, _shareId: shareId } } };
+  }
+  return { id: shareId, entry: p };
+}
+
+/**
+ * Clinical share link — self-contained, the whole record travels compressed
+ * in the URL hash. No server dependency, works even if Turso/the Worker are
+ * down. Requires clinical sign-in (Cloudflare Access) to open.
+ */
+export async function buildClinicalShareUrl(): Promise<string | null> {
+  const found = getOrCreateShareId();
+  if (!found) return null;
+  const { id: shareId, entry: p } = found;
   const data = { ...p.record, _shareId: shareId, lesions: p.lesionRows };
   const encoded = await compressToB64u(JSON.stringify(data));
   return `${window.location.origin}${window.location.pathname}#case=${encoded}`;
 }
 
 /**
+ * Patient share link — short (`/patient/<id>`, no hash): the record is
+ * pushed to Turso (via the Cloudflare Worker proxy, see src/lib/turso.ts)
+ * keyed by the same share id, and the recipient's browser fetches it by id
+ * instead of decoding a giant URL. Unauthenticated by design (Cloudflare
+ * Access is configured to bypass this path) — patients don't have Sinai
+ * logins.
+ */
+export async function buildPatientShareUrl(): Promise<string | null> {
+  const found = getOrCreateShareId();
+  if (!found) return null;
+  const { id: shareId, entry: p } = found;
+  const data = { ...p.record, _shareId: shareId, lesions: p.lesionRows };
+  const { saveShareCase } = await import("@/lib/turso");
+  await saveShareCase(shareId, data);
+  return `${window.location.origin}/patient/${shareId}`;
+}
+
+/** Applies a decoded shared record as the active patient entry. */
+function applySharedRecord(data: Prostate3DInputV1): void {
+  data.zones = mergeZones(data.zones || {});
+  const id = data._shareId ?? `shared-${Date.now()}`;
+  const lesionRows = ensureLesionIds((data.lesions as LesionRow[]) || []);
+  const entry: PatientEntry = { id, name: "Shared Case", record: data, lesionRows };
+  const { patients } = usePatientStore.getState();
+  const existing = patients.findIndex((p) => p.id === id);
+  const updated = existing >= 0
+    ? patients.map((p, i) => (i === existing ? entry : p))
+    : [...patients, entry];
+  usePatientStore.setState({ patients: updated, activeId: id, loading: false });
+  usePatientStore.getState().recompute();
+}
+
+/**
  * If the URL hash contains `#case=<encoded>`, parse it, add the patient to
  * the store as the active entry, and strip the hash from the URL.
  * Supports both gzip-compressed (new) and plain base64 (legacy) payloads.
+ * This is the clinical share-link format — self-contained, no server call.
  */
 export async function loadSharedCaseFromUrl(): Promise<void> {
   const match = window.location.hash.match(/^#case=(.+)$/);
@@ -696,19 +763,31 @@ export async function loadSharedCaseFromUrl(): Promise<void> {
     }
     const data = JSON.parse(json) as Prostate3DInputV1;
     if (data._schema !== "prostate-3d-input-v1") return;
-    data.zones = mergeZones(data.zones || {});
-    const id = data._shareId ?? `shared-${Date.now()}`;
-    const lesionRows = ensureLesionIds((data.lesions as LesionRow[]) || []);
-    const entry: PatientEntry = { id, name: "Shared Case", record: data, lesionRows };
-    const { patients } = usePatientStore.getState();
-    const existing = patients.findIndex((p) => p.id === id);
-    const updated = existing >= 0
-      ? patients.map((p, i) => (i === existing ? entry : p))
-      : [...patients, entry];
-    usePatientStore.setState({ patients: updated, activeId: id, loading: false });
-    usePatientStore.getState().recompute();
+    applySharedRecord(data);
     history.replaceState(null, "", window.location.pathname + window.location.search);
   } catch {
     /* malformed hash — ignore */
+  }
+}
+
+/**
+ * If the URL path is `/patient/<id>` with no `#case=` hash (the short
+ * patient-link format — see buildPatientShareUrl), fetch that case from
+ * Turso via the Worker proxy and add it as the active entry. No-op if a
+ * hash is present (that path is handled by loadSharedCaseFromUrl instead)
+ * or the id isn't found.
+ */
+export async function loadSharedCaseFromPath(): Promise<void> {
+  if (window.location.hash) return;
+  const match = window.location.pathname.match(/^\/patient\/([^/]+)\/?$/);
+  if (!match) return;
+  const id = match[1]!;
+  try {
+    const { loadShareCase } = await import("@/lib/turso");
+    const data = await loadShareCase(id);
+    if (!data || (data as Prostate3DInputV1)._schema !== "prostate-3d-input-v1") return;
+    applySharedRecord(data as Prostate3DInputV1);
+  } catch {
+    /* Turso/Worker unreachable or malformed record — leave whatever's already loaded */
   }
 }

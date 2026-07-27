@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { OverlayType } from "@/types/prediction";
 import { VIEWS } from "@/lib/three/prostateScene";
 
-export type DesktopTab = "input" | "predictions" | "outcomes";
+export type DesktopTab = "input" | "predictions" | "outcomes" | "inflammation";
 
 const WELCOME_SEEN_KEY = "compass-welcome-seen";
 const TUTORIAL_TOTAL_STEPS = 8;
@@ -12,6 +12,52 @@ function readWelcomeSeen(): boolean {
     return localStorage.getItem(WELCOME_SEEN_KEY) === "1";
   } catch {
     return false;
+  }
+}
+
+/**
+ * A link built for a patient uses the `/patient/<id>` path (not a query
+ * flag) so a Cloudflare Access rule can match on it — Access matches
+ * hostname/path, not query strings. Unlike the old `?view=patient` flag,
+ * this path is never stripped from the URL: it needs to stay put so every
+ * subsequent request (including a reload) keeps hitting a path Access is
+ * configured to leave unauthenticated. Checked fresh on every load.
+ */
+function readPatientViewPath(): boolean {
+  try {
+    return window.location.pathname.startsWith("/patient/");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Secondary signal for a clinician's own in-app "preview patient view"
+ * toggle, which — unlike a patient link — doesn't change the URL. Without
+ * this, a clinician's page refresh while previewing would silently drop
+ * back to the clinical shell. sessionStorage (not localStorage — scoped to
+ * this tab, cleared when it closes) is that signal, written whenever
+ * patient view is entered/left via `setPatientView`.
+ */
+const PATIENT_VIEW_SESSION_KEY = "compass-patient-view-session";
+
+function readPatientViewSession(): { patientView: boolean; locked: boolean } {
+  try {
+    const raw = sessionStorage.getItem(PATIENT_VIEW_SESSION_KEY);
+    if (!raw) return { patientView: false, locked: false };
+    const parsed = JSON.parse(raw);
+    return { patientView: !!parsed.patientView, locked: !!parsed.locked };
+  } catch {
+    return { patientView: false, locked: false };
+  }
+}
+
+function writePatientViewSession(patientView: boolean, locked: boolean) {
+  try {
+    if (!patientView) sessionStorage.removeItem(PATIENT_VIEW_SESSION_KEY);
+    else sessionStorage.setItem(PATIENT_VIEW_SESSION_KEY, JSON.stringify({ patientView, locked }));
+  } catch {
+    /* private mode */
   }
 }
 
@@ -35,6 +81,17 @@ interface UiState {
   targetRot: { x: number; y: number };
   /** Active workspace tab — same on desktop and mobile */
   desktopTab: DesktopTab;
+  /** Simplified patient-facing screen — own layout, no clinical tabs/numbers. */
+  patientView: boolean;
+  /**
+   * True when this session arrived via a patient link (`?view=patient`) —
+   * patients only ever get patient view, so "Back to clinical view" is
+   * hidden. False for a clinician who toggled into patient view from within
+   * their own session — they can freely switch back.
+   */
+  patientViewLocked: boolean;
+  /** Full-screen 3D model overlay, opened on demand from within patient view. */
+  patientView3DOpen: boolean;
   setDark: (v: boolean) => void;
   setOverlay: (o: OverlayType) => void;
   toggleHeatmap: () => void;
@@ -51,12 +108,22 @@ interface UiState {
   setExplainKey: (k: string | null) => void;
   setView: (name: keyof typeof VIEWS) => void;
   setDesktopTab: (t: DesktopTab) => void;
+  setPatientView: (v: boolean) => void;
+  setPatientView3DOpen: (v: boolean) => void;
   startTutorial: () => void;
   nextTutorialStep: () => void;
   prevTutorialStep: () => void;
   endTutorial: () => void;
   setWizardTab: (t: 1 | 2 | null) => void;
 }
+
+const fromPath = readPatientViewPath();
+const fromSession = readPatientViewSession();
+const initialPatientView = fromPath || fromSession.patientView;
+const initialPatientViewLocked = fromPath || fromSession.locked;
+// Keep the session fallback in sync too, so the clinician-preview path
+// (sessionStorage-only, no URL signal) stays consistent.
+if (fromPath) writePatientViewSession(true, true);
 
 export const useUiStore = create<UiState>((set, get) => ({
   dark: true,
@@ -76,6 +143,9 @@ export const useUiStore = create<UiState>((set, get) => ({
   wizardTab: null,
   targetRot: { x: 0, y: 0 },
   desktopTab: "input" as DesktopTab,
+  patientView: initialPatientView,
+  patientViewLocked: initialPatientViewLocked,
+  patientView3DOpen: false,
   setDark: (v) => {
     set({ dark: v });
     document.documentElement.classList.toggle("dark", v);
@@ -101,6 +171,16 @@ export const useUiStore = create<UiState>((set, get) => ({
     if (v) set({ targetRot: { x: v.x, y: v.y } });
   },
   setDesktopTab: (t) => set({ desktopTab: t }),
+  setPatientView: (v) => {
+    // A clinician's own "Switch to patient view" toggle is never locked —
+    // only a link opened with ?view=patient sets patientViewLocked. Leaving
+    // via "Back to clinical view" (only reachable when unlocked) clears the
+    // session fallback too, so a later refresh doesn't re-enter patient view.
+    const locked = v && get().patientViewLocked;
+    writePatientViewSession(v, locked);
+    set({ patientView: v, patientViewLocked: locked, patientView3DOpen: false });
+  },
+  setPatientView3DOpen: (v) => set({ patientView3DOpen: v }),
   startTutorial: () => {
     try { localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch { /* private mode */ }
     set({ tutorialStep: 0, welcomeOpen: false, desktopTab: "input", wizardTab: null });

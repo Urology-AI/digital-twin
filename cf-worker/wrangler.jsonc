@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "compass-spa-fallback",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-27",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  // Bind this Worker to the app's domain — requests hit this Worker first,
+  // then it fetches from GitHub Pages. Update to your real domain.
+  "routes": [
+    { "pattern": "yourapp.com/*", "zone_name": "yourapp.com" }
+  ],
+  "vars": {
+    // Your GitHub Pages origin, e.g. "https://<org>.github.io" (project
+    // pages: include the repo path too, e.g. ".../repo-name").
+    "GITHUB_PAGES_ORIGIN": "https://your-org.github.io",
+    // Not secret by itself (just a hostname), fine as a plain var.
+    "TURSO_URL": "https://your-db.turso.io"
+  }
+  // TURSO_AUTH_TOKEN is a secret — never put it here. Set it with:
+  //   npx wrangler secret put TURSO_AUTH_TOKEN
+}

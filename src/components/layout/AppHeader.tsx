@@ -4,36 +4,42 @@ import {
   BookMarked,
   BookOpen,
   ClipboardList,
+  FlaskConical,
   Info,
   Layers,
-  Link2,
   MessageCircle,
   Moon,
   Printer,
   Redo2,
+  Share2,
   Sun,
   Undo2,
+  UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { usePatientStore, buildShareUrl } from "@/store/patientStore";
+import { usePatientStore } from "@/store/patientStore";
 import { useUiStore, type DesktopTab } from "@/store/uiStore";
 import { printReport } from "@/lib/compass/printReport";
 import { cn } from "@/lib/utils";
 import { useApiStatus } from "@/hooks/useApiStatus";
+import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { AiSettingsModal } from "@/components/AiSettingsModal";
+import { ShareLinkModal } from "@/components/ShareLinkModal";
 
 const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[] = [
-  { id: "input",       label: "Input",       Icon: ClipboardList },
-  { id: "predictions", label: "Predictions", Icon: Activity },
-  { id: "outcomes",    label: "Outcomes",    Icon: Layers },
+  { id: "input",        label: "Input",       Icon: ClipboardList },
+  { id: "predictions",  label: "Predictions", Icon: Activity },
+  { id: "outcomes",     label: "Outcomes",    Icon: Layers },
+  { id: "inflammation", label: "Experimental", Icon: FlaskConical },
 ];
 
 export function AppHeader() {
   const { status: aiStatus, recheck: recheckAi } = useApiStatus();
+  const accessIdentity = useAccessIdentity();
   const chatOpen = useUiStore((s) => s.chatOpen);
   const setChatOpen = useUiStore((s) => s.setChatOpen);
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const dark = useUiStore((s) => s.dark);
   const setDark = useUiStore((s) => s.setDark);
@@ -43,6 +49,7 @@ export function AppHeader() {
   const setWelcomeOpen = useUiStore((s) => s.setWelcomeOpen);
   const setCaseLogOpen = useUiStore((s) => s.setCaseLogOpen);
   const setReferenceOpen = useUiStore((s) => s.setReferenceOpen);
+  const setPatientView = useUiStore((s) => s.setPatientView);
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
   const loading = usePatientStore((s) => s.loading);
@@ -210,24 +217,26 @@ export function AppHeader() {
           type="button"
           variant="ghost"
           size="icon"
-          className={cn(
-            "h-8 w-8 transition-colors",
-            copied ? "text-emerald-500" : "text-muted-foreground hover:text-foreground",
-          )}
-          aria-label="Copy share link"
-          title={copied ? "Link copied!" : "Copy share link"}
-          onClick={() => {
-            buildShareUrl().then((url) => {
-              if (!url) return;
-              navigator.clipboard.writeText(url).then(() => {
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
-              });
-            });
-          }}
+          className="h-8 w-8 text-blue-400 hover:text-blue-300"
+          aria-label="Switch to patient view"
+          title="Patient view"
+          onClick={() => setPatientView(true)}
         >
-          <Link2 className="h-[15px] w-[15px]" />
+          <UserRound className="h-[15px] w-[15px]" />
         </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          aria-label="Share case"
+          title="Share case"
+          onClick={() => setShareOpen(true)}
+        >
+          <Share2 className="h-[15px] w-[15px]" />
+        </Button>
+        {shareOpen && <ShareLinkModal onClose={() => setShareOpen(false)} />}
 
         <Button
           type="button"
@@ -250,6 +259,19 @@ export function AppHeader() {
         >
           <Info className="h-[15px] w-[15px]" />
         </Button>
+
+        {/* Who's signed in via Cloudflare Access, if anyone (blank locally / on patient links) */}
+        {accessIdentity && (
+          <div
+            className="hidden items-center gap-1.5 rounded-md px-2 py-1 text-muted-foreground sm:flex"
+            title={`Signed in as ${accessIdentity.email}`}
+          >
+            <UserRound className="h-3.5 w-3.5" />
+            <span className="max-w-[140px] truncate text-[11px] font-medium">
+              {accessIdentity.name || accessIdentity.email}
+            </span>
+          </div>
+        )}
 
         {/* AI status indicator — click to open settings */}
         <button
