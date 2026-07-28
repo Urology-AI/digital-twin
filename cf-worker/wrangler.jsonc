@@ -20,6 +20,7 @@
   "routes": [
     { "pattern": "digital-twin.urology.edu.eu.org/api/turso/*", "zone_name": "urology.edu.eu.org" },
     { "pattern": "digital-twin.urology.edu.eu.org/patient/*", "zone_name": "urology.edu.eu.org" },
+    { "pattern": "digital-twin.urology.edu.eu.org/clinical", "zone_name": "urology.edu.eu.org" },
     { "pattern": "digital-twin.urology.edu.eu.org/clinical/*", "zone_name": "urology.edu.eu.org" }
   ]
   // TURSO_URL and TURSO_AUTH_TOKEN are both secrets — never put them here.
