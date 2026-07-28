@@ -24,7 +24,6 @@ import { cn } from "@/lib/utils";
 import { useApiStatus } from "@/hooks/useApiStatus";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { AiSettingsModal } from "@/components/AiSettingsModal";
-import { ShareLinkModal } from "@/components/ShareLinkModal";
 
 const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[] = [
   { id: "input",        label: "Input",       Icon: ClipboardList },
@@ -39,7 +38,7 @@ export function AppHeader() {
   const chatOpen = useUiStore((s) => s.chatOpen);
   const setChatOpen = useUiStore((s) => s.setChatOpen);
   const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
+  const setShareOpen = useUiStore((s) => s.setShareOpen);
 
   const dark = useUiStore((s) => s.dark);
   const setDark = useUiStore((s) => s.setDark);
@@ -236,7 +235,6 @@ export function AppHeader() {
         >
           <Share2 className="h-[15px] w-[15px]" />
         </Button>
-        {shareOpen && <ShareLinkModal onClose={() => setShareOpen(false)} />}
 
         <Button
           type="button"

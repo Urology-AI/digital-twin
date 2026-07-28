@@ -1,14 +1,26 @@
 /**
- * Turso proxy only. Holds the Turso auth token as a Worker secret so it
- * never ships in the client bundle. The case-log schema/column-mapping
- * logic stays in src/lib/turso.ts unchanged; only the transport moves
- * here, as a thin pass-through of the exact SQL that code already builds.
+ * Two narrow jobs (see wrangler.jsonc routes — bound to exactly these two
+ * path patterns, nothing else):
  *
- * Bound to /api/turso/* only (see wrangler.jsonc) — everything else on
- * this domain (page loads, assets, deep links) passes straight through to
- * the zone's normal DNS/origin, which already works correctly with
- * Cloudflare Access and GitHub Pages' own custom-domain handling. This
- * Worker has no business touching any of that.
+ * 1. /api/turso/* — Turso proxy. Holds the Turso auth token as a Worker
+ *    secret so it never ships in the client bundle. The case-log
+ *    schema/column-mapping logic stays in src/lib/turso.ts unchanged;
+ *    only the transport moves here, as a thin pass-through of the exact
+ *    SQL that code already builds.
+ *
+ * 2. /patient/* — SPA fallback. GitHub Pages has no server-side rewrite
+ *    capability, so a fresh visit to a client-side route like
+ *    /patient/<id> (no matching file) 404s. This fetches /index.html
+ *    from the same custom domain instead — a same-zone fetch, which
+ *    Cloudflare docs confirm bypasses Worker routing entirely and goes
+ *    straight to the zone's normal origin (the plain proxied CNAME to
+ *    GitHub Pages), preserving the custom-domain Host header GitHub
+ *    Pages needs to serve this project without redirecting.
+ *
+ * Everything else on this domain (the main page load, real assets)
+ * passes straight through untouched — this Worker never sees it, and has
+ * no business touching Cloudflare Access or GitHub's custom-domain
+ * handling, both of which already work correctly on their own.
  *
  * No route here does its own auth check. Cloudflare Access, configured
  * separately on this domain, runs before this Worker executes at all —
@@ -133,6 +145,18 @@ async function handleTursoBatch(request: Request, env: Env): Promise<Response> {
   }
 }
 
+async function handlePatientSpaFallback(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  const indexUrl = new URL("/index.html", url.origin);
+  const response = await fetch(new Request(indexUrl, request));
+  // Report 200, not GitHub Pages' 404 for the (nonexistent) deep-link path
+  // — the content itself is index.html, so the client-side router can run.
+  if (response.status === 404) {
+    return new Response(response.body, { status: 200, headers: response.headers });
+  }
+  return response;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url);
@@ -140,6 +164,7 @@ export default {
       if (pathname === "/api/turso/health") return await handleTursoHealth(env);
       if (pathname === "/api/turso/execute") return await handleTursoExecute(request, env);
       if (pathname === "/api/turso/batch") return await handleTursoBatch(request, env);
+      if (pathname.startsWith("/patient/")) return await handlePatientSpaFallback(request);
       return jsonError("Not found", 404);
     } catch (err) {
       return jsonError(`Unhandled error: ${err instanceof Error ? err.message : String(err)}`, 500);

@@ -7,13 +7,18 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
-  // Only intercept Turso API calls — everything else (page loads, assets,
-  // deep links) passes straight through to this zone's normal DNS/origin
-  // (the plain proxied CNAME to GitHub Pages), which already works
-  // correctly with Cloudflare Access and GitHub's custom-domain handling.
-  // The Worker has no business touching any of that.
+  // Two narrow routes only:
+  //  - /api/turso/*  — the Turso proxy.
+  //  - /patient/*    — SPA fallback for deep links GitHub Pages can't
+  //                    serve directly (no matching file on a fresh visit).
+  // Everything else (the main page load, assets) passes straight through
+  // to this zone's normal DNS/origin (the plain proxied CNAME to GitHub
+  // Pages), which already works correctly with Cloudflare Access and
+  // GitHub's custom-domain handling. The Worker has no business touching
+  // any of that.
   "routes": [
-    { "pattern": "digital-twin.urology.edu.eu.org/api/turso/*", "zone_name": "urology.edu.eu.org" }
+    { "pattern": "digital-twin.urology.edu.eu.org/api/turso/*", "zone_name": "urology.edu.eu.org" },
+    { "pattern": "digital-twin.urology.edu.eu.org/patient/*", "zone_name": "urology.edu.eu.org" }
   ]
   // TURSO_URL and TURSO_AUTH_TOKEN are both secrets — never put them here.
   // Set them with:
