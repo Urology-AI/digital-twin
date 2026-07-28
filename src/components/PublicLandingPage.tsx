@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
+import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 
 const APP_URL = "https://urology-ai.github.io/digital-twin/";
 
@@ -38,6 +40,15 @@ function MountSinaiMark({ className, style }: { className?: string; style?: Reac
  * audiences that land here.
  */
 export function PublicLandingPage() {
+  const accessIdentity = useAccessIdentity();
+
+  // A clinician who's already signed in via Cloudflare Access doesn't need
+  // to see the public welcome page or click "Clinician sign in" again —
+  // send them straight into the app.
+  useEffect(() => {
+    if (accessIdentity) window.location.href = "/clinical";
+  }, [accessIdentity]);
+
   return (
     <div className="flex min-h-screen w-full flex-col items-center justify-center gap-5 bg-background px-4 py-10 text-center">
       <MountSinaiMark className="h-auto w-auto" style={{ height: "3rem" }} />
