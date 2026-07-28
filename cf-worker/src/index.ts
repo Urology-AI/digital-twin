@@ -30,7 +30,13 @@ async function handleSpaFallback(request: Request, env: Env): Promise<Response> 
   const isAsset = HAS_FILE_EXTENSION.test(url.pathname);
   const upstreamPath = isAsset ? url.pathname : "/index.html";
 
-  const upstreamUrl = new URL(upstreamPath, env.GITHUB_PAGES_ORIGIN);
+  // GITHUB_PAGES_ORIGIN can itself carry a path prefix (project pages, e.g.
+  // https://org.github.io/repo-name/). `new URL(absolutePath, base)` would
+  // discard that prefix entirely — an absolute path replaces the base's
+  // path rather than appending to it — so it's stitched in manually here.
+  const originBase = new URL(env.GITHUB_PAGES_ORIGIN);
+  const prefix = originBase.pathname.replace(/\/$/, "");
+  const upstreamUrl = new URL(`${prefix}${upstreamPath}`, originBase.origin);
   const upstreamRequest = new Request(upstreamUrl, request);
 
   const response = await fetch(upstreamRequest);
