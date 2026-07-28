@@ -178,10 +178,12 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       if (pulledLibrary.length) {
         mergePatientLibrary(pulledLibrary);
         syncPatientLibraryToStore();
-      } else {
-        // Fallback: reconstruct minimal entries from flat case records.
-        hydratePatientsFromCaseLog();
       }
+      // Always also run the minimal fallback — it only adds entries for
+      // cases not already in the store (existingIds filter), so any pulled
+      // case that lacked a parseable full record (older rows, etc.) still
+      // shows up in the dropdown instead of silently disappearing.
+      hydratePatientsFromCaseLog();
       setSyncStatus(`Pulled ${pulled.length} case${pulled.length !== 1 ? "s" : ""} ✓`);
     } catch (err) {
       setSyncStatus(`Pull failed: ${err instanceof Error ? err.message : String(err)}`);

@@ -1,51 +1,26 @@
 /**
- * Two jobs, both in front of a GitHub Pages origin that can't do either
- * itself:
+ * Turso proxy only. Holds the Turso auth token as a Worker secret so it
+ * never ships in the client bundle. The case-log schema/column-mapping
+ * logic stays in src/lib/turso.ts unchanged; only the transport moves
+ * here, as a thin pass-through of the exact SQL that code already builds.
  *
- * 1. SPA fallback — deep links like /patient/<id> have no matching file on
- *    GitHub Pages, so serve index.html for them instead of a 404.
- * 2. Turso proxy — holds the Turso auth token as a Worker secret so it
- *    never ships in the client bundle. The case-log schema/column-mapping
- *    logic stays in src/lib/turso.ts unchanged; only the transport moves
- *    here, as a thin pass-through of the exact SQL that code already built.
+ * Bound to /api/turso/* only (see wrangler.jsonc) — everything else on
+ * this domain (page loads, assets, deep links) passes straight through to
+ * the zone's normal DNS/origin, which already works correctly with
+ * Cloudflare Access and GitHub Pages' own custom-domain handling. This
+ * Worker has no business touching any of that.
  *
- * Neither route does its own auth check. Cloudflare Access, configured
- * separately on this same hostname/route, runs before this Worker executes
- * at all — by the time a request reaches here it's already authenticated,
- * and Access injects `Cf-Access-Authenticated-User-Email` on every request
+ * No route here does its own auth check. Cloudflare Access, configured
+ * separately on this domain, runs before this Worker executes at all —
+ * by the time a request reaches here it's already authenticated, and
+ * Access injects `Cf-Access-Authenticated-User-Email` on every request
  * if you want to attribute a write to a specific clinician later.
  */
 import { createClient } from "@libsql/client/web";
 
 interface Env {
-  GITHUB_PAGES_ORIGIN: string;
   TURSO_URL: string;
   TURSO_AUTH_TOKEN: string;
-}
-
-const HAS_FILE_EXTENSION = /\.[a-zA-Z0-9]+$/;
-
-async function handleSpaFallback(request: Request, env: Env): Promise<Response> {
-  const url = new URL(request.url);
-  const isAsset = HAS_FILE_EXTENSION.test(url.pathname);
-  const upstreamPath = isAsset ? url.pathname : "/index.html";
-
-  // GITHUB_PAGES_ORIGIN can itself carry a path prefix (project pages, e.g.
-  // https://org.github.io/repo-name/). `new URL(absolutePath, base)` would
-  // discard that prefix entirely — an absolute path replaces the base's
-  // path rather than appending to it — so it's stitched in manually here.
-  const originBase = new URL(env.GITHUB_PAGES_ORIGIN);
-  const prefix = originBase.pathname.replace(/\/$/, "");
-  const upstreamUrl = new URL(`${prefix}${upstreamPath}`, originBase.origin);
-  const upstreamRequest = new Request(upstreamUrl, request);
-
-  const response = await fetch(upstreamRequest);
-  // SPA-fallback responses should report 200, not GitHub Pages' 404 for the
-  // (nonexistent) deep-link path — the content itself is index.html.
-  if (!isAsset && response.status === 404) {
-    return new Response(response.body, { status: 200, headers: response.headers });
-  }
-  return response;
 }
 
 function jsonError(message: string, status: number): Response {
@@ -55,23 +30,59 @@ function jsonError(message: string, status: number): Response {
   });
 }
 
+/**
+ * @libsql/client/web (the HTTP-based build that runs in Workers) requires
+ * an https:// URL — it does not accept the libsql:// connection string
+ * Turso hands you in its dashboard. Normalize either form here.
+ */
+function tursoClient(env: Env) {
+  const url = env.TURSO_URL.replace(/^libsql:\/\//, "https://");
+  return createClient({ url, authToken: env.TURSO_AUTH_TOKEN });
+}
+
+type Args = (string | number | null)[];
+
+/**
+ * GET for reads (?sql=...&args=[...] as query params), POST for writes
+ * (JSON body) — matches how the two are actually used: pullCases() only
+ * ever SELECTs, pushCases()'s ensureSchema() only ever CREATE/ALTERs.
+ */
 async function handleTursoExecute(request: Request, env: Env): Promise<Response> {
-  if (request.method !== "POST") return jsonError("POST only", 405);
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return jsonError("Invalid JSON body", 400);
+  let sql: unknown;
+  let args: unknown;
+
+  if (request.method === "GET") {
+    const params = new URL(request.url).searchParams;
+    sql = params.get("sql");
+    try {
+      args = params.has("args") ? JSON.parse(params.get("args")!) : [];
+    } catch {
+      return jsonError("'args' query param must be JSON", 400);
+    }
+  } else if (request.method === "POST") {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return jsonError("Invalid JSON body", 400);
+    }
+    sql = (body as { sql?: unknown })?.sql;
+    args = (body as { args?: unknown })?.args ?? [];
+  } else {
+    return jsonError("GET or POST only", 405);
   }
-  const sql = (body as { sql?: unknown })?.sql;
-  const args = (body as { args?: unknown })?.args ?? [];
+
   if (typeof sql !== "string" || !sql.trim()) return jsonError("Missing 'sql' string", 400);
   if (!Array.isArray(args)) return jsonError("'args' must be an array", 400);
 
-  const client = createClient({ url: env.TURSO_URL, authToken: env.TURSO_AUTH_TOKEN });
   try {
-    const result = await client.execute({ sql, args: args as (string | number | null)[] });
-    return new Response(JSON.stringify({ rows: result.rows, columns: result.columns }), {
+    const result = await tursoClient(env).execute({ sql, args: args as Args });
+    // libsql's Row objects support both row[0] and row.columnName access but
+    // are NOT plain arrays — JSON.stringify on them directly does not
+    // reliably carry the actual values across. Force each row into a real
+    // array first.
+    const rows = result.rows.map((row) => Array.from(row));
+    return new Response(JSON.stringify({ rows, columns: result.columns }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
@@ -81,9 +92,8 @@ async function handleTursoExecute(request: Request, env: Env): Promise<Response>
 
 /** Real connectivity check — not just "are the env vars set", an actual round-trip to Turso. */
 async function handleTursoHealth(env: Env): Promise<Response> {
-  const client = createClient({ url: env.TURSO_URL, authToken: env.TURSO_AUTH_TOKEN });
   try {
-    await client.execute({ sql: "SELECT 1", args: [] });
+    await tursoClient(env).execute({ sql: "SELECT 1", args: [] });
     return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
   } catch (err) {
     return jsonError(`Turso unreachable: ${err instanceof Error ? err.message : String(err)}`, 502);
@@ -92,7 +102,7 @@ async function handleTursoHealth(env: Env): Promise<Response> {
 
 interface BatchStatement {
   sql: string;
-  args: (string | number | null)[];
+  args: Args;
 }
 
 async function handleTursoBatch(request: Request, env: Env): Promise<Response> {
@@ -113,9 +123,8 @@ async function handleTursoBatch(request: Request, env: Env): Promise<Response> {
     }
   }
 
-  const client = createClient({ url: env.TURSO_URL, authToken: env.TURSO_AUTH_TOKEN });
   try {
-    await client.batch(statements as BatchStatement[], "write");
+    await tursoClient(env).batch(statements as BatchStatement[], "write");
     return new Response(JSON.stringify({ ok: true, count: statements.length }), {
       headers: { "Content-Type": "application/json" },
     });
@@ -131,7 +140,7 @@ export default {
       if (pathname === "/api/turso/health") return await handleTursoHealth(env);
       if (pathname === "/api/turso/execute") return await handleTursoExecute(request, env);
       if (pathname === "/api/turso/batch") return await handleTursoBatch(request, env);
-      return await handleSpaFallback(request, env);
+      return jsonError("Not found", 404);
     } catch (err) {
       return jsonError(`Unhandled error: ${err instanceof Error ? err.message : String(err)}`, 500);
     }
