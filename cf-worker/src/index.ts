@@ -1,5 +1,5 @@
 /**
- * Two narrow jobs (see wrangler.jsonc routes — bound to exactly these two
+ * Narrow jobs only (see wrangler.jsonc routes — bound to exactly these
  * path patterns, nothing else):
  *
  * 1. /api/turso/* — Turso proxy. Holds the Turso auth token as a Worker
@@ -8,25 +8,25 @@
  *    only the transport moves here, as a thin pass-through of the exact
  *    SQL that code already builds.
  *
- * 2. /patient/* — SPA fallback. GitHub Pages has no server-side rewrite
- *    capability, so a fresh visit to a client-side route like
- *    /patient/<id> (no matching file) 404s. This fetches /index.html
- *    from the same custom domain instead — a same-zone fetch, which
- *    Cloudflare docs confirm bypasses Worker routing entirely and goes
- *    straight to the zone's normal origin (the plain proxied CNAME to
- *    GitHub Pages), preserving the custom-domain Host header GitHub
- *    Pages needs to serve this project without redirecting.
+ * 2. /patient/* and /clinical/* — SPA fallback. GitHub Pages has no
+ *    server-side rewrite capability, so a fresh visit to a client-side
+ *    route (no matching file) 404s. This fetches /index.html from the
+ *    same custom domain instead — a same-zone fetch, which Cloudflare
+ *    docs confirm bypasses Worker routing entirely and goes straight to
+ *    the zone's normal origin (the plain proxied CNAME to GitHub Pages),
+ *    preserving the custom-domain Host header GitHub Pages needs to
+ *    serve this project without redirecting.
  *
- * Everything else on this domain (the main page load, real assets)
- * passes straight through untouched — this Worker never sees it, and has
- * no business touching Cloudflare Access or GitHub's custom-domain
- * handling, both of which already work correctly on their own.
+ * Root ("/") and anything else passes straight through untouched — this
+ * Worker never sees it. Cloudflare Access has exactly one application,
+ * scoped to /clinical/* only; root and /patient/* are genuinely public by
+ * having no Access application on them at all, not by a bypass rule (no
+ * path-precedence ambiguity between competing apps that way).
  *
- * No route here does its own auth check. Cloudflare Access, configured
- * separately on this domain, runs before this Worker executes at all —
- * by the time a request reaches here it's already authenticated, and
- * Access injects `Cf-Access-Authenticated-User-Email` on every request
- * if you want to attribute a write to a specific clinician later.
+ * No route here does its own auth check — by the time a request reaches
+ * this Worker on /clinical/*, Access has already authenticated it, and
+ * injects `Cf-Access-Authenticated-User-Email` on every request if you
+ * want to attribute a write to a specific clinician later.
  */
 import { createClient } from "@libsql/client/web";
 
@@ -145,7 +145,7 @@ async function handleTursoBatch(request: Request, env: Env): Promise<Response> {
   }
 }
 
-async function handlePatientSpaFallback(request: Request): Promise<Response> {
+async function handleSpaFallback(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const indexUrl = new URL("/index.html", url.origin);
   const response = await fetch(new Request(indexUrl, request));
@@ -164,7 +164,9 @@ export default {
       if (pathname === "/api/turso/health") return await handleTursoHealth(env);
       if (pathname === "/api/turso/execute") return await handleTursoExecute(request, env);
       if (pathname === "/api/turso/batch") return await handleTursoBatch(request, env);
-      if (pathname.startsWith("/patient/")) return await handlePatientSpaFallback(request);
+      if (pathname.startsWith("/patient/") || pathname.startsWith("/clinical")) {
+        return await handleSpaFallback(request);
+      }
       return jsonError("Not found", 404);
     } catch (err) {
       return jsonError(`Unhandled error: ${err instanceof Error ? err.message : String(err)}`, 500);
