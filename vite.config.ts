@@ -6,9 +6,12 @@ import { defineConfig } from "vitest/config";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  // Relative asset URLs so the app works when hosted under a subpath (e.g. GitHub Pages)
-  // and avoids 404s for /assets/* when the site root is not the server root.
-  base: "./",
+  // Absolute asset URLs, required for deep-link routes like /patient/<id> —
+  // with a relative base, a browser landing directly on that path would
+  // resolve assets relative to /patient/ instead of the real root and 404.
+  // (Previously "./" for hosting under an unknown subpath e.g. GitHub Pages;
+  // not compatible with patient-link routing, so fixed to the real root.)
+  base: "/",
   plugins: [react()],
   resolve: {
     alias: {

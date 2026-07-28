@@ -1,4 +1,3 @@
-import { createClient } from "@libsql/client/web";
 import type { CaseRecord } from "@/components/CaseLog";
 import type { PatientEntry } from "@/store/patientStore";
 
@@ -107,13 +106,48 @@ async function sha256hex(s: string): Promise<string> {
     .slice(0, 24);
 }
 
-function getClient() {
-  const url = import.meta.env.VITE_TURSO_URL as string | undefined;
-  const authToken = import.meta.env.VITE_TURSO_AUTH_TOKEN as string | undefined;
-  if (!url || !authToken) {
-    throw new Error("Turso not configured. Set VITE_TURSO_URL and VITE_TURSO_AUTH_TOKEN.");
+/**
+ * Live connectivity check — actually calls the Worker's health endpoint
+ * (which itself does a real round-trip to Turso), rather than just assuming
+ * sync works because the code path exists. Used to gate the CaseLog sync UI.
+ */
+export async function checkTursoHealth(): Promise<boolean> {
+  try {
+    const res = await fetch("/api/turso/health");
+    return res.ok;
+  } catch {
+    return false;
   }
-  return createClient({ url: url.replace(/^libsql:\/\//, "https://"), authToken });
+}
+
+/**
+ * Thin client-side stand-in for the subset of the Turso SDK this file uses
+ * (`.execute`, `.batch`). Neither the DB URL nor the auth token ever reach
+ * the browser — both requests go to the Cloudflare Worker proxy (see
+ * cf-worker/src/index.ts), which holds the real Turso credentials as a
+ * server-side secret and is itself gated by Cloudflare Access.
+ */
+function getClient() {
+  async function post(path: string, body: unknown): Promise<Record<string, unknown>> {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error((data as { error?: string })?.error ?? `Turso proxy error (${res.status})`);
+    return data as Record<string, unknown>;
+  }
+  return {
+    execute: async (sql: string, args: (string | number | null)[] = []) => {
+      const data = await post("/api/turso/execute", { sql, args });
+      return { rows: data.rows as unknown[][], columns: data.columns as string[] };
+    },
+    batch: async (statements: { sql: string; args: (string | number | null)[] }[], _mode: "write") => {
+      void _mode; // kept for call-site parity with the real SDK's signature
+      await post("/api/turso/batch", { statements });
+    },
+  };
 }
 
 /**
@@ -291,4 +325,47 @@ export async function pullCases(
 
   if (idMapDirty) saveIdMap(idMap);
   return { records, library: restoredLibrary };
+}
+
+// ── Patient-link sharing ──────────────────────────────────────────────────
+// Deliberately a separate table from case_log above: sharing a case with a
+// patient (via /patient/<id>) is not the same thing as logging it into the
+// aggregate research case log, and the two shouldn't be conflated — this
+// table exists only so a short /patient/<id> link can be resolved server-
+// side instead of embedding the whole (often very long) record in the URL.
+const SHARE_CREATE_SQL = `CREATE TABLE IF NOT EXISTS patient_shares (
+  id TEXT PRIMARY KEY,
+  record TEXT NOT NULL,
+  created_at TEXT NOT NULL
+)`;
+
+/** Upserts one case for patient-link sharing, keyed by its share id. */
+export async function saveShareCase(id: string, record: unknown): Promise<void> {
+  const client = getClient();
+  await client.execute(SHARE_CREATE_SQL);
+  await client.batch(
+    [
+      {
+        sql: "INSERT OR REPLACE INTO patient_shares (id, record, created_at) VALUES (?, ?, ?)",
+        args: [id, JSON.stringify(record), new Date().toISOString()],
+      },
+    ],
+    "write",
+  );
+}
+
+/** Fetches one case previously saved with `saveShareCase`, or null if not found. */
+export async function loadShareCase(id: string): Promise<unknown | null> {
+  const client = getClient();
+  const result = await client.execute("SELECT record FROM patient_shares WHERE id = ?", [id]);
+  const row = result.rows[0];
+  if (!row) return null;
+  const recordIdx = result.columns.indexOf("record");
+  const raw = row[recordIdx];
+  if (typeof raw !== "string") return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }

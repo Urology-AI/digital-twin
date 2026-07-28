@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "compass-spa-fallback",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-27",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  // Bind this Worker to the app's domain — requests hit this Worker first,
+  // then it fetches from GitHub Pages. Update to your real domain.
+  "routes": [
+    { "pattern": "digital-twin.urology.edu.eu.org/*", "zone_name": "urology.edu.eu.org" }
+  ],
+  "vars": {
+    // Your GitHub Pages origin, e.g. "https://<org>.github.io" (project
+    // pages: include the repo path too, e.g. ".../repo-name").
+    "GITHUB_PAGES_ORIGIN": "https://urology-ai.github.io/digital-twin/"
+  }
+  // TURSO_URL and TURSO_AUTH_TOKEN are both secrets — never put them here.
+  // Set them with:
+  //   npx wrangler secret put TURSO_URL
+  //   npx wrangler secret put TURSO_AUTH_TOKEN
+}

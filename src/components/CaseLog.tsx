@@ -5,12 +5,9 @@ import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydrateP
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { cn } from "@/lib/utils";
-import { pushCases, pullCases } from "@/lib/turso";
+import { pushCases, pullCases, checkTursoHealth } from "@/lib/turso";
 
 const CASE_LOG_KEY = "compass_cases";
-const TURSO_ENABLED = !!(
-  import.meta.env.VITE_TURSO_URL && import.meta.env.VITE_TURSO_AUTH_TOKEN
-);
 
 export interface CaseRecord {
   id: string;
@@ -131,7 +128,16 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
   const [cases, setCases] = useState<CaseRecord[]>([]);
   const [syncStatus, setSyncStatus] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
+  // null = still checking. A real round-trip to the Worker/Turso, not just
+  // "does the code path exist" — reflects whether sync will actually work.
+  const [tursoAvailable, setTursoAvailable] = useState<boolean | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    checkTursoHealth().then((ok) => { if (!cancelled) setTursoAvailable(ok); });
+    return () => { cancelled = true; };
+  }, []);
 
   const handlePush = async () => {
     setSyncing(true);
@@ -418,7 +424,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
           <Button size="sm" variant="outline" onClick={exportCSV}>
             Export CSV
           </Button>
-          {TURSO_ENABLED && (
+          {tursoAvailable && (
             <>
               <Button
                 size="sm"
@@ -447,12 +453,15 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
           </Button>
         </div>
 
-        {TURSO_ENABLED && syncStatus && (
+        {tursoAvailable && syncStatus && (
           <p className="mb-3 text-[11px] text-muted-foreground">{syncStatus}</p>
         )}
-        {!TURSO_ENABLED && (
+        {tursoAvailable === null && (
+          <p className="mb-3 text-[11px] text-muted-foreground">Checking cloud sync…</p>
+        )}
+        {tursoAvailable === false && (
           <p className="mb-3 rounded border border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-[10px] text-amber-500">
-            Cloud sync disabled — set VITE_TURSO_URL and VITE_TURSO_AUTH_TOKEN to enable.
+            Cloud sync unavailable — the Worker/Turso didn't respond to a health check.
           </p>
         )}
 
