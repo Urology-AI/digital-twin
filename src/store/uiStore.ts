@@ -72,6 +72,7 @@ interface UiState {
   printReportOpen: boolean;
   referenceOpen: boolean;
   creditsOpen: boolean;
+  shareOpen: boolean;
   chatOpen: boolean;
   welcomeOpen: boolean;
   explainKey: string | null;
@@ -99,6 +100,7 @@ interface UiState {
   toggleLesionsOnly: () => void;
   setInfoOpen: (v: boolean) => void;
   setCaseLogOpen: (v: boolean) => void;
+  setShareOpen: (v: boolean) => void;
   setPrintReportOpen: (v: boolean) => void;
   setReferenceOpen: (v: boolean) => void;
   setCreditsOpen: (v: boolean) => void;
@@ -133,6 +135,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   lesionsOnly: false,
   infoOpen: false,
   caseLogOpen: false,
+  shareOpen: false,
   printReportOpen: false,
   referenceOpen: false,
   creditsOpen: false,
@@ -156,6 +159,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   toggleLesionsOnly: () => set({ lesionsOnly: !get().lesionsOnly }),
   setInfoOpen: (v) => set({ infoOpen: v }),
   setCaseLogOpen: (v) => set({ caseLogOpen: v }),
+  setShareOpen: (v) => set({ shareOpen: v }),
   setPrintReportOpen: (v) => set({ printReportOpen: v }),
   setReferenceOpen: (v) => set({ referenceOpen: v }),
   setCreditsOpen: (v) => set({ creditsOpen: v }),

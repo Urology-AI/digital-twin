@@ -10,6 +10,7 @@ import { PatientView, PatientViewHeader } from "@/components/PatientView";
 import { ThreeCanvas } from "@/components/ThreeCanvas";
 import { ZoneLabelsOverlay } from "@/components/ZoneLabelsOverlay";
 import { CaseLog } from "@/components/CaseLog";
+import { ShareLinkModal } from "@/components/ShareLinkModal";
 import { ChatWidget } from "@/components/ChatWidget";
 import { InfoPanel } from "@/components/InfoPanel";
 import { ReferencePanel } from "@/components/ReferencePanel";
@@ -73,6 +74,8 @@ export default function App() {
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
   const caseLogOpen = useUiStore((s) => s.caseLogOpen);
   const setCaseLogOpen = useUiStore((s) => s.setCaseLogOpen);
+  const shareOpen = useUiStore((s) => s.shareOpen);
+  const setShareOpen = useUiStore((s) => s.setShareOpen);
   const referenceOpen = useUiStore((s) => s.referenceOpen);
   const setReferenceOpen = useUiStore((s) => s.setReferenceOpen);
   const explainKey = useUiStore((s) => s.explainKey);
@@ -250,6 +253,10 @@ export default function App() {
 
       {caseLogOpen && (
         <CaseLog onClose={() => setCaseLogOpen(false)} />
+      )}
+
+      {shareOpen && (
+        <ShareLinkModal onClose={() => setShareOpen(false)} />
       )}
 
       {referenceOpen && (
