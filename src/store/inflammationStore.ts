@@ -16,7 +16,7 @@ import {
   type PatientInflammationInput,
   type SideInflammationInput,
 } from "@/types/inflammation";
-import { DEFAULT_INFLAMMATION_CONFIG } from "@/lib/inflammation/model";
+import { DEFAULT_INFLAMMATION_CONFIG, OUTCOME_KEYS } from "@/lib/inflammation/model";
 
 const STORAGE_KEY = "compass-ppi-standalone-v1";
 
@@ -34,6 +34,8 @@ interface InflammationStoreState {
     field: K,
     value: SideInflammationInput[K],
   ) => void;
+  /** Copies all non-outcome fields from one side to the other; each side's own ground-truth fields are left untouched. */
+  mirrorSide: (from: "L" | "R", to: "L" | "R") => void;
   /** Validates `cfg` against `inflammationConfigSchema` before applying it. */
   applyCfgJson: (raw: string) => { ok: true } | { ok: false; error: string };
   resetCfg: () => void;
@@ -116,6 +118,18 @@ export const useInflammationStore = create<InflammationStoreState>((set, get) =>
   setSideField: (side, field, value) => {
     const nextSide = { ...get().sides[side], [field]: value };
     const nextSides = { ...get().sides, [side]: nextSide };
+    set({ sides: nextSides });
+    persist({ patient: get().patient, sides: nextSides, cfg: get().cfg, isCustomCfg: get().isCustomCfg });
+  },
+  mirrorSide: (from, to) => {
+    if (from === to) return;
+    const source = get().sides[from];
+    const target = get().sides[to];
+    const nextTarget = { ...target };
+    for (const [k, v] of Object.entries(source)) {
+      if (!OUTCOME_KEYS.has(k)) (nextTarget as Record<string, unknown>)[k] = v;
+    }
+    const nextSides = { ...get().sides, [to]: nextTarget };
     set({ sides: nextSides });
     persist({ patient: get().patient, sides: nextSides, cfg: get().cfg, isCustomCfg: get().isCustomCfg });
   },
