@@ -35,7 +35,8 @@ import {
   loadSharedCaseFromUrl,
   usePatientStore,
 } from "@/store/patientStore";
-import { useUiStore } from "@/store/uiStore";
+import { useUiStore, readClinicalPath } from "@/store/uiStore";
+import { PublicLandingPage } from "@/components/PublicLandingPage";
 import { cn } from "@/lib/utils";
 
 function DimOverlay() {
@@ -120,6 +121,13 @@ export default function App() {
   const onPredictions = desktopTab === "predictions";
   const patientView3DOpen = useUiStore((s) => s.patientView3DOpen);
   const setPatientView3DOpen = useUiStore((s) => s.setPatientView3DOpen);
+
+  // Root ("/") is the only path with no Access application on it, so it
+  // must stay a plain public landing page — the full clinical shell only
+  // renders under /clinical (Access-gated) or for a patient link.
+  if (!patientView && !readClinicalPath()) {
+    return <PublicLandingPage />;
+  }
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
