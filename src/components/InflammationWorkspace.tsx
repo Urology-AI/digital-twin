@@ -7,7 +7,11 @@ import { cn } from "@/lib/utils";
 import { useInflammationStore } from "@/store/inflammationStore";
 import { DEFAULT_INFLAMMATION_CONFIG, nsGrade, scoreSide } from "@/lib/inflammation/model";
 import { exportCSV, saveJSON } from "@/lib/inflammation/exportRow";
+import { validateCohort, type CohortValidationSummary } from "@/lib/inflammation/validation";
+import { cohortSchema } from "@/types/inflammation";
+import { InflammationSourcesModal } from "@/components/InflammationSourcesModal";
 import type {
+  InflammationConfig,
   PatientInflammationInput,
   SideInflammationInput,
   SideInflammationResult,
@@ -18,38 +22,40 @@ import type {
 /* ---------------------------------------------------------------------- */
 
 type FieldDef<T> =
-  | { id: keyof T; t: "num"; l: string; h?: string; step?: number }
+  | { id: keyof T; t: "num"; l: string; h?: string; step?: number; plausible?: [number, number] }
   | { id: keyof T; t: "sel"; l: string; h?: string; o: [string, string][] }
   | { id: keyof T; t: "chk"; l: string }
   | { group: string };
 
 const PATIENT_FIELDS: FieldDef<PatientInflammationInput>[] = [
-  { id: "psa", t: "num", l: "Serum PSA", h: "ng/mL", step: 0.1 },
-  { id: "vol", t: "num", l: "Prostate volume", h: "mL", step: 1 },
+  { id: "psa", t: "num", l: "Serum PSA", h: "ng/mL", step: 0.1, plausible: [0.1, 500] },
+  { id: "vol", t: "num", l: "Prostate volume", h: "mL", step: 1, plausible: [10, 200] },
   { id: "priorBx", t: "sel", l: "Prior biopsy sessions", h: "count", o: [["", "—"], ["1", "1"], ["2", "2"], ["3", "3 or more"]] },
   { id: "route", t: "sel", l: "Biopsy route", h: "approach", o: [["", "—"], ["tp", "Transperineal"], ["tr", "Transrectal"]] },
-  { id: "bxMri", t: "num", l: "Biopsy → MRI interval", h: "days", step: 1 },
-  { id: "bxSurg", t: "num", l: "Biopsy → surgery interval", h: "days", step: 1 },
-  { id: "bmi", t: "num", l: "BMI", h: "kg/m²", step: 0.1 },
+  { id: "bxMri", t: "num", l: "Biopsy → MRI interval", h: "days", step: 1, plausible: [0, 365] },
+  { id: "bxSurg", t: "num", l: "Biopsy → surgery interval", h: "days", step: 1, plausible: [0, 365] },
+  { id: "bmi", t: "num", l: "BMI", h: "kg/m²", step: 0.1, plausible: [14, 60] },
   { id: "mets", t: "sel", l: "Metabolic syndrome components", h: "0–5", o: [["", "—"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"]] },
-  { id: "crp", t: "num", l: "CRP", h: "mg/L", step: 0.1 },
-  { id: "nlr", t: "num", l: "Neutrophil–lymphocyte ratio", h: "ratio", step: 0.1 },
+  { id: "crp", t: "num", l: "CRP", h: "mg/L", step: 0.1, plausible: [0, 200] },
+  { id: "nlr", t: "num", l: "Neutrophil–lymphocyte ratio", h: "ratio", step: 0.1, plausible: [0.3, 20] },
   { id: "priorIntv", t: "chk", l: "Prior TURP, focal therapy, BCG, or documented chronic prostatitis" },
+  { id: "psaPrior", t: "num", l: "Prior PSA (earlier timepoint)", h: "ng/mL", step: 0.1, plausible: [0.1, 500] },
+  { id: "psaPriorMonths", t: "num", l: "Interval since prior PSA", h: "months", step: 1, plausible: [0, 120] },
 ];
 
 const SIDE_FIELDS: FieldDef<SideInflammationInput>[] = [
   { group: "MRI — capsular interface geometry" },
-  { id: "ccl", t: "num", l: "Capsular contact length", h: "mm", step: 1 },
-  { id: "angle", t: "num", l: "Contact angle", h: "degrees", step: 1 },
+  { id: "ccl", t: "num", l: "Capsular contact length", h: "mm", step: 1, plausible: [0, 60] },
+  { id: "angle", t: "num", l: "Contact angle", h: "degrees", step: 1, plausible: [0, 180] },
   { id: "caps", t: "sel", l: "Capsular integrity", h: "0–2", o: [["", "—"], ["0", "0 intact"], ["1", "1 thinned"], ["2", "2 interrupted"]] },
   { id: "epeGr", t: "sel", l: "Mehralivand EPE grade", h: "0–3", o: [["", "—"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"]] },
   { id: "morph", t: "sel", l: "Periprostatic abnormality shape", h: "pattern", o: [["", "—"], ["nod", "Nodular / mass-like"], ["band", "Band, wedge or reticular"], ["none", "No periprostatic change"]] },
   { id: "anch", t: "sel", l: "Contiguous with PI-RADS 4–5 lesion", h: "anchoring", o: [["", "—"], ["yes", "Yes — anchored"], ["no", "No — free-standing"]] },
 
   { group: "MRI — quantitative" },
-  { id: "adcI", t: "num", l: "ADC at tumour–capsule interface", h: "×10⁻³", step: 0.01 },
-  { id: "adcL", t: "num", l: "ADC of index lesion core", h: "×10⁻³", step: 0.01 },
-  { id: "t2Ratio", t: "num", l: "T2 signal ratio (interface / contralateral fat)", h: "ratio", step: 0.01 },
+  { id: "adcI", t: "num", l: "ADC at tumour–capsule interface", h: "×10⁻³", step: 0.01, plausible: [0.3, 2.5] },
+  { id: "adcL", t: "num", l: "ADC of index lesion core", h: "×10⁻³", step: 0.01, plausible: [0.3, 2.5] },
+  { id: "t2Ratio", t: "num", l: "T2 signal ratio (interface / contralateral fat)", h: "ratio", step: 0.01, plausible: [0.3, 3] },
   { id: "dce", t: "sel", l: "DCE curve at the interface", h: "type", o: [["", "—"], ["3", "Type 3 washout"], ["12", "Type 1–2, rim or delayed"]] },
   { id: "t1hi", t: "chk", l: "T1 hyperintensity at capsule (haemorrhage or thrombosed vein)" },
 
@@ -60,13 +66,14 @@ const SIDE_FIELDS: FieldDef<SideInflammationInput>[] = [
   { id: "vein", t: "chk", l: "Prominent or asymmetric periprostatic venous plexus" },
 
   { group: "Periprostatic adipose tissue (PPAT)" },
-  { id: "rwo", t: "num", l: "Chemical-shift water:oil ratio (RWO)", h: "index", step: 1 },
+  { id: "rwo", t: "num", l: "Chemical-shift water:oil ratio (RWO)", h: "index", step: 1, plausible: [0, 100] },
   { id: "ppatFibrosis", t: "chk", l: "High PPAT radiomic fiber complexity (T1W)" },
   { id: "ppatGeom", t: "chk", l: "Altered PPAT geometric shape descriptors" },
 
   { group: "PSMA PET" },
-  { id: "suvL", t: "num", l: "SUVmax of index intraprostatic lesion", h: "SUV", step: 0.1 },
-  { id: "suvP", t: "num", l: "SUVmax at the capsular contact", h: "SUV", step: 0.1 },
+  { id: "suvL", t: "num", l: "SUVmax of index intraprostatic lesion", h: "SUV", step: 0.1, plausible: [0, 40] },
+  { id: "suvP", t: "num", l: "SUVmax at the capsular contact", h: "SUV", step: 0.1, plausible: [0, 40] },
+  { id: "psmaFocalUptake", t: "chk", l: "Focal periprostatic uptake, distinct from lesion (not diffuse/background)" },
 
   { group: "Micro-ultrasound (ExactVu)" },
   { id: "mus1", t: "chk", l: "Capsular bulging" },
@@ -76,21 +83,52 @@ const SIDE_FIELDS: FieldDef<SideInflammationInput>[] = [
 
   { group: "Biopsy — oncological" },
   { id: "gg", t: "sel", l: "Highest ipsilateral grade group", h: "1–5", o: [["", "—"], ["1", "GG 1"], ["2", "GG 2"], ["3", "GG 3"], ["4", "GG 4"], ["5", "GG 5"]] },
-  { id: "posC", t: "num", l: "Ipsilateral positive cores", h: "percent", step: 1 },
-  { id: "maxI", t: "num", l: "Greatest single-core involvement", h: "percent", step: 1 },
+  { id: "posC", t: "num", l: "Ipsilateral positive cores", h: "percent", step: 1, plausible: [0, 100] },
+  { id: "maxI", t: "num", l: "Greatest single-core involvement", h: "percent", step: 1, plausible: [0, 100] },
   { id: "pni", t: "chk", l: "Perineural invasion in ipsilateral cores" },
 
   { group: "Biopsy — inflammatory" },
   { id: "iraniG", t: "sel", l: "Irani G (stromal infiltrate)", h: "0–3", o: [["", "—"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"]] },
   { id: "iraniA", t: "sel", l: "Irani A (glandular aggressiveness)", h: "0–3", o: [["", "—"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"]] },
   { id: "gran", t: "chk", l: "Granulomatous inflammation reported" },
-  { id: "nCores", t: "num", l: "Ipsilateral cores taken", h: "count", step: 1 },
+  { id: "nCores", t: "num", l: "Ipsilateral cores taken", h: "count", step: 1, plausible: [1, 30] },
+
+  { group: "Interval imaging (kinetics)" },
+  {
+    id: "mriIntervalChange",
+    t: "sel",
+    l: "Interval MRI change, this side's finding",
+    h: "vs. prior MRI",
+    o: [["", "—"], ["growing", "Growing"], ["stable", "Stable"], ["shrinking", "Shrinking"], ["new", "New"]],
+  },
 
   { group: "Outcome — post-op ground truth (optional)" },
   { id: "outEce", t: "sel", l: "Whole-mount ECE, this side", h: "pathology", o: [["", "—"], ["yes", "Yes"], ["no", "No"]] },
   { id: "outInflGrade", t: "sel", l: "Whole-mount periprostatic inflammation grade", h: "0–3", o: [["", "—"], ["0", "0 none"], ["1", "1 mild"], ["2", "2 moderate"], ["3", "3 severe"]] },
   { id: "outPlaneCall", t: "sel", l: "Intraoperative plane actually used (pre-pathology)", h: "NS grade", o: [["", "—"], ["1", "Grade 1 — intrafascial"], ["2", "Grade 2 — interfascial"], ["3", "Grade 3 — wide"], ["4", "Grade 4 — extrafascial"]] },
 ];
+
+const SIDE_FIELD_GROUPS = groupFieldDefs(SIDE_FIELDS);
+
+function isFieldFilled(def: FieldDef<Record<string, unknown>>, value: unknown): boolean {
+  if ("group" in def) return false;
+  if (def.t === "chk") return Boolean(value);
+  return value !== null && value !== undefined && value !== "";
+}
+
+/** Splits a flat field-def list into { group, fields } sections, keyed by preceding `{ group }` markers. */
+function groupFieldDefs<T extends Record<string, unknown>>(defs: FieldDef<T>[]): { group: string; fields: Exclude<FieldDef<T>, { group: string }>[] }[] {
+  const sections: { group: string; fields: Exclude<FieldDef<T>, { group: string }>[] }[] = [];
+  for (const def of defs) {
+    if ("group" in def) {
+      sections.push({ group: def.group, fields: [] });
+      continue;
+    }
+    if (sections.length === 0) sections.push({ group: "General", fields: [] });
+    sections[sections.length - 1]!.fields.push(def);
+  }
+  return sections;
+}
 
 /* ---------------------------------------------------------------------- */
 /* Generic field renderer                                                 */
@@ -137,19 +175,30 @@ function FieldRow<T extends Record<string, unknown>>({
       </div>
     );
   }
+  const numValue = value as number | null;
+  const outOfRange =
+    numValue !== null && numValue !== undefined && def.plausible !== undefined &&
+    (numValue < def.plausible[0] || numValue > def.plausible[1]);
   return (
-    <div className="grid grid-cols-[1fr_100px] items-center gap-2 py-1">
-      <label className="text-xs leading-snug text-foreground">
-        {def.l}
-        {def.h && <span className="ml-1 font-mono text-[10px] text-muted-foreground">{def.h}</span>}
-      </label>
-      <Input
-        type="number"
-        step={def.step ?? 1}
-        value={(value as number) ?? ""}
-        onChange={(e) => onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
-        className="h-8 font-mono text-xs"
-      />
+    <div className="py-1">
+      <div className="grid grid-cols-[1fr_100px] items-center gap-2">
+        <label className="text-xs leading-snug text-foreground">
+          {def.l}
+          {def.h && <span className="ml-1 font-mono text-[10px] text-muted-foreground">{def.h}</span>}
+        </label>
+        <Input
+          type="number"
+          step={def.step ?? 1}
+          value={numValue ?? ""}
+          onChange={(e) => onChange(e.target.value === "" ? null : parseFloat(e.target.value))}
+          className={cn("h-8 font-mono text-xs", outOfRange && "border-amber-500 focus-visible:ring-amber-500/40")}
+        />
+      </div>
+      {outOfRange && def.plausible && (
+        <div className="mt-0.5 flex items-center justify-end gap-1 text-right font-mono text-[10px] text-amber-500">
+          <AlertTriangle className="h-3 w-3 shrink-0" /> outside typical range ({def.plausible[0]}–{def.plausible[1]})
+        </div>
+      )}
     </div>
   );
 }
@@ -205,29 +254,33 @@ function ReadoutCard({
     <Card className="overflow-hidden">
       <CardHeader className="flex-row items-baseline justify-between gap-2 border-b border-border bg-muted/40 py-2.5">
         <CardTitle className="font-mono text-[11px] uppercase tracking-wider">{name}</CardTitle>
-        <span className="font-mono text-xs font-semibold">{gA.label.split(" —")[0]}</span>
+        <span className="font-mono text-xs font-semibold">{r.inflScore.toFixed(0)} / 100</span>
       </CardHeader>
       <CardContent className="space-y-3 pt-4">
         <div>
           <div className="flex items-baseline gap-2">
+            <span className="font-mono text-2xl font-bold text-amber-500">{r.inflScore.toFixed(0)}</span>
+            <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+              inflammation index /100 <span className="opacity-70">(primary outcome)</span>
+            </span>
+          </div>
+          <div className="mt-1.5 h-1.5 rounded-full bg-muted">
+            <div className="h-full rounded-full bg-amber-500" style={{ width: `${r.inflScore}%` }} />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-baseline gap-2">
             <span className="font-mono text-2xl font-bold text-red-500">{r.pAdj.toFixed(1)}%</span>
-            <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">adjusted P(ECE)</span>
+            <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+              adjusted P(ECE) <span className="opacity-70">(secondary outcome)</span>
+            </span>
           </div>
           <div className="font-mono text-[11px] text-muted-foreground">
             unadjusted <b className="text-foreground">{r.pRaw.toFixed(1)}%</b> → λ={r.lambda.toFixed(2)} → correction −{delta.toFixed(1)} pts
           </div>
           <div className="mt-1.5 h-1.5 rounded-full bg-muted">
             <div className="h-full rounded-full bg-red-500" style={{ width: `${Math.max(0, Math.min(100, r.pAdj))}%` }} />
-          </div>
-        </div>
-
-        <div>
-          <div className="flex items-baseline gap-2">
-            <span className="font-mono text-2xl font-bold text-amber-500">{r.inflScore.toFixed(0)}</span>
-            <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">inflammation index /100</span>
-          </div>
-          <div className="mt-1.5 h-1.5 rounded-full bg-muted">
-            <div className="h-full rounded-full bg-amber-500" style={{ width: `${r.inflScore}%` }} />
           </div>
         </div>
 
@@ -383,6 +436,104 @@ function DecisionGrid({ resultL, resultR }: { resultL: SideInflammationResult; r
   );
 }
 
+/* ---------------------------------------------------------------------- */
+/* Cohort validation                                                      */
+/* ---------------------------------------------------------------------- */
+
+function fmtAuc(a: { auc: number | null; nPos: number; nNeg: number }): string {
+  if (a.auc === null) return `n/a (need both outcome classes; nPos=${a.nPos}, nNeg=${a.nNeg})`;
+  return `${a.auc.toFixed(3)} (nPos=${a.nPos}, nNeg=${a.nNeg})`;
+}
+
+function CohortValidationSection({ cfg }: { cfg: InflammationConfig }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [summary, setSummary] = useState<CohortValidationSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <section>
+      <h2 className="mb-2 border-b border-border pb-1.5 font-mono text-[11px] uppercase tracking-wider">
+        Cohort validation
+      </h2>
+      <CardDescription className="mb-3">
+        Upload a JSON array of cases (each shaped like a single "Save case" export: <code className="rounded bg-muted px-1 text-[11px]">{`{ patient, sides: { L, R } }`}</code>)
+        with <code className="rounded bg-muted px-1 text-[11px]">outInflGrade</code> / <code className="rounded bg-muted px-1 text-[11px]">outEce</code> filled
+        in from whole-mount pathology. Reports discrimination (AUC) for the inflammation index against any periprostatic
+        inflammation (primary outcome) and for adjusted P(ECE) against side-specific extracapsular extension (secondary outcome).
+        Runs entirely in the browser — nothing is uploaded anywhere.
+      </CardDescription>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()}>
+          <Upload className="h-3.5 w-3.5" /> Load cohort (JSON array)
+        </Button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              let parsed: unknown;
+              try {
+                parsed = JSON.parse(String(ev.target?.result));
+              } catch (err) {
+                setError(`Could not parse JSON: ${err instanceof Error ? err.message : String(err)}`);
+                setSummary(null);
+                return;
+              }
+              const result = cohortSchema.safeParse(parsed);
+              if (!result.success) {
+                setError(result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+                setSummary(null);
+                return;
+              }
+              setError(null);
+              setSummary(validateCohort(result.data, cfg));
+            };
+            reader.readAsText(file);
+            e.target.value = "";
+          }}
+        />
+      </div>
+      {error && (
+        <div className="mt-2 flex items-center gap-1.5 text-xs text-red-500">
+          <AlertTriangle className="h-3.5 w-3.5" /> {error}
+        </div>
+      )}
+      {summary && (
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Card>
+            <CardHeader className="border-b border-border bg-muted/40 py-2">
+              <CardTitle className="font-mono text-[11px] uppercase tracking-wider">
+                Inflammation index — primary outcome
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-3 font-mono text-xs">
+              AUC vs. any periprostatic inflammation, whole-mount: <b>{fmtAuc(summary.inflammation)}</b>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="border-b border-border bg-muted/40 py-2">
+              <CardTitle className="font-mono text-[11px] uppercase tracking-wider">
+                Adjusted P(ECE) — secondary outcome
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-3 font-mono text-xs">
+              AUC vs. whole-mount ECE, this side: <b>{fmtAuc(summary.epe)}</b>
+            </CardContent>
+          </Card>
+          <div className="font-mono text-[11px] text-muted-foreground sm:col-span-2">
+            {summary.nCases} case{summary.nCases === 1 ? "" : "s"} loaded, {summary.nSidesScored} side{summary.nSidesScored === 1 ? "" : "s"} with at least one field entered.
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function InflammationWorkspace() {
   const patient = useInflammationStore((s) => s.patient);
   const sides = useInflammationStore((s) => s.sides);
@@ -390,6 +541,7 @@ export function InflammationWorkspace() {
   const isCustomCfg = useInflammationStore((s) => s.isCustomCfg);
   const setPatientField = useInflammationStore((s) => s.setPatientField);
   const setSideField = useInflammationStore((s) => s.setSideField);
+  const mirrorSide = useInflammationStore((s) => s.mirrorSide);
   const applyCfgJson = useInflammationStore((s) => s.applyCfgJson);
   const resetCfg = useInflammationStore((s) => s.resetCfg);
   const clearAll = useInflammationStore((s) => s.clearAll);
@@ -408,18 +560,25 @@ export function InflammationWorkspace() {
     resultR.touched > 0;
 
   const [hasRun, setHasRun] = useState(false);
+  const [showSources, setShowSources] = useState(false);
 
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto overflow-x-hidden overscroll-contain app-scroll px-5 py-5" data-tutorial="inflammation">
       <div className="mx-auto w-full max-w-6xl space-y-6">
-        <div className="rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-xs leading-relaxed text-red-700 dark:text-red-300">
-          <b>Experimental feature — not a validated nomogram, not for clinical use.</b> Every coefficient below is
-          an expert prior derived from published effect directions, not a fitted regression coefficient. This tool
-          is deliberately kept separate from the main COMPASS ECE prediction until it is fitted on real whole-mount
-          outcome data and merged by design decision. Use it to standardise data capture and structure the
-          nerve-sparing discussion — not as a sole determinant of surgical plane.
-          {isCustomCfg && <span className="ml-1 font-semibold">Custom coefficients active.</span>}
+        <div className="flex items-start justify-between gap-3 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-xs leading-relaxed text-red-700 dark:text-red-300">
+          <div>
+            <b>Experimental feature — not a validated nomogram, not for clinical use.</b> Every coefficient below is
+            an expert prior derived from published effect directions, not a fitted regression coefficient. This tool
+            is deliberately kept separate from the main COMPASS ECE prediction until it is fitted on real whole-mount
+            outcome data and merged by design decision. Use it to standardise data capture and structure the
+            nerve-sparing discussion — not as a sole determinant of surgical plane.
+            {isCustomCfg && <span className="ml-1 font-semibold">Custom coefficients active.</span>}
+          </div>
+          <Button size="sm" variant="outline" className="shrink-0 border-red-500/40 text-red-700 hover:bg-red-500/10 dark:text-red-300" onClick={() => setShowSources(true)}>
+            Sources
+          </Button>
         </div>
+        {showSources && <InflammationSourcesModal onClose={() => setShowSources(false)} />}
 
         {/* Patient-level */}
         <section>
@@ -445,7 +604,12 @@ export function InflammationWorkspace() {
 
         {/* Side-specific entry */}
         <section>
-          <h2 className="mb-2 border-b border-border pb-1.5 font-mono text-[11px] uppercase tracking-wider">Side-specific entry</h2>
+          <div className="mb-2 flex items-center justify-between border-b border-border pb-1.5">
+            <h2 className="font-mono text-[11px] uppercase tracking-wider">Side-specific entry</h2>
+            <Button size="sm" variant="ghost" onClick={() => mirrorSide("L", "R")}>
+              Mirror left → right
+            </Button>
+          </div>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {(["L", "R"] as const).map((s) => (
               <Card key={s}>
@@ -453,21 +617,33 @@ export function InflammationWorkspace() {
                   <CardTitle className="font-mono text-xs uppercase tracking-wider">{s === "L" ? "Left lobe" : "Right lobe"}</CardTitle>
                   <span className="font-mono text-[10px] text-muted-foreground">{s === "L" ? resultL.touched : resultR.touched} fields</span>
                 </CardHeader>
-                <CardContent className="pt-3">
-                  {SIDE_FIELDS.map((f, i) =>
-                    "group" in f ? (
-                      <h3 key={f.group + i} className="mb-1 mt-4 font-mono text-[10px] uppercase tracking-wide text-muted-foreground first:mt-0">
-                        {f.group}
-                      </h3>
-                    ) : (
-                      <FieldRow
-                        key={String(f.id) + i}
-                        def={f}
-                        value={sides[s][f.id]}
-                        onChange={(v) => setSideField(s, f.id, v as never)}
-                      />
-                    ),
-                  )}
+                <CardContent className="pt-1">
+                  {SIDE_FIELD_GROUPS.map((g, gi) => {
+                    const isOutcome = g.group.startsWith("Outcome");
+                    const filled = g.fields.filter((f) => isFieldFilled(f, sides[s][f.id])).length;
+                    return (
+                      <details key={g.group} className="border-b border-border py-1 last:border-b-0" open={gi === 0}>
+                        <summary className="flex cursor-pointer items-center justify-between py-1.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                          <span>{g.group}</span>
+                          {!isOutcome && (
+                            <span className={cn("font-mono text-[10px] normal-case", filled > 0 ? "text-foreground" : "text-muted-foreground")}>
+                              {filled}/{g.fields.length}
+                            </span>
+                          )}
+                        </summary>
+                        <div className="pb-1">
+                          {g.fields.map((f, i) => (
+                            <FieldRow
+                              key={String(f.id) + i}
+                              def={f}
+                              value={sides[s][f.id]}
+                              onChange={(v) => setSideField(s, f.id, v as never)}
+                            />
+                          ))}
+                        </div>
+                      </details>
+                    );
+                  })}
                 </CardContent>
               </Card>
             ))}
@@ -619,6 +795,9 @@ export function InflammationWorkspace() {
 
         {/* Decision grid */}
         {hasRun && <DecisionGrid resultL={resultL} resultR={resultR} />}
+
+        {/* Cohort validation */}
+        <CohortValidationSection cfg={cfg} />
       </div>
     </div>
   );

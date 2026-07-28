@@ -32,6 +32,9 @@ export const patientInflammationInputSchema = z.object({
   crp: nnum,
   nlr: nnum,
   priorIntv: z.boolean(),
+  // Longitudinal kinetics
+  psaPrior: nnum,
+  psaPriorMonths: nnum,
 });
 export type PatientInflammationInput = z.infer<typeof patientInflammationInputSchema>;
 
@@ -61,6 +64,7 @@ export const sideInflammationInputSchema = z.object({
   // PSMA PET
   suvL: nnum,
   suvP: nnum,
+  psmaFocalUptake: z.boolean(),
   // Micro-ultrasound
   mus1: z.boolean(),
   mus2: z.boolean(),
@@ -76,6 +80,8 @@ export const sideInflammationInputSchema = z.object({
   iraniA: nenum(["0", "1", "2", "3"]),
   gran: z.boolean(),
   nCores: nnum,
+  // Longitudinal kinetics
+  mriIntervalChange: nenum(["growing", "stable", "shrinking", "new"]),
   // Outcome (post-op ground truth — optional, filled in after pathology)
   outEce: nenum(["yes", "no"]),
   outInflGrade: nenum(["0", "1", "2", "3"]),
@@ -87,6 +93,7 @@ export function emptyPatientInput(): PatientInflammationInput {
   return {
     psa: null, vol: null, priorBx: null, route: null, bxMri: null, bxSurg: null,
     bmi: null, mets: null, crp: null, nlr: null, priorIntv: false,
+    psaPrior: null, psaPriorMonths: null,
   };
 }
 
@@ -96,10 +103,11 @@ export function emptySideInput(): SideInflammationInput {
     adcI: null, adcL: null, t2Ratio: null, dce: null, t1hi: false,
     fatPl: null, pdff: false, sym: false, vein: false,
     rwo: null, ppatFibrosis: false, ppatGeom: false,
-    suvL: null, suvP: null,
+    suvL: null, suvP: null, psmaFocalUptake: false,
     mus1: false, mus2: false, mus3: false, mus4: false,
     gg: null, posC: null, maxI: null, pni: false,
     iraniG: null, iraniA: null, gran: false, nCores: null,
+    mriIntervalChange: null,
     outEce: null, outInflGrade: null, outPlaneCall: null,
   };
 }
@@ -117,6 +125,8 @@ export const inflammationConfigSchema = z.object({
   eceHard: z.object({
     gg: rec(["1", "2", "3", "4", "5"]),
     posCoresPer100: num,
+    posCoresThirdPct: num,
+    posCoresThird: num,
     maxInvolPer100: num,
     pni: num,
     psadPerUnit: num,
@@ -126,6 +136,7 @@ export const inflammationConfigSchema = z.object({
     psmaRatioMid: num,
     psmaRatioLow: num,
     psmaIndexHot: num,
+    psmaFocalUptake: num,
   }),
   eceSoft: z.object({
     cclPerMm: num,
@@ -181,9 +192,26 @@ export const inflammationConfigSchema = z.object({
     crpHigh: num,
     nlrHigh: num,
   }),
+  kinetics: z.object({
+    psaVelocityThreshold: num,
+    psaVelocityEceHard: num,
+    psaVelocityDecliningInfl: num,
+    mriGrowingEceSoft: num,
+    mriShrinkingEceSoft: num,
+    mriShrinkingInfl: num,
+    mriStableInfl: num,
+  }),
   inflMax: num,
 });
 export type InflammationConfig = z.infer<typeof inflammationConfigSchema>;
+
+export const cohortCaseSchema = z.object({
+  patient: patientInflammationInputSchema,
+  sides: z.object({ L: sideInflammationInputSchema, R: sideInflammationInputSchema }),
+});
+export type CohortCase = z.infer<typeof cohortCaseSchema>;
+
+export const cohortSchema = z.array(cohortCaseSchema);
 
 export interface WeightedTerm {
   label: string;

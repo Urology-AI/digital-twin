@@ -31,6 +31,8 @@ export const DEFAULT_INFLAMMATION_CONFIG: InflammationConfig = {
   eceHard: {
     gg: { "1": 0.00, "2": 0.55, "3": 1.05, "4": 1.50, "5": 1.90 },
     posCoresPer100: 1.20,
+    posCoresThirdPct: 33.34,
+    posCoresThird: 1.41,
     maxInvolPer100: 0.80,
     pni: 0.45,
     psadPerUnit: 3.00,
@@ -40,6 +42,7 @@ export const DEFAULT_INFLAMMATION_CONFIG: InflammationConfig = {
     psmaRatioMid: 0.40,
     psmaRatioLow: -0.30,
     psmaIndexHot: 0.50,
+    psmaFocalUptake: 0.65,
   },
   eceSoft: {
     cclPerMm: 0.09,
@@ -95,6 +98,15 @@ export const DEFAULT_INFLAMMATION_CONFIG: InflammationConfig = {
     crpHigh: 3,
     nlrHigh: 3,
   },
+  kinetics: {
+    psaVelocityThreshold: 0.75,
+    psaVelocityEceHard: 0.50,
+    psaVelocityDecliningInfl: 8,
+    mriGrowingEceSoft: 0.60,
+    mriShrinkingEceSoft: -0.60,
+    mriShrinkingInfl: 10,
+    mriStableInfl: 5,
+  },
   inflMax: 155,
 };
 
@@ -102,7 +114,7 @@ function add(arr: WeightedTerm[], label: string, value: number | null | undefine
   if (value) arr.push({ label, value });
 }
 
-const OUTCOME_KEYS = new Set(["outEce", "outInflGrade", "outPlaneCall"]);
+export const OUTCOME_KEYS = new Set(["outEce", "outInflGrade", "outPlaneCall"]);
 
 /** Count non-blank fields entered for a side, for the "sparse input" flag. Excludes outcome/ground-truth fields. */
 export function countTouchedSideFields(side: SideInflammationInput): number {
@@ -130,6 +142,7 @@ export function scoreSide(
 
   if (side.posC !== null) {
     add(hardTerms, `Positive cores ${side.posC}%`, (side.posC / 100) * H.posCoresPer100);
+    if (side.posC >= H.posCoresThirdPct) add(hardTerms, "Ipsilateral cores ≥1/3 positive", H.posCoresThird);
   }
   if (side.maxI !== null) {
     add(hardTerms, `Core involvement ${side.maxI}%`, (side.maxI / 100) * H.maxInvolPer100);
@@ -153,6 +166,16 @@ export function scoreSide(
     add(hardTerms, `PSMA periprostatic:lesion ${suvRatio.toFixed(2)}`, w);
   }
   if (side.suvL !== null && side.suvL >= 13) add(hardTerms, "Lesion SUVmax ≥13", H.psmaIndexHot);
+  if (side.psmaFocalUptake) add(hardTerms, "Focal periprostatic PSMA uptake", H.psmaFocalUptake);
+
+  // ---- Kinetics: PSA velocity (progressive rise argues against inflammation) ----
+  let psaVelocity: number | null = null;
+  if (patient.psa !== null && patient.psaPrior !== null && patient.psaPriorMonths && patient.psaPriorMonths > 0) {
+    psaVelocity = ((patient.psa - patient.psaPrior) / patient.psaPriorMonths) * 12;
+    if (psaVelocity >= cfg.kinetics.psaVelocityThreshold) {
+      add(hardTerms, `PSA velocity ${psaVelocity.toFixed(2)} ng/mL/yr`, cfg.kinetics.psaVelocityEceHard);
+    }
+  }
 
   // ---- ECE: soft terms ----
   if (side.ccl !== null) {
@@ -219,6 +242,12 @@ export function scoreSide(
   if (side.ppatFibrosis) add(softTerms, "High PPAT radiomic fiber complexity", S.ppatFibrosisHigh);
   if (side.ppatGeom) add(softTerms, "Altered PPAT geometric shape", S.ppatGeomAltered);
 
+  if (side.mriIntervalChange === "growing") {
+    add(softTerms, "Interval MRI: growing", cfg.kinetics.mriGrowingEceSoft);
+  } else if (side.mriIntervalChange === "shrinking") {
+    add(softTerms, "Interval MRI: shrinking", cfg.kinetics.mriShrinkingEceSoft);
+  }
+
   // ---- Inflammation axis ----
   if (side.iraniG) add(inflTerms, `Irani G ${side.iraniG}`, Number(side.iraniG) * I.iraniG);
   if (side.iraniA) add(inflTerms, `Irani A ${side.iraniA}`, Number(side.iraniA) * I.iraniA);
@@ -248,6 +277,15 @@ export function scoreSide(
   if (patient.mets && Number(patient.mets) >= 3) add(inflTerms, "MetS ≥3 components", I.mets3);
   if (patient.crp !== null && patient.crp > 2.5) add(inflTerms, "CRP >2.5 mg/L", I.crpHigh);
   if (patient.nlr !== null && patient.nlr >= 3) add(inflTerms, "NLR ≥3", I.nlrHigh);
+
+  if (psaVelocity !== null && psaVelocity < 0) {
+    add(inflTerms, `PSA declining ${psaVelocity.toFixed(2)} ng/mL/yr`, cfg.kinetics.psaVelocityDecliningInfl);
+  }
+  if (side.mriIntervalChange === "shrinking") {
+    add(inflTerms, "Interval MRI: shrinking", cfg.kinetics.mriShrinkingInfl);
+  } else if (side.mriIntervalChange === "stable") {
+    add(inflTerms, "Interval MRI: stable", cfg.kinetics.mriStableInfl);
+  }
 
   // ---- Assemble ----
   const sum = (a: WeightedTerm[]) => a.reduce((t, w) => t + w.value, 0);
