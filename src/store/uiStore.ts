@@ -107,6 +107,9 @@ interface UiState {
   patientViewLocked: boolean;
   /** Full-screen 3D model overlay, opened on demand from within patient view. */
   patientView3DOpen: boolean;
+  /** Local autosave status, shown as a header dot — reflects localStorage writes only, not cloud sync. */
+  saveStatus: "saving" | "saved";
+  setSaveStatus: (v: "saving" | "saved") => void;
   setDark: (v: boolean) => void;
   setOverlay: (o: OverlayType) => void;
   toggleHeatmap: () => void;
@@ -163,6 +166,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   patientView: initialPatientView,
   patientViewLocked: initialPatientViewLocked,
   patientView3DOpen: false,
+  saveStatus: "saved",
+  setSaveStatus: (v) => set({ saveStatus: v }),
   setDark: (v) => {
     set({ dark: v });
     document.documentElement.classList.toggle("dark", v);

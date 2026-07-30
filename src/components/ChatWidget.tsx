@@ -6,6 +6,7 @@ import {
   MessageCircle,
   Paperclip,
   Send,
+  Settings,
   Wand2,
   X,
 } from "lucide-react";
@@ -19,6 +20,8 @@ import {
 } from "@/lib/api";
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
+import { useApiStatus } from "@/hooks/useApiStatus";
+import { AiSettingsModal } from "@/components/AiSettingsModal";
 import { cn } from "@/lib/utils";
 
 const MAX_TEXT_BYTES = 200_000; // 200 KB per text file
@@ -88,6 +91,8 @@ function hasClinicalData(text: string): boolean {
 export function ChatWidget() {
   const open = useUiStore((s) => s.chatOpen);
   const setOpen = useUiStore((s) => s.setChatOpen);
+  const { status: aiStatus, recheck: recheckAi } = useApiStatus();
+  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
@@ -276,15 +281,42 @@ export function ChatWidget() {
           <MessageCircle className="h-4 w-4 text-primary" />
           COMPASS Assistant
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          aria-label="Close chat"
-          className="text-muted-foreground hover:text-foreground"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setAiSettingsOpen(true)}
+            aria-label="AI settings"
+            title="AI settings"
+            className="relative text-muted-foreground hover:text-foreground"
+          >
+            <Settings className="h-4 w-4" />
+            <span
+              className={cn(
+                "absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full",
+                aiStatus === "connected"    && "bg-emerald-400",
+                aiStatus === "disconnected" && "bg-red-500",
+                aiStatus === "checking"     && "animate-pulse bg-yellow-400",
+              )}
+            />
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            aria-label="Close chat"
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
+
+      {aiSettingsOpen && (
+        <AiSettingsModal
+          status={aiStatus}
+          onRecheck={recheckAi}
+          onClose={() => setAiSettingsOpen(false)}
+        />
+      )}
 
       <div
         ref={scrollRef}

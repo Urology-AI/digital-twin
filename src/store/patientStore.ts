@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { useUiStore } from "@/store/uiStore";
 import { createDefaultZones, createBaseThreeZones } from "@/lib/compass/constants";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { mapLesionsToZones } from "@/lib/compass/lesionZones";
@@ -409,9 +410,12 @@ export function hydrateFromLocalStorage(): void {
   }
 }
 
+let saveStatusResetTimer: ReturnType<typeof setTimeout> | undefined;
+
 export function autosavePatients(): void {
-  const { patients, activeId } = usePatientStore.getState();
+  useUiStore.getState().setSaveStatus("saving");
   try {
+    const { patients, activeId } = usePatientStore.getState();
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({ patients, activeId, _v: STORAGE_VERSION }),
@@ -419,6 +423,8 @@ export function autosavePatients(): void {
   } catch {
     /* noop */
   }
+  clearTimeout(saveStatusResetTimer);
+  saveStatusResetTimer = setTimeout(() => useUiStore.getState().setSaveStatus("saved"), 400);
 }
 
 usePatientStore.subscribe(autosavePatients);
