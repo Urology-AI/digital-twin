@@ -63,6 +63,10 @@ export function WelcomeScreen() {
         aria-hidden
         className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(0,174,239,0.20),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgba(213,0,91,0.16),transparent_55%)]"
       />
+      <div
+        aria-hidden
+        className="pointer-events-none fixed inset-0 opacity-[0.15] dark:opacity-[0.4] [background-image:linear-gradient(rgba(255,255,255,0.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:36px_36px]"
+      />
 
       {/*
         Scrollable-modal pattern:
@@ -129,6 +133,33 @@ export function WelcomeScreen() {
             prostatectomy. Combines clinical data with imaging and genomics to deliver
             patient-specific outcome predictions and side-specific nerve-sparing recommendations.
           </p>
+
+          {/* Impact stats */}
+          <div
+            className="welcome-fade-up mt-[clamp(1rem,3vh,1.5rem)] flex w-full max-w-md items-stretch justify-center divide-x divide-border/60 rounded-lg border border-border/70 bg-card/60 backdrop-blur"
+            style={{ animationDelay: "250ms" }}
+          >
+            {[
+              { value: "5,352", label: "RARP cases" },
+              { value: "9", label: "Prediction models" },
+              { value: "6", label: "Outcomes tracked" },
+            ].map(({ value, label }) => (
+              <div key={label} className="flex flex-1 flex-col items-center gap-0.5 px-3 py-2.5">
+                <span
+                  className="font-black tracking-tight text-primary"
+                  style={{ fontSize: "clamp(1.125rem, 2.2vw, 1.375rem)" }}
+                >
+                  {value}
+                </span>
+                <span
+                  className="text-center font-medium uppercase tracking-wide text-muted-foreground/80"
+                  style={{ fontSize: "clamp(0.5625rem, 1vw, 0.625rem)" }}
+                >
+                  {label}
+                </span>
+              </div>
+            ))}
+          </div>
 
           {/* Feature highlights */}
           <div
