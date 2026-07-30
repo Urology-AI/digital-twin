@@ -111,4 +111,26 @@
   .risk-low  { @apply text-emerald-500; }
   .risk-mid  { @apply text-amber-500; }
   .risk-high { @apply text-red-500; }
+
+  /* Welcome screen entrance stagger */
+  @keyframes welcome-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .welcome-fade-up {
+    animation: welcome-fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .welcome-fade-up {
+      animation: none;
+    }
+  }
 }
