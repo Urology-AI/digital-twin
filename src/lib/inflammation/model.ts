@@ -313,9 +313,24 @@ export function scoreSide(
   };
 }
 
+/** Martini incremental nerve-sparing grade labels, keyed by grade number — shared by
+ *  the P(ECE)-threshold lookup below and by direct display of the digital twin's own
+ *  zone-aware `nsL`/`nsR` grade, so both readouts use identical wording. */
+export const NS_GRADE_BY_NUMBER: Record<1 | 2 | 3 | 4, Omit<NsGradeInfo, "n">> = {
+  1: { label: "Grade 1 — intrafascial", desc: "Plane between periprostatic veins and pseudocapsule." },
+  2: { label: "Grade 2 — interfascial", desc: "Perivenous plane." },
+  3: { label: "Grade 3 — interfascial, wide", desc: "Outside the outer lateral prostatic fascia." },
+  4: { label: "Grade 4 — extrafascial", desc: "Bundle taken with the specimen." },
+};
+
+export function nsGradeByNumber(n: number): NsGradeInfo {
+  const clamped = Math.min(4, Math.max(1, Math.round(n))) as 1 | 2 | 3 | 4;
+  return { n: clamped, ...NS_GRADE_BY_NUMBER[clamped] };
+}
+
 export function nsGrade(p: number): NsGradeInfo {
-  if (p <= 10) return { n: 1, label: "Grade 1 — intrafascial", desc: "Plane between periprostatic veins and pseudocapsule." };
-  if (p <= 21) return { n: 2, label: "Grade 2 — interfascial", desc: "Perivenous plane." };
-  if (p <= 73) return { n: 3, label: "Grade 3 — interfascial, wide", desc: "Outside the outer lateral prostatic fascia." };
-  return { n: 4, label: "Grade 4 — extrafascial", desc: "Bundle taken with the specimen." };
+  if (p <= 10) return { n: 1, ...NS_GRADE_BY_NUMBER[1] };
+  if (p <= 21) return { n: 2, ...NS_GRADE_BY_NUMBER[2] };
+  if (p <= 73) return { n: 3, ...NS_GRADE_BY_NUMBER[3] };
+  return { n: 4, ...NS_GRADE_BY_NUMBER[4] };
 }

@@ -13,11 +13,15 @@ const FIELD_LABELS: Record<string, string> = {
   caps: "Capsular integrity",
   epeGr: "Mehralivand EPE grade",
   morph: "Periprostatic abnormality shape",
+  anch: "Contiguous with PI-RADS 4–5 lesion (anchoring)",
   adcI: "Interface ADC",
   adcL: "Lesion-core ADC",
   t2Ratio: "T2 signal ratio (interface / contralateral fat)",
   dce: "DCE curve type",
   t1hi: "T1 hyperintensity at capsule",
+  fatPl: "Fat plane character",
+  pdff: "Reduced periprostatic fat fraction (Dixon PDFF)",
+  sym: "Bilateral symmetric periprostatic change",
   vein: "Periprostatic venous plexus",
   rwo: "PPAT chemical-shift water:oil ratio",
   ppatFibrosis: "PPAT T1W radiomic fibrosis",
@@ -29,6 +33,7 @@ const FIELD_LABELS: Record<string, string> = {
   mus2: "Micro-US: visible breach",
   mus3: "Micro-US: hypoechoic halo",
   mus4: "Micro-US: vesiculo-prostatic angle",
+  gg: "Highest ipsilateral grade group",
   posC: "Ipsilateral positive cores (incl. ≥1/3 threshold)",
   maxI: "Greatest single-core involvement",
   pni: "Perineural invasion",
@@ -46,21 +51,31 @@ const FIELD_LABELS: Record<string, string> = {
   nlr: "Neutrophil–lymphocyte ratio",
   psad: "PSA density",
   nsGrade: "Martini nerve-sparing grade thresholds",
+  psa: "Serum PSA",
+  vol: "Prostate volume",
+  route: "Biopsy route",
+  psaPrior: "Prior PSA (earlier timepoint)",
+  psaPriorMonths: "Interval since prior PSA",
+  mriIntervalChange: "Interval MRI change, this side's finding",
 };
 
 const DOMAINS: { title: string; fields: string[] }[] = [
-  { title: "MRI — morphology & geometry", fields: ["ccl", "angle", "caps", "epeGr", "morph"] },
-  { title: "MRI — quantitative", fields: ["adcI", "adcL", "t2Ratio", "dce", "t1hi", "vein"] },
+  { title: "MRI — morphology & geometry", fields: ["ccl", "angle", "caps", "epeGr", "morph", "anch"] },
+  { title: "MRI — quantitative", fields: ["adcI", "adcL", "t2Ratio", "dce", "t1hi"] },
+  { title: "Periprostatic soft tissue", fields: ["fatPl", "pdff", "sym", "vein"] },
   { title: "Periprostatic adipose tissue (PPAT)", fields: ["rwo", "ppatFibrosis", "ppatGeom"] },
   { title: "PSMA-PET", fields: ["suvL", "suvP", "psmaFocalUptake"] },
   { title: "Micro-ultrasound", fields: ["mus1", "mus2", "mus3", "mus4"] },
-  { title: "Biopsy — oncological", fields: ["posC", "maxI", "pni"] },
+  { title: "Biopsy — oncological", fields: ["gg", "posC", "maxI", "pni"] },
   { title: "Biopsy — inflammatory & interval", fields: ["iraniG", "iraniA", "gran", "nCores", "priorBx", "bxMri", "bxSurg", "priorIntv"] },
   { title: "Clinical / metabolic", fields: ["bmi", "mets", "crp", "nlr", "psad"] },
   { title: "Nerve-sparing plane mapping", fields: ["nsGrade"] },
 ];
 
-const UNCITED_NOTE_FIELDS = ["psaPrior", "psaPriorMonths", "mriIntervalChange"];
+// Raw clinical values (psa/vol/route feed psad and lesion mapping but carry no threshold
+// of their own) and the PSA-kinetics / interval-imaging fields added after the source
+// literature review — flagged here so the modal never silently omits a field.
+const UNCITED_NOTE_FIELDS = ["psa", "vol", "route", "psaPrior", "psaPriorMonths", "mriIntervalChange"];
 
 function RefBadges({ ns }: { ns: number[] }) {
   return (
@@ -128,9 +143,11 @@ export function InflammationSourcesModal({ onClose }: InflammationSourcesModalPr
                 Not in the source literature review
               </h3>
               <p className="text-xs text-muted-foreground">
-                {UNCITED_NOTE_FIELDS.map((f) => FIELD_LABELS[f] ?? f).join(", ")} — added as coefficients without a
-                specific citation from this reference set; treat their weights as unvalidated placeholders pending a
-                dedicated kinetics literature pass.
+                {UNCITED_NOTE_FIELDS.map((f) => FIELD_LABELS[f] ?? f).join(", ")} — raw clinical values or
+                coefficients added without a specific citation from this reference set (PSA and volume only carry a
+                citation via the derived PSA-density term; the PSA-kinetics and interval-imaging fields were added
+                after the source review). Treat their weights as unvalidated placeholders pending a dedicated
+                literature pass.
               </p>
             </div>
           </section>

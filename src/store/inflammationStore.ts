@@ -17,6 +17,7 @@ import {
   type SideInflammationInput,
 } from "@/types/inflammation";
 import { DEFAULT_INFLAMMATION_CONFIG, OUTCOME_KEYS } from "@/lib/inflammation/model";
+import type { PatientSyncResult } from "@/lib/inflammation/syncFromPatient";
 
 const STORAGE_KEY = "compass-ppi-standalone-v1";
 
@@ -36,6 +37,8 @@ interface InflammationStoreState {
   ) => void;
   /** Copies all non-outcome fields from one side to the other; each side's own ground-truth fields are left untouched. */
   mirrorSide: (from: "L" | "R", to: "L" | "R") => void;
+  /** Fills only currently-empty fields from the active COMPASS patient record; never overwrites a manually entered value. */
+  syncFromPatientRecord: (sync: PatientSyncResult) => void;
   /** Validates `cfg` against `inflammationConfigSchema` before applying it. */
   applyCfgJson: (raw: string) => { ok: true } | { ok: false; error: string };
   resetCfg: () => void;
@@ -132,6 +135,26 @@ export const useInflammationStore = create<InflammationStoreState>((set, get) =>
     const nextSides = { ...get().sides, [to]: nextTarget };
     set({ sides: nextSides });
     persist({ patient: get().patient, sides: nextSides, cfg: get().cfg, isCustomCfg: get().isCustomCfg });
+  },
+  syncFromPatientRecord: (sync) => {
+    const isEmpty = (v: unknown) => v === null || v === undefined || v === false;
+
+    const patient = get().patient;
+    const nextPatient = { ...patient };
+    for (const [k, v] of Object.entries(sync.patient)) {
+      if (isEmpty((nextPatient as Record<string, unknown>)[k])) (nextPatient as Record<string, unknown>)[k] = v;
+    }
+
+    const sides = get().sides;
+    const nextSides = { L: { ...sides.L }, R: { ...sides.R } };
+    (["L", "R"] as const).forEach((side) => {
+      for (const [k, v] of Object.entries(sync.sides[side])) {
+        if (isEmpty((nextSides[side] as Record<string, unknown>)[k])) (nextSides[side] as Record<string, unknown>)[k] = v;
+      }
+    });
+
+    set({ patient: nextPatient, sides: nextSides });
+    persist({ patient: nextPatient, sides: nextSides, cfg: get().cfg, isCustomCfg: get().isCustomCfg });
   },
   applyCfgJson: (raw) => {
     let parsedJson: unknown;
