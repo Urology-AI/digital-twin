@@ -61,7 +61,7 @@ export function WelcomeScreen() {
       {/* Decorative background gradient — Mount Sinai cyan/magenta accents */}
       <div
         aria-hidden
-        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(0,174,239,0.12),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgba(213,0,91,0.10),transparent_55%)]"
+        className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(0,174,239,0.20),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgba(213,0,91,0.16),transparent_55%)]"
       />
 
       {/*
@@ -73,7 +73,10 @@ export function WelcomeScreen() {
       <div className="relative flex min-h-full w-full items-center justify-center px-[clamp(0.75rem,3vw,2rem)] py-[clamp(1rem,4vh,3rem)]">
         <div className="z-10 mx-auto flex w-full max-w-3xl flex-col items-center">
           {/* Mount Sinai logo */}
-          <div className="mb-[clamp(1rem,2.5vh,1.5rem)] flex flex-col items-center gap-3">
+          <div
+            className="welcome-fade-up mb-[clamp(1rem,2.5vh,1.5rem)] flex flex-col items-center gap-3"
+            style={{ animationDelay: "0ms" }}
+          >
             <MountSinaiMark
               className="h-auto w-auto text-foreground"
               style={{ height: "clamp(3rem, 9vh, 4.75rem)" }}
@@ -91,26 +94,36 @@ export function WelcomeScreen() {
           {/* Wordmark + tagline */}
           <h1
             id="welcome-title"
-            className="text-center font-black tracking-tight text-foreground"
-            style={{ fontSize: "clamp(2.75rem, 7.5vw, 4.25rem)", lineHeight: 1.02, letterSpacing: "-0.02em" }}
+            className="welcome-fade-up text-center font-black tracking-tight text-foreground"
+            style={{
+              fontSize: "clamp(2.75rem, 7.5vw, 4.25rem)",
+              lineHeight: 1.02,
+              letterSpacing: "-0.02em",
+              animationDelay: "60ms",
+            }}
           >
             COMPASS
           </h1>
           <p
-            className="mt-2 text-center font-semibold uppercase tracking-[0.22em] text-primary"
-            style={{ fontSize: "clamp(0.75rem, 1.6vw, 1rem)" }}
+            className="welcome-fade-up mt-2 text-center font-semibold uppercase tracking-[0.22em] text-primary"
+            style={{ fontSize: "clamp(0.75rem, 1.6vw, 1rem)", animationDelay: "120ms" }}
           >
             Prostate cancer · Surgical outcomes
           </p>
+          <div
+            className="welcome-fade-up mt-3 h-px w-16 bg-gradient-to-r from-transparent via-primary/40 to-transparent"
+            style={{ animationDelay: "150ms" }}
+            aria-hidden
+          />
           <p
-            className="mt-2 text-center font-medium text-foreground/80"
-            style={{ fontSize: "clamp(0.8125rem, 1.5vw, 0.9375rem)", letterSpacing: "0.01em" }}
+            className="welcome-fade-up mt-3 text-center font-medium text-foreground/80"
+            style={{ fontSize: "clamp(0.8125rem, 1.5vw, 0.9375rem)", letterSpacing: "0.01em", animationDelay: "180ms" }}
           >
             Tewari Lab — Mount Sinai Department of Urology
           </p>
           <p
-            className="mt-4 max-w-2xl text-center leading-relaxed text-muted-foreground"
-            style={{ fontSize: "clamp(0.875rem, 1.7vw, 1.0625rem)" }}
+            className="welcome-fade-up mt-4 max-w-2xl text-center leading-relaxed text-muted-foreground"
+            style={{ fontSize: "clamp(0.875rem, 1.7vw, 1.0625rem)", animationDelay: "220ms" }}
           >
             A 3D decision-support platform for preoperative planning in robot-assisted radical
             prostatectomy. Combines clinical data with imaging and genomics to deliver
@@ -118,14 +131,17 @@ export function WelcomeScreen() {
           </p>
 
           {/* Feature highlights */}
-          <div className="mt-[clamp(1.25rem,3.5vh,2rem)] grid w-full grid-cols-1 gap-3.5 sm:grid-cols-3">
+          <div
+            className="welcome-fade-up mt-[clamp(1.25rem,3.5vh,2rem)] grid w-full grid-cols-1 gap-3.5 sm:grid-cols-3"
+            style={{ animationDelay: "280ms" }}
+          >
             {FEATURES.map(({ Icon, title, body }) => (
               <div
                 key={title}
-                className="rounded-lg border border-border/70 bg-card/80 p-[clamp(0.875rem,1.75vw,1.125rem)] shadow-sm backdrop-blur"
+                className="group rounded-lg border border-border/70 bg-card/80 p-[clamp(0.875rem,1.75vw,1.125rem)] shadow-sm backdrop-blur transition-colors hover:border-primary/30 hover:bg-card"
               >
                 <div
-                  className="mb-2.5 inline-flex items-center justify-center rounded-md bg-primary/10 text-primary"
+                  className="mb-2.5 inline-flex items-center justify-center rounded-md bg-gradient-to-br from-primary/20 to-primary/5 text-primary shadow-[0_0_0_1px_rgba(0,174,239,0.08)] transition-shadow group-hover:shadow-[0_0_16px_rgba(0,174,239,0.35)]"
                   style={{ width: "clamp(2rem, 3.25vw, 2.25rem)", height: "clamp(2rem, 3.25vw, 2.25rem)" }}
                 >
                   <Icon className="h-[55%] w-[55%]" />
@@ -147,12 +163,16 @@ export function WelcomeScreen() {
           </div>
 
           {/* CTAs */}
-          <div className="mt-[clamp(1.25rem,3.5vh,1.75rem)] flex flex-col items-center gap-2.5 sm:flex-row sm:justify-center">
+          <div
+            className="welcome-fade-up mt-[clamp(1.25rem,3.5vh,1.75rem)] flex flex-col items-center gap-2.5 sm:flex-row sm:justify-center"
+            style={{ animationDelay: "340ms" }}
+          >
             <Button
               type="button"
               size="lg"
+              autoFocus
               onClick={dismissWelcome}
-              className="gap-2 font-semibold shadow-md shadow-primary/20"
+              className="gap-2 font-semibold shadow-md shadow-primary/20 transition-transform hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/25 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               style={{
                 height: "clamp(2.5rem, 5.5vh, 3rem)",
                 paddingLeft: "clamp(1.5rem, 3.25vw, 2rem)",
@@ -168,7 +188,7 @@ export function WelcomeScreen() {
               size="lg"
               variant="outline"
               onClick={startTutorial}
-              className="gap-2 font-semibold"
+              className="gap-2 font-semibold transition-colors hover:border-primary/40 hover:bg-primary/5"
               style={{
                 height: "clamp(2.5rem, 5.5vh, 3rem)",
                 paddingLeft: "clamp(1.5rem, 3.25vw, 2rem)",
@@ -180,13 +200,22 @@ export function WelcomeScreen() {
               Take the Tour
             </Button>
           </div>
+          <p
+            className="welcome-fade-up mt-2 text-center text-muted-foreground/60"
+            style={{ fontSize: "clamp(0.6875rem, 1.15vw, 0.75rem)", animationDelay: "380ms" }}
+          >
+            New here? Take the tour first — it's a 2-minute walkthrough.
+          </p>
 
           {/* QR code — scan to open this app on a mobile device */}
-          <div className="mt-[clamp(1.25rem,3vh,1.75rem)] flex flex-col items-center gap-2">
+          <div
+            className="welcome-fade-up mt-[clamp(1.25rem,3vh,1.75rem)] flex flex-col items-center gap-2 rounded-lg border border-border/70 bg-card/80 p-3 shadow-sm backdrop-blur"
+            style={{ animationDelay: "420ms" }}
+          >
             <div className="rounded-md bg-white p-2 shadow-sm ring-1 ring-border/60">
               <QRCodeSVG
                 value={APP_URL}
-                size={96}
+                size={88}
                 level="M"
                 marginSize={0}
                 aria-label={`QR code linking to ${APP_URL}`}
@@ -204,8 +233,8 @@ export function WelcomeScreen() {
           </div>
 
           <p
-            className="mt-3 text-center text-muted-foreground/60"
-            style={{ fontSize: "clamp(0.625rem, 1.05vw, 0.6875rem)" }}
+            className="welcome-fade-up mt-3 text-center text-muted-foreground/60"
+            style={{ fontSize: "clamp(0.625rem, 1.05vw, 0.6875rem)", animationDelay: "460ms" }}
           >
             Decision support, not a substitute for clinical judgment.
           </p>
