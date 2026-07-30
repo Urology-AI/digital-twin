@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, CloudUpload, CloudDownload } from "lucide-react";
+import { X, CloudUpload, CloudDownload, Cloud, CloudOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydratePatientsFromCaseLog, hydratePatientLibrary, getPatientLibrary, mergePatientLibrary, syncPatientLibraryToStore } from "@/store/patientStore";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { cn } from "@/lib/utils";
-import { pushCases, pullCases, checkTursoHealth } from "@/lib/turso";
+import { pushCases, pullCases, checkTursoHealth, hasCloudId } from "@/lib/turso";
 
 const CASE_LOG_KEY = "compass_cases";
 
@@ -147,6 +147,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       const library = getPatientLibrary();
       const n = await pushCases(all, library);
       setSyncStatus(`Pushed ${n} case${n !== 1 ? "s" : ""} ✓`);
+      setCases([...all]); // re-render so the per-case "Synced" badges pick up the updated cloud-id map
     } catch (err) {
       setSyncStatus(`Push failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
@@ -297,15 +298,19 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
 
     // Also save the full patient record to the library so it can be reloaded.
     // Name defaults to date+clinical summary; updated to notes when user loads.
+    const displayName = c.notes.trim() || `GG${c.gg} · PSA ${c.psa}`;
     savePatientToLibrary({
       id: c.id,
-      name: c.notes.trim() || `${c.date} — GG${c.gg} PSA ${c.psa}`,
+      name: displayName,
       record: entry.record,
       lesionRows: entry.lesionRows,
     });
     // Sync the newly saved entry into the live store so the header dropdown updates
     // without needing a page reload.
     hydratePatientLibrary();
+    // Rename the still-active patient too, so the header dropdown stops showing
+    // the placeholder "New Case" once it's actually been saved to the case log.
+    if (activeId) setPatientName(activeId, displayName);
   };
 
   const updatePath = (idx: number, field: keyof CaseRecord, raw: string) => {
@@ -515,16 +520,33 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
                         Current
                       </span>
                     )}
-                    <span className="font-semibold text-primary text-sm">{c.date}</span>
+                    <span className="font-semibold text-primary text-sm">
+                      {c.notes.trim() || `GG${c.gg} · PSA ${c.psa}`}
+                    </span>
                     <span className="text-[11px] text-muted-foreground">
                       GG{c.gg} | PSA {c.psa} | PIRADS {c.pirads} | {c.laterality}
                     </span>
+                    {hasCloudId(c.id) ? (
+                      <span
+                        title="Pushed to cloud"
+                        className="flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-400"
+                      >
+                        <Cloud className="h-2.5 w-2.5" /> Synced
+                      </span>
+                    ) : (
+                      <span
+                        title="Not yet pushed to cloud — use Push in the toolbar above"
+                        className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground"
+                      >
+                        <CloudOff className="h-2.5 w-2.5" /> Local only
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => {
-                        const name = c.notes.trim() || `${c.date} — GG${c.gg} PSA ${c.psa}`;
+                        const name = c.notes.trim() || `GG${c.gg} · PSA ${c.psa}`;
                         // Try library first (full record), otherwise use the
                         // case log snapshot already loaded into the store on startup.
                         if (!loadPatientFromLibrary(c.id, name)) {

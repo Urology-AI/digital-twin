@@ -242,6 +242,11 @@ function saveIdMap(m: Record<string, string>) {
   localStorage.setItem(CLOUD_ID_KEY, JSON.stringify(m));
 }
 
+/** True once a local case id has been pushed to the cloud at least once. */
+export function hasCloudId(localId: string): boolean {
+  return Boolean(loadIdMap()[localId]);
+}
+
 export async function pushCases(
   cases: CaseRecord[],
   library: PatientEntry[],

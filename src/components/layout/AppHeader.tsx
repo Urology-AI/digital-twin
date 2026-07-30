@@ -1,7 +1,6 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   Activity,
-  BookMarked,
   BookOpen,
   ClipboardList,
   FlaskConical,
@@ -21,9 +20,7 @@ import { usePatientStore } from "@/store/patientStore";
 import { useUiStore, type DesktopTab } from "@/store/uiStore";
 import { printReport } from "@/lib/compass/printReport";
 import { cn } from "@/lib/utils";
-import { useApiStatus } from "@/hooks/useApiStatus";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
-import { AiSettingsModal } from "@/components/AiSettingsModal";
 
 const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[] = [
   { id: "input",        label: "Input",       Icon: ClipboardList },
@@ -33,11 +30,10 @@ const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[]
 ];
 
 export function AppHeader() {
-  const { status: aiStatus, recheck: recheckAi } = useApiStatus();
   const accessIdentity = useAccessIdentity();
   const chatOpen = useUiStore((s) => s.chatOpen);
   const setChatOpen = useUiStore((s) => s.setChatOpen);
-  const [aiSettingsOpen, setAiSettingsOpen] = useState(false);
+  const saveStatus = useUiStore((s) => s.saveStatus);
   const setShareOpen = useUiStore((s) => s.setShareOpen);
 
   const dark = useUiStore((s) => s.dark);
@@ -47,7 +43,6 @@ export function AppHeader() {
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
   const setWelcomeOpen = useUiStore((s) => s.setWelcomeOpen);
   const setCaseLogOpen = useUiStore((s) => s.setCaseLogOpen);
-  const setReferenceOpen = useUiStore((s) => s.setReferenceOpen);
   const setPatientView = useUiStore((s) => s.setPatientView);
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
@@ -71,11 +66,11 @@ export function AppHeader() {
           <span className="text-sm font-black tracking-tight text-foreground sm:text-base">
             COMPASS
           </span>
-          <span className="hidden text-[10px] font-medium text-muted-foreground sm:inline">
+          <span className="hidden text-[10px] font-medium text-muted-foreground 2xl:inline">
             Prostate cancer · surgical outcomes
           </span>
         </div>
-        <div className="hidden items-center gap-1.5 sm:flex">
+        <div className="hidden items-center gap-1.5 2xl:flex">
           <span className="rounded bg-amber-500/15 px-1 py-px text-[8px] font-bold uppercase tracking-wider text-amber-500">
             Research Use Only
           </span>
@@ -154,22 +149,24 @@ export function AppHeader() {
           <Button
             type="button"
             variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            size="sm"
+            className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
             aria-label="Undo"
             onClick={() => undo()}
           >
             <Undo2 className="h-[15px] w-[15px]" />
+            <span className="hidden text-xs font-medium lg:inline">Undo</span>
           </Button>
           <Button
             type="button"
             variant="ghost"
-            size="icon"
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            size="sm"
+            className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
             aria-label="Redo"
             onClick={() => redo()}
           >
             <Redo2 className="h-[15px] w-[15px]" />
+            <span className="hidden text-xs font-medium lg:inline">Redo</span>
           </Button>
         </div>
 
@@ -178,8 +175,8 @@ export function AppHeader() {
         <Button
           type="button"
           variant="ghost"
-          size="icon"
-          className="h-8 w-8"
+          size="sm"
+          className="h-8 gap-1.5 px-2"
           aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
           onClick={() => setDark(!dark)}
         >
@@ -188,74 +185,69 @@ export function AppHeader() {
           ) : (
             <Moon className="h-[15px] w-[15px] text-muted-foreground" />
           )}
+          <span className="hidden text-xs font-medium lg:inline">{dark ? "Light" : "Dark"}</span>
         </Button>
 
         <Button
           type="button"
           variant="ghost"
-          size="icon"
-          className="h-8 w-8 hidden lg:inline-flex text-purple-400 hover:text-purple-300"
-          aria-label="Reference video"
-          onClick={() => setReferenceOpen(true)}
-        >
-          <BookMarked className="h-[15px] w-[15px]" />
-        </Button>
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-emerald-500 hover:text-emerald-400"
+          size="sm"
+          className="h-8 gap-1.5 px-2 text-emerald-500 hover:text-emerald-400"
           aria-label="Prospective case log"
           onClick={() => setCaseLogOpen(true)}
         >
           <BookOpen className="h-[15px] w-[15px]" />
+          <span className="hidden text-xs font-medium lg:inline">Case log</span>
         </Button>
 
         <Button
           type="button"
           variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-blue-400 hover:text-blue-300"
+          size="sm"
+          className="h-8 gap-1.5 px-2 text-blue-400 hover:text-blue-300"
           aria-label="Switch to patient view"
           title="Patient view"
           onClick={() => setPatientView(true)}
         >
           <UserRound className="h-[15px] w-[15px]" />
+          <span className="hidden text-xs font-medium lg:inline">Patient view</span>
         </Button>
 
         <Button
           type="button"
           variant="ghost"
-          size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+          size="sm"
+          className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
           aria-label="Share case"
           title="Share case"
           onClick={() => setShareOpen(true)}
         >
           <Share2 className="h-[15px] w-[15px]" />
+          <span className="hidden text-xs font-medium lg:inline">Share</span>
         </Button>
 
         <Button
           type="button"
           variant="ghost"
-          size="icon"
-          className="hidden sm:inline-flex h-8 w-8 text-muted-foreground hover:text-foreground"
+          size="sm"
+          className="hidden sm:inline-flex h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
           aria-label="Print report"
           onClick={() => printReport()}
         >
           <Printer className="h-[15px] w-[15px]" />
+          <span className="hidden text-xs font-medium lg:inline">Print</span>
         </Button>
 
         <Button
           type="button"
           variant="ghost"
-          size="icon"
-          className="hidden sm:inline-flex h-8 w-8 text-muted-foreground hover:text-primary"
+          size="sm"
+          className="hidden sm:inline-flex h-8 gap-1.5 px-2 text-muted-foreground hover:text-primary"
           aria-label="About COMPASS"
           onClick={() => setInfoOpen(true)}
         >
           <Info className="h-[15px] w-[15px]" />
+          <span className="hidden text-xs font-medium lg:inline">About</span>
         </Button>
 
         {/* Who's signed in via Cloudflare Access, if anyone (blank locally / on patient links) */}
@@ -271,24 +263,23 @@ export function AppHeader() {
           </div>
         )}
 
-        {/* AI status indicator — click to open settings */}
-        <button
-          type="button"
-          className="hidden sm:flex items-center gap-1.5 rounded-md px-2 py-1 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
-          aria-label="AI settings"
-          onClick={() => setAiSettingsOpen(true)}
-          title="AI settings"
+        {/* Local save status */}
+        <div
+          className="hidden sm:flex items-center gap-1.5 rounded-md px-2 py-1 text-muted-foreground"
+          title={saveStatus === "saving" ? "Saving locally…" : "All changes saved locally"}
         >
           <span
             className={cn(
               "h-2 w-2 shrink-0 rounded-full",
-              aiStatus === "connected"    && "bg-emerald-400 shadow-[0_0_6px_1px_rgba(52,211,153,0.6)]",
-              aiStatus === "disconnected" && "bg-red-500 shadow-[0_0_6px_1px_rgba(239,68,68,0.5)]",
-              aiStatus === "checking"     && "animate-pulse bg-yellow-400",
+              saveStatus === "saving"
+                ? "animate-pulse bg-yellow-400"
+                : "bg-emerald-400 shadow-[0_0_6px_1px_rgba(52,211,153,0.6)]",
             )}
           />
-          <span className="hidden text-[10px] font-medium sm:inline">AI</span>
-        </button>
+          <span className="hidden text-[10px] font-medium sm:inline">
+            {saveStatus === "saving" ? "Saving" : "Saved"}
+          </span>
+        </div>
 
         {/* Chat assistant */}
         <button
@@ -311,13 +302,6 @@ export function AppHeader() {
         </span>
       )}
 
-      {aiSettingsOpen && (
-        <AiSettingsModal
-          status={aiStatus}
-          onRecheck={recheckAi}
-          onClose={() => setAiSettingsOpen(false)}
-        />
-      )}
     </header>
   );
 }

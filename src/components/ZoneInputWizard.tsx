@@ -347,6 +347,7 @@ export function ZoneInputWizard() {
   const updateLesionRows   = usePatientStore((s) => s.updateLesionRows);
   const updateClinicalForm = usePatientStore((s) => s.updateClinicalForm);
   const pushHistory        = usePatientStore((s) => s.pushHistory);
+  const setPatientName     = usePatientStore((s) => s.setPatientName);
 
   const entry = patients.find((p) => p.id === activeId);
 
@@ -518,6 +519,14 @@ export function ZoneInputWizard() {
       linear_mm: Math.max(0, ...zones.map((d) => d.linearMm ?? 0)) || undefined,
     });
     pushHistory();
+
+    // Once the case has real data applied, replace the placeholder "New Case"
+    // name in the header dropdown with a real title.
+    if (activeId && entry && (entry.name === "New Case" || !entry.name.trim())) {
+      const gg = entry.record.biopsy?.max_grade_group ?? "?";
+      const psaVal = psa || String(entry.record.patient?.psa ?? "?");
+      setPatientName(activeId, `GG${gg} · PSA ${psaVal}`);
+    }
   };
 
   const applyNoteImport = useCallback(

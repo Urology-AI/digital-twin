@@ -246,8 +246,15 @@ export default function App() {
         </span>
         <button
           type="button"
+          onClick={() => setReferenceOpen(true)}
+          className="rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 hover:bg-muted/70 hover:text-foreground transition-colors"
+        >
+          Reference
+        </button>
+        <button
+          type="button"
           onClick={() => setCreditsOpen(true)}
-          className="text-[10px] text-muted-foreground/60 hover:text-muted-foreground underline-offset-2 hover:underline transition-colors"
+          className="rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 hover:bg-muted/70 hover:text-foreground transition-colors"
         >
           Credits
         </button>
