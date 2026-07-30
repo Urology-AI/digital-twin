@@ -59,30 +59,19 @@ export function AppHeader() {
       <button
         type="button"
         onClick={() => setWelcomeOpen(true)}
-        className="flex shrink-0 flex-col justify-center gap-0.5 rounded-md text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        className="flex shrink-0 items-center rounded-md text-left transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
         aria-label="Open welcome screen"
       >
-        <div className="flex items-baseline gap-2">
-          <span className="text-sm font-black tracking-tight text-foreground sm:text-base">
-            COMPASS
-          </span>
-          <span className="hidden text-[10px] font-medium text-muted-foreground 2xl:inline">
-            Prostate cancer · surgical outcomes
-          </span>
-        </div>
-        <div className="hidden items-center gap-1.5 2xl:flex">
-          <span className="rounded bg-amber-500/15 px-1 py-px text-[8px] font-bold uppercase tracking-wider text-amber-500">
-            Research Use Only
-          </span>
-          <span className="text-[8px] text-muted-foreground/50">IRB: STUDY-14-00050</span>
-        </div>
+        <span className="text-sm font-black tracking-tight text-foreground sm:text-base">
+          COMPASS
+        </span>
       </button>
 
       {/* Divider */}
       <div className="hidden h-5 w-px shrink-0 bg-border/70 sm:block" />
 
       {/* Patient selector */}
-      <div className="flex min-w-0 flex-1 items-center gap-2 sm:max-w-[260px]">
+      <div className="flex min-w-[110px] flex-1 items-center gap-2 sm:min-w-[160px] sm:max-w-[260px]">
         <label htmlFor="nav-patient" className="sr-only">Active patient</label>
         <select
           id="nav-patient"
