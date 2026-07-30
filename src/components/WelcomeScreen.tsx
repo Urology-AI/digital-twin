@@ -122,7 +122,7 @@ export function WelcomeScreen() {
             {FEATURES.map(({ Icon, title, body }) => (
               <div
                 key={title}
-                className="rounded-lg border border-border/70 bg-card/80 p-[clamp(0.875rem,1.75vw,1.125rem)] shadow-sm backdrop-blur"
+                className="rounded-lg border border-border/70 bg-card/80 p-[clamp(0.875rem,1.75vw,1.125rem)] shadow-sm backdrop-blur transition-colors hover:border-primary/30 hover:bg-card"
               >
                 <div
                   className="mb-2.5 inline-flex items-center justify-center rounded-md bg-primary/10 text-primary"
@@ -151,8 +151,9 @@ export function WelcomeScreen() {
             <Button
               type="button"
               size="lg"
+              autoFocus
               onClick={dismissWelcome}
-              className="gap-2 font-semibold shadow-md shadow-primary/20"
+              className="gap-2 font-semibold shadow-md shadow-primary/20 transition-transform hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/25"
               style={{
                 height: "clamp(2.5rem, 5.5vh, 3rem)",
                 paddingLeft: "clamp(1.5rem, 3.25vw, 2rem)",
@@ -168,7 +169,7 @@ export function WelcomeScreen() {
               size="lg"
               variant="outline"
               onClick={startTutorial}
-              className="gap-2 font-semibold"
+              className="gap-2 font-semibold transition-colors hover:border-primary/40 hover:bg-primary/5"
               style={{
                 height: "clamp(2.5rem, 5.5vh, 3rem)",
                 paddingLeft: "clamp(1.5rem, 3.25vw, 2rem)",
@@ -180,6 +181,12 @@ export function WelcomeScreen() {
               Take the Tour
             </Button>
           </div>
+          <p
+            className="mt-2 text-center text-muted-foreground/60"
+            style={{ fontSize: "clamp(0.6875rem, 1.15vw, 0.75rem)" }}
+          >
+            New here? Take the tour first — it's a 2-minute walkthrough.
+          </p>
 
           {/* QR code — scan to open this app on a mobile device */}
           <div className="mt-[clamp(1.25rem,3vh,1.75rem)] flex flex-col items-center gap-2">
