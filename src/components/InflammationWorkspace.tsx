@@ -1,13 +1,16 @@
 import { useMemo, useRef, useState } from "react";
-import { AlertTriangle, Download, FileJson, Play, RotateCcw, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, Download, FileJson, Info, Play, RotateCcw, Trash2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useInflammationStore } from "@/store/inflammationStore";
-import { DEFAULT_INFLAMMATION_CONFIG, nsGrade, scoreSide } from "@/lib/inflammation/model";
+import { usePatientStore } from "@/store/patientStore";
+import { DEFAULT_INFLAMMATION_CONFIG, nsGrade, nsGradeByNumber, scoreSide } from "@/lib/inflammation/model";
 import { exportCSV, saveJSON } from "@/lib/inflammation/exportRow";
 import { validateCohort, type CohortValidationSummary } from "@/lib/inflammation/validation";
+import { buildPatientSync } from "@/lib/inflammation/syncFromPatient";
+import { FIELD_REFERENCES, REFERENCES_BY_N } from "@/lib/inflammation/references";
 import { cohortSchema } from "@/types/inflammation";
 import { InflammationSourcesModal } from "@/components/InflammationSourcesModal";
 import type {
@@ -22,76 +25,76 @@ import type {
 /* ---------------------------------------------------------------------- */
 
 type FieldDef<T> =
-  | { id: keyof T; t: "num"; l: string; h?: string; step?: number; plausible?: [number, number] }
-  | { id: keyof T; t: "sel"; l: string; h?: string; o: [string, string][] }
-  | { id: keyof T; t: "chk"; l: string }
+  | { id: keyof T; t: "num"; l: string; h?: string; step?: number; plausible?: [number, number]; info?: string }
+  | { id: keyof T; t: "sel"; l: string; h?: string; o: [string, string][]; info?: string }
+  | { id: keyof T; t: "chk"; l: string; info?: string }
   | { group: string };
 
 const PATIENT_FIELDS: FieldDef<PatientInflammationInput>[] = [
-  { id: "psa", t: "num", l: "Serum PSA", h: "ng/mL", step: 0.1, plausible: [0.1, 500] },
-  { id: "vol", t: "num", l: "Prostate volume", h: "mL", step: 1, plausible: [10, 200] },
-  { id: "priorBx", t: "sel", l: "Prior biopsy sessions", h: "count", o: [["", "—"], ["1", "1"], ["2", "2"], ["3", "3 or more"]] },
-  { id: "route", t: "sel", l: "Biopsy route", h: "approach", o: [["", "—"], ["tp", "Transperineal"], ["tr", "Transrectal"]] },
-  { id: "bxMri", t: "num", l: "Biopsy → MRI interval", h: "days", step: 1, plausible: [0, 365] },
-  { id: "bxSurg", t: "num", l: "Biopsy → surgery interval", h: "days", step: 1, plausible: [0, 365] },
-  { id: "bmi", t: "num", l: "BMI", h: "kg/m²", step: 0.1, plausible: [14, 60] },
-  { id: "mets", t: "sel", l: "Metabolic syndrome components", h: "0–5", o: [["", "—"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"]] },
-  { id: "crp", t: "num", l: "CRP", h: "mg/L", step: 0.1, plausible: [0, 200] },
-  { id: "nlr", t: "num", l: "Neutrophil–lymphocyte ratio", h: "ratio", step: 0.1, plausible: [0.3, 20] },
-  { id: "priorIntv", t: "chk", l: "Prior TURP, focal therapy, BCG, or documented chronic prostatitis" },
-  { id: "psaPrior", t: "num", l: "Prior PSA (earlier timepoint)", h: "ng/mL", step: 0.1, plausible: [0.1, 500] },
-  { id: "psaPriorMonths", t: "num", l: "Interval since prior PSA", h: "months", step: 1, plausible: [0, 120] },
+  { id: "psa", t: "num", l: "Serum PSA", h: "ng/mL", step: 0.1, plausible: [0.1, 500], info: "Most recent serum PSA before biopsy or surgery." },
+  { id: "vol", t: "num", l: "Prostate volume", h: "mL", step: 1, plausible: [10, 200], info: "Whole-gland volume on TRUS/MRI (e.g. ellipsoid formula). Used with PSA to derive PSA density." },
+  { id: "priorBx", t: "sel", l: "Prior biopsy sessions", h: "count", o: [["", "—"], ["1", "1"], ["2", "2"], ["3", "3 or more"]], info: "How many separate biopsy sessions (not cores) this patient has had, including the current one. More sessions means more expected post-biopsy scarring/inflammation." },
+  { id: "route", t: "sel", l: "Biopsy route", h: "approach", o: [["", "—"], ["tp", "Transperineal"], ["tr", "Transrectal"]], info: "Approach used for the most recent biopsy." },
+  { id: "bxMri", t: "num", l: "Biopsy → MRI interval", h: "days", step: 1, plausible: [0, 365], info: "Days from biopsy to the MRI being scored here. Short intervals (<28 d) mean post-biopsy hemorrhage/inflammation is still evolving and can mimic ECE on imaging." },
+  { id: "bxSurg", t: "num", l: "Biopsy → surgery interval", h: "days", step: 1, plausible: [0, 365], info: "Days from biopsy to surgery. Short intervals (<56 d) are associated with more intraoperative inflammatory change." },
+  { id: "bmi", t: "num", l: "BMI", h: "kg/m²", step: 0.1, plausible: [14, 60], info: "Body mass index. Obesity is associated with more periprostatic adipose tissue inflammation." },
+  { id: "mets", t: "sel", l: "Metabolic syndrome components", h: "0–5", o: [["", "—"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"]], info: "Count how many of the 5 NCEP ATP III metabolic syndrome criteria this patient meets: (1) waist circumference >102 cm (men); (2) triglycerides ≥150 mg/dL or on treatment; (3) HDL cholesterol <40 mg/dL (men); (4) blood pressure ≥130/85 mmHg or on treatment; (5) fasting glucose ≥100 mg/dL or on treatment. A higher count is associated with more systemic inflammation and, in this literature, more aggressive prostate cancer." },
+  { id: "crp", t: "num", l: "CRP", h: "mg/L", step: 0.1, plausible: [0, 200], info: "Most recent serum C-reactive protein, a systemic inflammation marker. >2.5 mg/L is treated as elevated." },
+  { id: "nlr", t: "num", l: "Neutrophil–lymphocyte ratio", h: "ratio", step: 0.1, plausible: [0.3, 20], info: "Absolute neutrophil count ÷ absolute lymphocyte count from a recent CBC with differential. ≥3 is treated as elevated." },
+  { id: "priorIntv", t: "chk", l: "Prior TURP, focal therapy, BCG, or documented chronic prostatitis", info: "Check if the patient has a documented history of any of these — each is an independent cause of periprostatic scarring unrelated to the current cancer." },
+  { id: "psaPrior", t: "num", l: "Prior PSA (earlier timepoint)", h: "ng/mL", step: 0.1, plausible: [0.1, 500], info: "An earlier PSA value, used with the current PSA to compute a velocity/kinetics trend." },
+  { id: "psaPriorMonths", t: "num", l: "Interval since prior PSA", h: "months", step: 1, plausible: [0, 120], info: "Months between the prior PSA above and the current PSA." },
 ];
 
 const SIDE_FIELDS: FieldDef<SideInflammationInput>[] = [
   { group: "MRI — capsular interface geometry" },
-  { id: "ccl", t: "num", l: "Capsular contact length", h: "mm", step: 1, plausible: [0, 60] },
-  { id: "angle", t: "num", l: "Contact angle", h: "degrees", step: 1, plausible: [0, 180] },
-  { id: "caps", t: "sel", l: "Capsular integrity", h: "0–2", o: [["", "—"], ["0", "0 intact"], ["1", "1 thinned"], ["2", "2 interrupted"]] },
-  { id: "epeGr", t: "sel", l: "Mehralivand EPE grade", h: "0–3", o: [["", "—"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"]] },
-  { id: "morph", t: "sel", l: "Periprostatic abnormality shape", h: "pattern", o: [["", "—"], ["nod", "Nodular / mass-like"], ["band", "Band, wedge or reticular"], ["none", "No periprostatic change"]] },
-  { id: "anch", t: "sel", l: "Contiguous with PI-RADS 4–5 lesion", h: "anchoring", o: [["", "—"], ["yes", "Yes — anchored"], ["no", "No — free-standing"]] },
+  { id: "ccl", t: "num", l: "Capsular contact length", h: "mm", step: 1, plausible: [0, 60], info: "Length of tumour-capsule contact measured on the axial MRI sequence showing the largest contact. The single strongest MRI predictor of true ECE; ≥15 mm favours extension." },
+  { id: "angle", t: "num", l: "Contact angle", h: "degrees", step: 1, plausible: [0, 180], info: "Angle subtended at the tumour centroid by the capsular contact arc. Wider angles (>80°) favour true extension over inflammation." },
+  { id: "caps", t: "sel", l: "Capsular integrity", h: "0–2", o: [["", "—"], ["0", "0 intact"], ["1", "1 thinned"], ["2", "2 interrupted"]], info: "Subjective 3-point read of the capsule at the point of contact: intact, thinned, or clearly breached." },
+  { id: "epeGr", t: "sel", l: "Mehralivand EPE grade", h: "0–3", o: [["", "—"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"]], info: "The published 4-tier Mehralivand MRI-based EPE grade (0 = no capsular contact, 3 = frank extraprostatic tumour) for this side's dominant lesion." },
+  { id: "morph", t: "sel", l: "Periprostatic abnormality shape", h: "pattern", o: [["", "—"], ["nod", "Nodular / mass-like"], ["band", "Band, wedge or reticular"], ["none", "No periprostatic change"]], info: "Shape of any periprostatic signal abnormality on T2. Nodular/mass-like favours true extension; band-like, wedge-shaped, or reticular favours inflammation/scarring." },
+  { id: "anch", t: "sel", l: "Contiguous with PI-RADS 4–5 lesion", h: "anchoring", o: [["", "—"], ["yes", "Yes — anchored"], ["no", "No — free-standing"]], info: "Is the periprostatic abnormality directly contiguous with a PI-RADS 4–5 lesion, or is it a free-standing finding not touching any suspicious lesion? Free-standing abnormalities favour a benign process." },
 
   { group: "MRI — quantitative" },
-  { id: "adcI", t: "num", l: "ADC at tumour–capsule interface", h: "×10⁻³", step: 0.01, plausible: [0.3, 2.5] },
-  { id: "adcL", t: "num", l: "ADC of index lesion core", h: "×10⁻³", step: 0.01, plausible: [0.3, 2.5] },
-  { id: "t2Ratio", t: "num", l: "T2 signal ratio (interface / contralateral fat)", h: "ratio", step: 0.01, plausible: [0.3, 3] },
-  { id: "dce", t: "sel", l: "DCE curve at the interface", h: "type", o: [["", "—"], ["3", "Type 3 washout"], ["12", "Type 1–2, rim or delayed"]] },
-  { id: "t1hi", t: "chk", l: "T1 hyperintensity at capsule (haemorrhage or thrombosed vein)" },
+  { id: "adcI", t: "num", l: "ADC at tumour–capsule interface", h: "×10⁻³", step: 0.01, plausible: [0.3, 2.5], info: "Mean ADC (×10⁻³ mm²/s) from a small ROI drawn at the tumour-capsule interface. Lower values (<0.85) favour true ECE; inflammation typically shows ADC ≥0.90." },
+  { id: "adcL", t: "num", l: "ADC of index lesion core", h: "×10⁻³", step: 0.01, plausible: [0.3, 2.5], info: "Mean ADC (×10⁻³ mm²/s) from the index lesion itself, away from the capsule — used as a reference to compare against the interface ADC above." },
+  { id: "t2Ratio", t: "num", l: "T2 signal ratio (interface / contralateral fat)", h: "ratio", step: 0.01, plausible: [0.3, 3], info: "T2 signal intensity at the tumour-fat interface divided by signal in normal contralateral periprostatic fat. Elevated ratios (>1.10) favour true extension." },
+  { id: "dce", t: "sel", l: "DCE curve at the interface", h: "type", o: [["", "—"], ["3", "Type 3 washout"], ["12", "Type 1–2, rim or delayed"]], info: "Dynamic contrast-enhanced curve shape at the capsular interface. Type 3 (washout) is seen with cancer; prostatitis instead shows a persistent/rim/delayed pattern." },
+  { id: "t1hi", t: "chk", l: "T1 hyperintensity at capsule (haemorrhage or thrombosed vein)", info: "Check if the capsular region is T1-hyperintense — this usually reflects post-biopsy haemorrhage or a thrombosed periprostatic vein, a known ECE mimic, not tumour." },
 
   { group: "Periprostatic soft tissue" },
-  { id: "fatPl", t: "sel", l: "Fat plane character", h: "0–2", o: [["", "—"], ["0", "0 preserved"], ["1", "1 reticular / stranded"], ["2", "2 effaced"]] },
-  { id: "pdff", t: "chk", l: "Reduced periprostatic fat fraction vs. contralateral (Dixon PDFF)" },
-  { id: "sym", t: "chk", l: "Bilateral, roughly symmetric periprostatic change" },
-  { id: "vein", t: "chk", l: "Prominent or asymmetric periprostatic venous plexus" },
+  { id: "fatPl", t: "sel", l: "Fat plane character", h: "0–2", o: [["", "—"], ["0", "0 preserved"], ["1", "1 reticular / stranded"], ["2", "2 effaced"]], info: "Appearance of the periprostatic fat plane adjacent to this side: clean/preserved, reticular or stranded, or fully effaced." },
+  { id: "pdff", t: "chk", l: "Reduced periprostatic fat fraction vs. contralateral (Dixon PDFF)", info: "Check if quantitative Dixon proton-density fat fraction is reduced on this side compared with the contralateral side, suggesting fat replacement by inflammatory/fibrotic tissue." },
+  { id: "sym", t: "chk", l: "Bilateral, roughly symmetric periprostatic change", info: "Check if the periprostatic finding is mirrored on both sides. Symmetric, bilateral change is a hallmark of a systemic/inflammatory process rather than a focal cancer-related one." },
+  { id: "vein", t: "chk", l: "Prominent or asymmetric periprostatic venous plexus", info: "Check if the periprostatic (Santorini) venous plexus is dilated or asymmetric on this side — a recognised finding in chronic prostatitis that can mimic tumour extension." },
 
   { group: "Periprostatic adipose tissue (PPAT)" },
-  { id: "rwo", t: "num", l: "Chemical-shift water:oil ratio (RWO)", h: "index", step: 1, plausible: [0, 100] },
-  { id: "ppatFibrosis", t: "chk", l: "High PPAT radiomic fiber complexity (T1W)" },
-  { id: "ppatGeom", t: "chk", l: "Altered PPAT geometric shape descriptors" },
+  { id: "rwo", t: "num", l: "Chemical-shift water:oil ratio (RWO)", h: "index", step: 1, plausible: [0, 100], info: "Water-to-oil ratio from chemical-shift (in/out-of-phase) imaging of the periprostatic fat on this side. Higher values reflect brown-adipocyte activation/inflammation and correlate with higher-risk cancer." },
+  { id: "ppatFibrosis", t: "chk", l: "High PPAT radiomic fiber complexity (T1W)", info: "Check if T1-weighted radiomic analysis of the periprostatic fat (if available) flags high fiber complexity/fibrosis — associated with more aggressive disease." },
+  { id: "ppatGeom", t: "chk", l: "Altered PPAT geometric shape descriptors", info: "Check if atlas-based geometric analysis of periprostatic fat shape (surface curvature etc., if available) is flagged as abnormal for this side." },
 
   { group: "PSMA PET" },
-  { id: "suvL", t: "num", l: "SUVmax of index intraprostatic lesion", h: "SUV", step: 0.1, plausible: [0, 40] },
-  { id: "suvP", t: "num", l: "SUVmax at the capsular contact", h: "SUV", step: 0.1, plausible: [0, 40] },
-  { id: "psmaFocalUptake", t: "chk", l: "Focal periprostatic uptake, distinct from lesion (not diffuse/background)" },
+  { id: "suvL", t: "num", l: "SUVmax of index intraprostatic lesion", h: "SUV", step: 0.1, plausible: [0, 40], info: "Maximum SUV of the dominant intraprostatic lesion on PSMA-PET, this side. Used as the denominator when judging whether periprostatic uptake is truly lesion-anchored." },
+  { id: "suvP", t: "num", l: "SUVmax at the capsular contact", h: "SUV", step: 0.1, plausible: [0, 40], info: "Maximum SUV measured right at the capsular contact/periprostatic region, this side. A high ratio to the lesion SUV above favours true extension; benign inflammation rarely shows meaningful PSMA uptake." },
+  { id: "psmaFocalUptake", t: "chk", l: "Focal periprostatic uptake, distinct from lesion (not diffuse/background)", info: "Check if there is a discrete focus of periprostatic PSMA uptake separate from the main lesion, rather than diffuse background activity." },
 
   { group: "Micro-ultrasound (ExactVu)" },
-  { id: "mus1", t: "chk", l: "Capsular bulging" },
-  { id: "mus2", t: "chk", l: "Visible capsular breach" },
-  { id: "mus3", t: "chk", l: "Hypoechoic halo" },
-  { id: "mus4", t: "chk", l: "Obliteration of vesiculo-prostatic angle" },
+  { id: "mus1", t: "chk", l: "Capsular bulging", info: "Micro-ultrasound (e.g. ExactVu) finding: outward bulging of the capsule at the site of the lesion, this side." },
+  { id: "mus2", t: "chk", l: "Visible capsular breach", info: "Micro-ultrasound finding: a directly visualised break in the capsular line, this side." },
+  { id: "mus3", t: "chk", l: "Hypoechoic halo", info: "Micro-ultrasound finding: a hypoechoic rind surrounding the lesion, this side." },
+  { id: "mus4", t: "chk", l: "Obliteration of vesiculo-prostatic angle", info: "Micro-ultrasound finding: loss of the normal angle between the seminal vesicle and prostate, this side." },
 
   { group: "Biopsy — oncological" },
-  { id: "gg", t: "sel", l: "Highest ipsilateral grade group", h: "1–5", o: [["", "—"], ["1", "GG 1"], ["2", "GG 2"], ["3", "GG 3"], ["4", "GG 4"], ["5", "GG 5"]] },
-  { id: "posC", t: "num", l: "Ipsilateral positive cores", h: "percent", step: 1, plausible: [0, 100] },
-  { id: "maxI", t: "num", l: "Greatest single-core involvement", h: "percent", step: 1, plausible: [0, 100] },
-  { id: "pni", t: "chk", l: "Perineural invasion in ipsilateral cores" },
+  { id: "gg", t: "sel", l: "Highest ipsilateral grade group", h: "1–5", o: [["", "—"], ["1", "GG 1"], ["2", "GG 2"], ["3", "GG 3"], ["4", "GG 4"], ["5", "GG 5"]], info: "Highest ISUP grade group among the biopsy cores taken from this side." },
+  { id: "posC", t: "num", l: "Ipsilateral positive cores", h: "percent", step: 1, plausible: [0, 100], info: "Percent of biopsy cores from this side that were cancer-positive (positive cores ÷ cores taken this side × 100). ≥1/3 positive is a recognised predictor of NVB proximity." },
+  { id: "maxI", t: "num", l: "Greatest single-core involvement", h: "percent", step: 1, plausible: [0, 100], info: "The single highest percent tumour involvement in any one core from this side." },
+  { id: "pni", t: "chk", l: "Perineural invasion in ipsilateral cores", info: "Check if any biopsy core from this side showed perineural invasion — an oncologic (non-inflammatory) predictor of extension, so it is never discounted by a high inflammation score." },
 
   { group: "Biopsy — inflammatory" },
-  { id: "iraniG", t: "sel", l: "Irani G (stromal infiltrate)", h: "0–3", o: [["", "—"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"]] },
-  { id: "iraniA", t: "sel", l: "Irani A (glandular aggressiveness)", h: "0–3", o: [["", "—"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"]] },
-  { id: "gran", t: "chk", l: "Granulomatous inflammation reported" },
-  { id: "nCores", t: "num", l: "Ipsilateral cores taken", h: "count", step: 1, plausible: [1, 30] },
+  { id: "iraniG", t: "sel", l: "Irani G (stromal infiltrate)", h: "0–3", o: [["", "—"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"]], info: "Irani grade (0–3) of periglandular/stromal inflammatory infiltrate on biopsy pathology, this side — higher means more histologic inflammation." },
+  { id: "iraniA", t: "sel", l: "Irani A (glandular aggressiveness)", h: "0–3", o: [["", "—"], ["0", "0"], ["1", "1"], ["2", "2"], ["3", "3"]], info: "Irani grade (0–3) of glandular epithelial aggressiveness/destruction on biopsy pathology, this side — the companion score to Irani G." },
+  { id: "gran", t: "chk", l: "Granulomatous inflammation reported", info: "Check if the biopsy pathology report describes granulomatous prostatitis on this side — this can itself mimic PI-RADS 4–5 lesions and locally advanced disease." },
+  { id: "nCores", t: "num", l: "Ipsilateral cores taken", h: "count", step: 1, plausible: [1, 30], info: "Total number of biopsy cores taken from this side across all sessions, not just positive ones — used to flag whether the volume of prior sampling itself is enough to explain scarring." },
 
   { group: "Interval imaging (kinetics)" },
   {
@@ -100,12 +103,13 @@ const SIDE_FIELDS: FieldDef<SideInflammationInput>[] = [
     l: "Interval MRI change, this side's finding",
     h: "vs. prior MRI",
     o: [["", "—"], ["growing", "Growing"], ["stable", "Stable"], ["shrinking", "Shrinking"], ["new", "New"]],
+    info: "How the suspicious finding on this side has changed between a prior MRI and the current one. Growing/new favours true tumour; shrinking after a repeat biopsy favours resolving inflammation.",
   },
 
   { group: "Outcome — post-op ground truth (optional)" },
-  { id: "outEce", t: "sel", l: "Whole-mount ECE, this side", h: "pathology", o: [["", "—"], ["yes", "Yes"], ["no", "No"]] },
-  { id: "outInflGrade", t: "sel", l: "Whole-mount periprostatic inflammation grade", h: "0–3", o: [["", "—"], ["0", "0 none"], ["1", "1 mild"], ["2", "2 moderate"], ["3", "3 severe"]] },
-  { id: "outPlaneCall", t: "sel", l: "Intraoperative plane actually used (pre-pathology)", h: "NS grade", o: [["", "—"], ["1", "Grade 1 — intrafascial"], ["2", "Grade 2 — interfascial"], ["3", "Grade 3 — wide"], ["4", "Grade 4 — extrafascial"]] },
+  { id: "outEce", t: "sel", l: "Whole-mount ECE, this side", h: "pathology", o: [["", "—"], ["yes", "Yes"], ["no", "No"]], info: "Fill in only after final pathology: was extracapsular extension actually present on whole-mount, this side? Used for cohort validation, not for the live prediction." },
+  { id: "outInflGrade", t: "sel", l: "Whole-mount periprostatic inflammation grade", h: "0–3", o: [["", "—"], ["0", "0 none"], ["1", "1 mild"], ["2", "2 moderate"], ["3", "3 severe"]], info: "Fill in only after final pathology: graded severity of periprostatic fibro-inflammatory change on whole-mount, this side." },
+  { id: "outPlaneCall", t: "sel", l: "Intraoperative plane actually used (pre-pathology)", h: "NS grade", o: [["", "—"], ["1", "Grade 1 — intrafascial"], ["2", "Grade 2 — interfascial"], ["3", "Grade 3 — wide"], ["4", "Grade 4 — extrafascial"]], info: "The nerve-sparing plane the surgeon actually chose intraoperatively, before pathology was known — recorded to later check whether the plane matched what pathology justified." },
 ];
 
 const SIDE_FIELD_GROUPS = groupFieldDefs(SIDE_FIELDS);
@@ -134,14 +138,30 @@ function groupFieldDefs<T extends Record<string, unknown>>(defs: FieldDef<T>[]):
 /* Generic field renderer                                                 */
 /* ---------------------------------------------------------------------- */
 
+/** Info icon shown next to a field's label — opens the shared FieldInfoModal with that field's definition + references. */
+function FieldInfoButton({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label="What does this field mean?"
+      className="ml-1 inline-flex shrink-0 align-middle text-muted-foreground hover:text-foreground"
+    >
+      <Info className="h-3 w-3" />
+    </button>
+  );
+}
+
 function FieldRow<T extends Record<string, unknown>>({
   def,
   value,
   onChange,
+  onOpenInfo,
 }: {
   def: Exclude<FieldDef<T>, { group: string }>;
   value: unknown;
   onChange: (v: unknown) => void;
+  onOpenInfo: (def: Exclude<FieldDef<T>, { group: string }>) => void;
 }) {
   if (def.t === "chk") {
     return (
@@ -152,7 +172,10 @@ function FieldRow<T extends Record<string, unknown>>({
           onChange={(e) => onChange(e.target.checked)}
           className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-primary"
         />
-        <span>{def.l}</span>
+        <span>
+          {def.l}
+          {def.info && <FieldInfoButton onOpen={() => onOpenInfo(def)} />}
+        </span>
       </label>
     );
   }
@@ -162,6 +185,7 @@ function FieldRow<T extends Record<string, unknown>>({
         <label className="text-xs leading-snug text-foreground">
           {def.l}
           {def.h && <span className="ml-1 font-mono text-[10px] text-muted-foreground">{def.h}</span>}
+          {def.info && <FieldInfoButton onOpen={() => onOpenInfo(def)} />}
         </label>
         <select
           value={(value as string) ?? ""}
@@ -185,6 +209,7 @@ function FieldRow<T extends Record<string, unknown>>({
         <label className="text-xs leading-snug text-foreground">
           {def.l}
           {def.h && <span className="ml-1 font-mono text-[10px] text-muted-foreground">{def.h}</span>}
+          {def.info && <FieldInfoButton onOpen={() => onOpenInfo(def)} />}
         </label>
         <Input
           type="number"
@@ -211,10 +236,12 @@ function ReadoutCard({
   name,
   r,
   anch,
+  compass,
 }: {
   name: string;
   r: SideInflammationResult;
   anch: SideInflammationInput["anch"];
+  compass: { ecePct: number; nsGrade: number } | null;
 }) {
   const gA = nsGrade(r.pAdj);
   const gR = nsGrade(r.pRaw);
@@ -236,6 +263,12 @@ function ReadoutCard({
   }
   if (anch === "no" && r.inflScore >= 40) {
     flags.push({ tone: "cool", text: "Free-standing abnormality, on an inflamed side. Strongly favours a benign process." });
+  }
+  if (compass && compass.nsGrade !== gA.n) {
+    flags.push({
+      tone: "warn",
+      text: `Disagrees with digital twin. COMPASS's zone-aware model puts this side at Grade ${compass.nsGrade}, this instrument at Grade ${gA.n} — no math has been merged between them; treat the gap itself as a signal to look closer, not as something to average away.`,
+    });
   }
   if (r.touched < 8) {
     flags.push({ tone: "warn", text: `Sparse input. ${r.touched} fields entered on this side. Blank fields are neutral, so the estimate drifts toward the intercept.` });
@@ -283,6 +316,20 @@ function ReadoutCard({
             <div className="h-full rounded-full bg-red-500" style={{ width: `${Math.max(0, Math.min(100, r.pAdj))}%` }} />
           </div>
         </div>
+
+        {compass && (
+          <div className="rounded-md border border-border bg-muted/30 px-2.5 py-2 font-mono text-[11px]">
+            <div className="mb-1 uppercase tracking-wide text-muted-foreground">Digital twin (COMPASS), for comparison only</div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">P(ECE), zone-aware model</span>
+              <span className="font-semibold">{compass.ecePct.toFixed(1)}%</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Nerve-sparing grade</span>
+              <span className="font-semibold">{nsGradeByNumber(compass.nsGrade).label.split(" —")[0]}</span>
+            </div>
+          </div>
+        )}
 
         <div className="border-t border-border pt-2.5">
           <div className="text-sm font-semibold">{gA.label}</div>
@@ -534,6 +581,53 @@ function CohortValidationSection({ cfg }: { cfg: InflammationConfig }) {
   );
 }
 
+/* ---------------------------------------------------------------------- */
+/* Per-field definition modal                                             */
+/* ---------------------------------------------------------------------- */
+
+interface FieldInfoState {
+  label: string;
+  info: string;
+  refNumbers: number[];
+}
+
+function FieldInfoModal({ state, onClose }: { state: FieldInfoState; onClose: () => void }) {
+  const refs = state.refNumbers.map((n) => REFERENCES_BY_N.get(n)).filter((r): r is NonNullable<typeof r> => Boolean(r));
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-lg border border-border bg-background p-5 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <h3 className="text-sm font-semibold">{state.label}</h3>
+          <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            ✕
+          </button>
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">{state.info}</p>
+        <div className="mt-4 border-t border-border pt-3">
+          <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">Sources</div>
+          {refs.length === 0 ? (
+            <p className="font-mono text-[10.5px] text-muted-foreground">
+              No specific literature citation was traced for this field in the source note.
+            </p>
+          ) : (
+            <ol className="space-y-1.5 font-mono text-[10.5px] leading-snug text-muted-foreground">
+              {refs.map((r) => (
+                <li key={r.n}>
+                  [{r.n}] {r.authors} {r.title}. <i>{r.journal}</i>. {r.year}
+                  {r.tag ? ` (${r.tag})` : ""}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function InflammationWorkspace() {
   const patient = useInflammationStore((s) => s.patient);
   const sides = useInflammationStore((s) => s.sides);
@@ -546,6 +640,9 @@ export function InflammationWorkspace() {
   const resetCfg = useInflammationStore((s) => s.resetCfg);
   const clearAll = useInflammationStore((s) => s.clearAll);
   const loadState = useInflammationStore((s) => s.loadState);
+  const syncFromPatientRecord = useInflammationStore((s) => s.syncFromPatientRecord);
+  const compassPredictions = usePatientStore((s) => s.predictions);
+  const activePatientEntry = usePatientStore((s) => s.patients.find((p) => p.id === s.activeId));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [cfgText, setCfgText] = useState(() => JSON.stringify(cfg, null, 2));
@@ -561,13 +658,16 @@ export function InflammationWorkspace() {
 
   const [hasRun, setHasRun] = useState(false);
   const [showSources, setShowSources] = useState(false);
+  const [infoField, setInfoField] = useState<FieldInfoState | null>(null);
+  const openFieldInfo = (def: { id: PropertyKey; l: string; info?: string }) =>
+    setInfoField({ label: def.l, info: def.info ?? "", refNumbers: FIELD_REFERENCES[String(def.id)] ?? [] });
 
   return (
     <div className="flex h-full w-full flex-col overflow-y-auto overflow-x-hidden overscroll-contain app-scroll px-5 py-5" data-tutorial="inflammation">
       <div className="mx-auto w-full max-w-6xl space-y-6">
         <div className="flex items-start justify-between gap-3 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-xs leading-relaxed text-red-700 dark:text-red-300">
           <div>
-            <b>Experimental feature — not a validated nomogram, not for clinical use.</b> Every coefficient below is
+            <b>Inflammation instrument — not a validated nomogram, not for clinical use.</b> Every coefficient below is
             an expert prior derived from published effect directions, not a fitted regression coefficient. This tool
             is deliberately kept separate from the main COMPASS ECE prediction until it is fitted on real whole-mount
             outcome data and merged by design decision. Use it to standardise data capture and structure the
@@ -579,6 +679,7 @@ export function InflammationWorkspace() {
           </Button>
         </div>
         {showSources && <InflammationSourcesModal onClose={() => setShowSources(false)} />}
+        {infoField && <FieldInfoModal state={infoField} onClose={() => setInfoField(null)} />}
 
         {/* Patient-level */}
         <section>
@@ -591,6 +692,7 @@ export function InflammationWorkspace() {
                   def={f}
                   value={patient[f.id]}
                   onChange={(v) => setPatientField(f.id, v as never)}
+                  onOpenInfo={openFieldInfo}
                 />
               ),
             )}
@@ -606,9 +708,23 @@ export function InflammationWorkspace() {
         <section>
           <div className="mb-2 flex items-center justify-between border-b border-border pb-1.5">
             <h2 className="font-mono text-[11px] uppercase tracking-wider">Side-specific entry</h2>
-            <Button size="sm" variant="ghost" onClick={() => mirrorSide("L", "R")}>
-              Mirror left → right
-            </Button>
+            <div className="flex items-center gap-2">
+              {activePatientEntry && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  title="Fills only currently-empty fields from the active COMPASS patient record (PSA, volume, BMI, grade group, max core involvement, PNI, index-lesion ADC/SUV). Never overwrites a value you've already entered here."
+                  onClick={() =>
+                    syncFromPatientRecord(buildPatientSync(activePatientEntry.record, activePatientEntry.lesionRows))
+                  }
+                >
+                  Sync from patient record
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={() => mirrorSide("L", "R")}>
+                Mirror left → right
+              </Button>
+            </div>
           </div>
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             {(["L", "R"] as const).map((s) => (
@@ -638,6 +754,7 @@ export function InflammationWorkspace() {
                               def={f}
                               value={sides[s][f.id]}
                               onChange={(v) => setSideField(s, f.id, v as never)}
+                              onOpenInfo={openFieldInfo}
                             />
                           ))}
                         </div>
@@ -662,8 +779,18 @@ export function InflammationWorkspace() {
           <section>
             <h2 className="mb-2 border-b border-border pb-1.5 font-mono text-[11px] uppercase tracking-wider">Readout</h2>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-              <ReadoutCard name="Left lobe" r={resultL} anch={sides.L.anch} />
-              <ReadoutCard name="Right lobe" r={resultR} anch={sides.R.anch} />
+              <ReadoutCard
+                name="Left lobe"
+                r={resultL}
+                anch={sides.L.anch}
+                compass={compassPredictions ? { ecePct: compassPredictions.eceL * 100, nsGrade: compassPredictions.nsL } : null}
+              />
+              <ReadoutCard
+                name="Right lobe"
+                r={resultR}
+                anch={sides.R.anch}
+                compass={compassPredictions ? { ecePct: compassPredictions.eceR * 100, nsGrade: compassPredictions.nsR } : null}
+              />
             </div>
           </section>
         )}

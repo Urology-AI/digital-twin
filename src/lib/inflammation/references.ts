@@ -80,9 +80,12 @@ export const REFERENCES_BY_N = new Map(REFERENCES.map((r) => [r.n, r]));
  *
  * Traced to the body-text citations in section II of the source note, not
  * its summary table (see module docstring). Fields with no entry here
- * (interval-kinetics fields, `psmaFocalUptake`'s discrete flag) were added
- * to the model without a specific literature citation in the source
- * material and are labeled as such in the UI.
+ * (raw `psa`/`vol`/`route`, PSA-kinetics fields, `mriIntervalChange`) were
+ * added to the model without a specific literature citation in the source
+ * material and are labeled as such in the UI; whole-mount outcome-capture
+ * fields (`outEce`, `outInflGrade`, `outPlaneCall`) are ground truth being
+ * recorded, not a literature-derived claim, so they intentionally have no
+ * entry either.
  */
 export const FIELD_REFERENCES: Record<string, number[]> = {
   ccl: [7, 8, 9, 10, 11],
@@ -90,12 +93,16 @@ export const FIELD_REFERENCES: Record<string, number[]> = {
   caps: [7],
   epeGr: [9],
   morph: [13, 16],
+  anch: [4, 5, 13, 16],
   adcI: [7, 12],
   adcL: [7, 12],
   t2Ratio: [7, 13, 14],
   dce: [15, 16],
   t1hi: [5, 40, 41, 42],
   vein: [5, 40, 41, 42],
+  fatPl: [5, 20, 41, 42],
+  pdff: [19, 21],
+  sym: [40, 41, 42],
   rwo: [19],
   ppatFibrosis: [17],
   ppatGeom: [18],
@@ -106,6 +113,7 @@ export const FIELD_REFERENCES: Record<string, number[]> = {
   mus2: [26, 27],
   mus3: [26, 27],
   mus4: [26, 27],
+  gg: [8, 10, 28, 29, 30],
   posC: [8, 10, 28, 29, 30],
   maxI: [8, 29],
   pni: [31],

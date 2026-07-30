@@ -68,7 +68,7 @@ export function PublicLandingPage() {
       </div>
 
       <p className="max-w-md text-sm text-muted-foreground">
-        If a patient sent you a link to view your case, use that link directly.
+        Patients: please use the link shared with you to view your case.
         Clinicians and staff sign in below.
       </p>
 
