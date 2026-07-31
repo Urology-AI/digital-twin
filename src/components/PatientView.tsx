@@ -257,18 +257,24 @@ function ResetBanner({ isDirty, onReset }: { isDirty: boolean; onReset: () => vo
 export function PatientView() {
   const heatmapVisible = useUiStore((s) => s.heatmapVisible);
   const toggleHeatmap = useUiStore((s) => s.toggleHeatmap);
+  const overlay = useUiStore((s) => s.overlay);
+  const setOverlay = useUiStore((s) => s.setOverlay);
   const patientViewLocked = useUiStore((s) => s.patientViewLocked);
   const { isDirty, reset, resetVersion } = useResetToOriginal();
 
-  // The clinical risk heatmap (zone colouring, boundary grid) is built to
-  // answer a surgeon's questions, not a patient's — keep it off here so the
-  // 3D model shows plain anatomy only. Force off for the duration of patient
+  // Patients get a simplified cancer-risk heatmap on the 3D model (plain
+  // Low/Moderate/High colouring, no ECE/SVI/PSM jargon or numeric legend —
+  // those clinical overlay controls aren't rendered in patient view at all).
+  // Force the overlay on and pinned to "cancer" for the duration of patient
   // view; restore whatever it was set to when leaving.
   useEffect(() => {
     const wasVisible = heatmapVisible;
-    if (wasVisible) toggleHeatmap();
+    const prevOverlay = overlay;
+    setOverlay("cancer");
+    if (!wasVisible) toggleHeatmap();
     return () => {
-      if (wasVisible) toggleHeatmap();
+      setOverlay(prevOverlay);
+      if (!wasVisible) toggleHeatmap();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
