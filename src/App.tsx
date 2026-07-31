@@ -9,6 +9,7 @@ import { InflammationWorkspace } from "@/components/InflammationWorkspace";
 import { PatientView, PatientViewHeader } from "@/components/PatientView";
 import { ThreeCanvas } from "@/components/ThreeCanvas";
 import { ZoneLabelsOverlay } from "@/components/ZoneLabelsOverlay";
+import { OrientationBadge } from "@/components/OrientationBadge";
 import { CaseLog } from "@/components/CaseLog";
 import { ShareLinkModal } from "@/components/ShareLinkModal";
 import { ChatWidget } from "@/components/ChatWidget";
@@ -157,14 +158,16 @@ export default function App() {
           <div className="absolute inset-0 min-h-0 min-w-0" data-tutorial="three-canvas">
             <ThreeCanvas />
           </div>
-          {/* Controls/labels: visible on the predictions tab */}
-          <div className={cn(!onPredictions && "hidden")}>
+          {/* Controls/labels: visible on the predictions tab (clinical view only) */}
+          <div className={cn((!onPredictions || patientView) && "hidden")}>
             <ControlsOverlay />
             <ZoneLabelsOverlay />
+            <OrientationBadge />
             <DimOverlay />
           </div>
           {patientView && patientView3DOpen && (
             <>
+              <OrientationBadge />
               <Button
                 variant="secondary"
                 size="sm"
@@ -173,9 +176,15 @@ export default function App() {
               >
                 <X className="h-4 w-4" /> Close 3D model
               </Button>
-              <div className="pointer-events-none absolute inset-x-0 bottom-6 z-50 flex justify-center px-4">
+              <div className="pointer-events-none absolute inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-4">
+                <div className="flex items-center gap-2 rounded-lg bg-black/70 px-3 py-1.5 text-xs text-white/90 backdrop-blur">
+                  <span className="h-2 w-6 rounded-full" style={{ background: "linear-gradient(to right,#22c55e,#eab308,#ef4444)" }} />
+                  <span>Lower risk</span>
+                  <span className="mx-1 text-white/40">→</span>
+                  <span>Higher risk</span>
+                </div>
                 <div className="rounded-lg bg-black/70 px-4 py-2.5 text-center text-sm text-white/90 backdrop-blur">
-                  This is a 3D model of your prostate, built from your own scan measurements. Drag to rotate.
+                  This is a 3D model of your prostate, colored by cancer risk, built from your own scan measurements. Drag to rotate.
                 </div>
               </div>
             </>
