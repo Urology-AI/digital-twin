@@ -1,13 +1,29 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { X, CloudUpload, CloudDownload, Cloud, CloudOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydratePatientsFromCaseLog, hydratePatientLibrary, getPatientLibrary, mergePatientLibrary, syncPatientLibraryToStore } from "@/store/patientStore";
-import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
-import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
+import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydratePatientsFromCaseLog, hydratePatientLibrary, getPatientLibrary, mergePatientLibrary, syncPatientLibraryToStore, type PatientEntry } from "@/store/patientStore";
 import { cn } from "@/lib/utils";
 import { pushCases, pullCases, checkTursoHealth, hasCloudId } from "@/lib/turso";
 
 const CASE_LOG_KEY = "compass_cases";
+// Tracks which patient entries (by PatientEntry.id) have been saved to the
+// case log, so imported/unsaved patients can be flagged separately.
+const SAVED_PATIENT_IDS_KEY = "compass_saved_patient_ids";
+
+function getSavedPatientIds(): Set<string> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SAVED_PATIENT_IDS_KEY) || "[]") as string[];
+    return new Set(raw);
+  } catch {
+    return new Set();
+  }
+}
+
+function markPatientSaved(id: string) {
+  const ids = getSavedPatientIds();
+  ids.add(id);
+  localStorage.setItem(SAVED_PATIENT_IDS_KEY, JSON.stringify([...ids]));
+}
 
 export interface CaseRecord {
   id: string;
@@ -120,12 +136,14 @@ function riskCls(v: number) {
 export function CaseLog({ onClose }: { onClose: () => void }) {
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
-  const predictions = usePatientStore((s) => s.predictions);
   const importJsonFile = usePatientStore((s) => s.importJsonFile);
   const setActive = usePatientStore((s) => s.setActive);
   const setPatientName = usePatientStore((s) => s.setPatientName);
+  const removePatient = usePatientStore((s) => s.removePatient);
+  const computeEntryPredictions = usePatientStore((s) => s.computeEntryPredictions);
 
   const [cases, setCases] = useState<CaseRecord[]>([]);
+  const [savedPatientIds, setSavedPatientIds] = useState<Set<string>>(() => getSavedPatientIds());
   const [syncStatus, setSyncStatus] = useState<string>("");
   const [syncing, setSyncing] = useState(false);
   // null = still checking. A real round-trip to the Worker/Turso, not just
@@ -228,17 +246,8 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
     reload();
   }, [reload]);
 
-  const saveCurrentCase = () => {
-    const entry = patients.find((p) => p.id === activeId);
-    if (!entry || !predictions) {
-      alert("No patient data loaded.");
-      return;
-    }
-    const rec = { ...entry.record, lesions: entry.lesionRows };
-    const S = deriveClinicalFromLesions(
-      clinicalStateFromRecord(rec),
-      lesionsFromRows(entry.lesionRows),
-    );
+  const saveEntry = (entry: PatientEntry) => {
+    const { S, predictions } = computeEntryPredictions(entry);
 
     const c: CaseRecord = {
       id: "C" + Date.now(),
@@ -308,10 +317,24 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
     // Sync the newly saved entry into the live store so the header dropdown updates
     // without needing a page reload.
     hydratePatientLibrary();
-    // Rename the still-active patient too, so the header dropdown stops showing
+    // Rename the patient too, so the header dropdown stops showing
     // the placeholder "New Case" once it's actually been saved to the case log.
-    if (activeId) setPatientName(activeId, displayName);
+    setPatientName(entry.id, displayName);
+
+    markPatientSaved(entry.id);
+    setSavedPatientIds(getSavedPatientIds());
   };
+
+  const saveCurrentCase = () => {
+    const entry = patients.find((p) => p.id === activeId);
+    if (!entry) {
+      alert("No patient data loaded.");
+      return;
+    }
+    saveEntry(entry);
+  };
+
+  const unsavedPatients = patients.filter((p) => !savedPatientIds.has(p.id));
 
   const updatePath = (idx: number, field: keyof CaseRecord, raw: string) => {
     const updated = getCases();
@@ -491,6 +514,65 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
             </div>
           )}
         </div>
+
+        {unsavedPatients.length > 0 && (
+          <div className="mb-4 space-y-2">
+            <h3 className="text-[10px] font-semibold uppercase tracking-wide text-amber-500">
+              Unsaved / Untracked ({unsavedPatients.length})
+            </h3>
+            {unsavedPatients.map((p) => (
+              <div
+                key={p.id}
+                className={cn(
+                  "flex items-center justify-between rounded-lg border border-dashed p-3",
+                  p.id === activeId
+                    ? "border-primary ring-1 ring-primary/30"
+                    : "border-amber-500/40",
+                )}
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  {p.id === activeId && (
+                    <span className="rounded bg-primary/20 px-1.5 py-0.5 text-[9px] font-bold uppercase text-primary tracking-wide">
+                      Current
+                    </span>
+                  )}
+                  <span className="font-semibold text-sm">{p.name}</span>
+                  <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-500">
+                    Unsaved
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  {p.id !== activeId && (
+                    <button
+                      type="button"
+                      onClick={() => setActive(p.id)}
+                      className="text-xs text-primary hover:underline"
+                    >
+                      load
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => saveEntry(p)}
+                    className="text-xs text-emerald-500 hover:underline"
+                  >
+                    save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!confirm(`Discard "${p.name}"? This only removes it from the dropdown, not any saved case.`)) return;
+                      removePatient(p.id);
+                    }}
+                    className="text-xs text-red-500 hover:underline"
+                  >
+                    discard
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {cases.length === 0 ? (
           <div className="rounded-lg border border-dashed border-border/70 py-10 text-center text-sm text-muted-foreground">
