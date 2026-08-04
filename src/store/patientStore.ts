@@ -9,7 +9,7 @@ import {
   deriveClinicalFromLesions,
   lesionsFromRows,
 } from "@/lib/utils/normalization";
-import type { Prostate3DInputV1, ZoneMap } from "@/types/patient";
+import type { ClinicalState, Prostate3DInputV1, ZoneMap } from "@/types/patient";
 import type { LesionRow } from "@/types/lesion";
 import type { CompassPredictions, ThreeZoneRuntime } from "@/types/prediction";
 import { emptyLesion } from "@/types/lesion";
@@ -80,6 +80,10 @@ interface PatientState {
   redo: () => void;
   pushHistory: () => void;
   recompute: () => void;
+  computeEntryPredictions: (entry: PatientEntry) => {
+    S: ClinicalState;
+    predictions: CompassPredictions;
+  };
 }
 
 function snapshot(state: PatientState): string {
@@ -214,6 +218,19 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       const threeZones = clone(createBaseThreeZones());
       const predictions = runCompassModels(S, working, entry.lesionRows, threeZones);
       set({ predictions, threeZones });
+    },
+
+    computeEntryPredictions: (entry) => {
+      const record = clone(entry.record);
+      record.zones = mergeZones(record.zones);
+      record.lesions = entry.lesionRows;
+      const S0 = clinicalStateFromRecord(record);
+      const S = deriveClinicalFromLesions(S0, lesionsFromRows(entry.lesionRows));
+      mapLesionsToZones(record.zones, entry.lesionRows, S);
+      const working: Prostate3DInputV1 = { ...record, zones: record.zones };
+      const threeZones = clone(createBaseThreeZones());
+      const predictions = runCompassModels(S, working, entry.lesionRows, threeZones);
+      return { S, predictions };
     },
 
     restorePatientRecord: (id, record, lesionRows) => {
