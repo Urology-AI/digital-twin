@@ -23,6 +23,49 @@ function computeCI(pct: number): { lo: number; hi: number } {
   return { lo: Math.round(Math.max(1, lo * 100)), hi: Math.round(Math.min(99, hi * 100)) };
 }
 
+// ── Recovery trajectory expand modal ────────────────────────────────────────────
+function RecoveryChartModal({ open, onClose, potency, continence, shimValid }: {
+  open: boolean;
+  onClose: () => void;
+  potency: (number | null)[];
+  continence: (number | null)[];
+  shimValid: boolean;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40" />
+      <div
+        className="relative z-10 w-full max-w-4xl rounded-xl border border-border bg-card shadow-xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-semibold">Recovery Trajectories</h2>
+            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+              {shimValid && (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-4 rounded-full bg-blue-500 inline-block" />
+                  Potency
+                </span>
+              )}
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-4 rounded-full bg-violet-500 inline-block" />
+                Continence
+              </span>
+            </div>
+          </div>
+          <button type="button" onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-lg leading-none">✕</button>
+        </div>
+        <div className="px-5 py-5">
+          <RecoveryLineChart potency={potency} continence={continence} height={380} large />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Info modal ────────────────────────────────────────────────────────────────
 function InfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
@@ -194,15 +237,26 @@ function NsGradeSelector({ side, value, onChange }: {
 // ── Line chart ────────────────────────────────────────────────────────────────
 const TIME_LABELS = ["6 wk", "3 mo", "6 mo", "12 mo", "18 mo"];
 
-function RecoveryLineChart({ potency, continence }: {
+function RecoveryLineChart({ potency, continence, height = 140, large = false }: {
   potency: (number | null)[];
   continence: (number | null)[];
+  height?: number;
+  large?: boolean;
 }) {
-  const W = 400, H = 140;
-  const padL = 34, padR = 12, padT = 22, padB = 26;
+  const W = large ? 640 : 400, H = height;
+  const padL = large ? 42 : 34, padR = large ? 20 : 12, padT = large ? 28 : 22, padB = large ? 34 : 26;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
   const n = TIME_LABELS.length;
+  const dotR = large ? 5 : 3.5;
+  const lineW = large ? 3.5 : 2.5;
+  const labelSize = large ? 13 : 9;
+  const axisSize = large ? 12 : 9;
+  const labelGap = large ? 18 : 12;
+  // Minimum vertical separation (px) below which two same-index labels would
+  // visually collide; when lines converge, push labels further apart instead
+  // of letting them overlap.
+  const minSep = large ? 30 : 16;
 
   const xOf = (i: number) => padL + (i / (n - 1)) * plotW;
   const yOf = (v: number) => padT + (1 - v / 100) * plotH;
@@ -220,6 +274,24 @@ function RecoveryLineChart({ potency, continence }: {
   const grids = [25, 50, 75, 100];
   const potencyHasData = potency.some(v => v !== null);
 
+  // Decide, per time point, which series sits above the other so labels can
+  // be pushed outward (away from the other line) instead of overlapping when
+  // the two curves converge near the top of the chart.
+  function labelOffsets(i: number): { continence: number; potency: number } {
+    const c = continence[i], p = potency[i];
+    if (c === null || p === null || !potencyHasData) {
+      return { continence: labelGap, potency: -labelGap * 0.65 };
+    }
+    const dy = Math.abs(yOf(c) - yOf(p));
+    const extra = dy < minSep ? (minSep - dy) : 0;
+    if (yOf(c) <= yOf(p)) {
+      // continence dot sits above (or level with) potency dot → push its
+      // label further up, and potency's label further down, away from each other
+      return { continence: -(labelGap * 0.65 + extra), potency: labelGap + extra };
+    }
+    return { continence: labelGap + extra, potency: -(labelGap * 0.65 + extra) };
+  }
+
   return (
     <svg viewBox={`0 0 ${W} ${H}`} className="w-full overflow-visible" style={{ height: H }}>
       {/* Grid lines */}
@@ -230,36 +302,38 @@ function RecoveryLineChart({ potency, continence }: {
       {/* Y-axis labels */}
       {grids.map(g => (
         <text key={g} x={padL - 6} y={yOf(g)} textAnchor="end" dominantBaseline="middle"
-          fill="currentColor" fillOpacity={0.35} fontSize={9}>{g}%</text>
+          fill="currentColor" fillOpacity={0.35} fontSize={axisSize}>{g}%</text>
       ))}
       {/* X-axis baseline */}
       <line x1={padL} y1={padT + plotH} x2={W - padR} y2={padT + plotH}
         stroke="currentColor" strokeOpacity={0.15} strokeWidth={1} />
       {/* X-axis labels */}
       {TIME_LABELS.map((lbl, i) => (
-        <text key={i} x={xOf(i)} y={H - 4} textAnchor="middle"
-          fill="currentColor" fillOpacity={0.45} fontSize={10}>{lbl}</text>
+        <text key={i} x={xOf(i)} y={H - (large ? 8 : 4)} textAnchor="middle"
+          fill="currentColor" fillOpacity={0.45} fontSize={axisSize}>{lbl}</text>
       ))}
 
       {/* Continence line + dots */}
-      <path d={buildPath(continence)} fill="none" stroke="#8b5cf6" strokeWidth={2.5}
+      <path d={buildPath(continence)} fill="none" stroke="#8b5cf6" strokeWidth={lineW}
         strokeLinecap="round" strokeLinejoin="round" />
       {continence.map((v, i) => v !== null && (
         <g key={i}>
-          <circle cx={xOf(i)} cy={yOf(v)} r={3.5} fill="#8b5cf6" />
-          <text x={xOf(i)} y={yOf(v) + 14} textAnchor="middle" fill="#8b5cf6" fontSize={9} fontWeight="bold">{v}%</text>
+          <circle cx={xOf(i)} cy={yOf(v)} r={dotR} fill="#8b5cf6" />
+          <text x={xOf(i)} y={yOf(v) + labelOffsets(i).continence} textAnchor="middle"
+            fill="#8b5cf6" fontSize={labelSize} fontWeight="bold">{v}%</text>
         </g>
       ))}
 
       {/* Potency line + dots (only if SHIM valid) */}
       {potencyHasData && (
         <>
-          <path d={buildPath(potency)} fill="none" stroke="#3b82f6" strokeWidth={2.5}
+          <path d={buildPath(potency)} fill="none" stroke="#3b82f6" strokeWidth={lineW}
             strokeLinecap="round" strokeLinejoin="round" />
           {potency.map((v, i) => v !== null && (
             <g key={i}>
-              <circle cx={xOf(i)} cy={yOf(v)} r={3.5} fill="#3b82f6" />
-              <text x={xOf(i)} y={yOf(v) - 8} textAnchor="middle" fill="#3b82f6" fontSize={9} fontWeight="bold">{v}%</text>
+              <circle cx={xOf(i)} cy={yOf(v)} r={dotR} fill="#3b82f6" />
+              <text x={xOf(i)} y={yOf(v) + labelOffsets(i).potency} textAnchor="middle"
+                fill="#3b82f6" fontSize={labelSize} fontWeight="bold">{v}%</text>
             </g>
           ))}
         </>
@@ -300,6 +374,7 @@ export function FunctionalOutcomesPanel() {
   const [nsOverrideL, setNsOverrideL] = useState<1|2|3|null>(null);
   const [nsOverrideR, setNsOverrideR] = useState<1|2|3|null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [chartExpanded, setChartExpanded] = useState(false);
 
   // Reset NS overrides when the active patient changes
   const prevActiveId = useRef(activeId);
@@ -340,6 +415,13 @@ export function FunctionalOutcomesPanel() {
   return (
     <div className="flex flex-col gap-4">
       <InfoModal open={infoOpen} onClose={() => setInfoOpen(false)} />
+      <RecoveryChartModal
+        open={chartExpanded}
+        onClose={() => setChartExpanded(false)}
+        potency={result.shimValid ? result.potencyTimeline : result.potencyTimeline.map(() => null)}
+        continence={result.continenceTimeline}
+        shimValid={result.shimValid}
+      />
 
       {/* NS Grade selectors */}
       <Card>
@@ -453,6 +535,14 @@ export function FunctionalOutcomesPanel() {
                 <span className="h-2 w-4 rounded-full bg-violet-500 inline-block" />
                 Continence
               </span>
+              <button type="button" onClick={() => setChartExpanded(true)}
+                className="flex h-5 w-5 items-center justify-center rounded border border-border text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors"
+                title="Expand chart"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                  <path d="M15 3h6v6" /><path d="M9 21H3v-6" /><path d="M21 3l-7 7" /><path d="M3 21l7-7" />
+                </svg>
+              </button>
             </div>
           </div>
         </CardHeader>
