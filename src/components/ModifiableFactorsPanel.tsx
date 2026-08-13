@@ -67,8 +67,8 @@ export function ModifiableFactorsPanel() {
   const [htn, setHtn] = useState(false);
   const [cad, setCad] = useState(false);
 
-  // Sync local state from the record whenever the active patient changes OR
-  // when the BMI/SHIM/IPSS values change externally (e.g. computed from the
+  // Sync local state from the record whenever the active patient changes or
+  // any mirrored field changes externally (e.g. report import, reset, or the
   // height+weight helper in the Input wizard).
   useEffect(() => {
     if (!entry) return;
@@ -86,7 +86,21 @@ export function ModifiableFactorsPanel() {
     setDm(rec.patient.dm ?? false);
     setHtn(rec.patient.htn ?? false);
     setCad(rec.patient.cad ?? false);
-  }, [entry?.id, entry?.record.patient.bmi, entry?.record.patient.shim, entry?.record.patient.ipss]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    entry?.id,
+    entry?.record.patient.bmi,
+    entry?.record.patient.shim,
+    entry?.record.patient.ipss,
+    entry?.record.patient.smoking,
+    entry?.record.patient.exercise,
+    entry?.record.patient.pfmt,
+    entry?.record.patient.alcohol,
+    entry?.record.patient.pde5_plan,
+    entry?.record.patient.pde5,
+    entry?.record.patient.dm,
+    entry?.record.patient.htn,
+    entry?.record.patient.cad,
+  ]);
 
   const handleBmi = (v: string) => {
     setBmi(v);

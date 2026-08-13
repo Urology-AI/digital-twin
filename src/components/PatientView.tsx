@@ -169,7 +169,7 @@ function Basics() {
     setAge(rec.patient.age != null && rec.patient.age > 0 ? String(rec.patient.age) : "");
     setPsa(rec.patient.psa != null && rec.patient.psa > 0 ? String(rec.patient.psa) : "");
     setVol(rec.prostate.volume_cc != null && rec.prostate.volume_cc > 0 ? String(rec.prostate.volume_cc) : "");
-  }, [entry?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [entry?.id, entry?.record.patient.age, entry?.record.patient.psa, entry?.record.prostate.volume_cc]);
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
@@ -201,18 +201,12 @@ function Basics() {
  * and offers a one-click reset. Only shown for locked (patient-link)
  * sessions — a clinician previewing their own case doesn't need this, it's
  * already their live data either way.
- *
- * Tracks the snapshot itself (not just whether it's dirty) so the parent can
- * remount `ModifiableFactorsPanel` on reset — that panel only re-syncs its
- * internal state from a few of the record's fields, not all of them, so a
- * wholesale record replacement needs a fresh mount to actually show up.
  */
 function useResetToOriginal() {
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
   const restorePatientRecord = usePatientStore((s) => s.restorePatientRecord);
   const entry = patients.find((p) => p.id === activeId);
-  const [resetVersion, setResetVersion] = useState(0);
 
   const snapshotRef = useRef<{ id: string; record: string; lesionRows: string } | null>(null);
   if (entry && snapshotRef.current?.id !== entry.id) {
@@ -236,10 +230,9 @@ function useResetToOriginal() {
       JSON.parse(snapshotRef.current.record),
       JSON.parse(snapshotRef.current.lesionRows),
     );
-    setResetVersion((v) => v + 1);
   };
 
-  return { isDirty, reset, resetVersion };
+  return { isDirty, reset };
 }
 
 function ResetBanner({ isDirty, onReset }: { isDirty: boolean; onReset: () => void }) {
@@ -260,7 +253,7 @@ export function PatientView() {
   const overlay = useUiStore((s) => s.overlay);
   const setOverlay = useUiStore((s) => s.setOverlay);
   const patientViewLocked = useUiStore((s) => s.patientViewLocked);
-  const { isDirty, reset, resetVersion } = useResetToOriginal();
+  const { isDirty, reset } = useResetToOriginal();
 
   // Patients get a simplified cancer-risk heatmap on the 3D model (plain
   // Low/Moderate/High colouring, no ECE/SVI/PSM jargon or numeric legend —
@@ -291,10 +284,7 @@ export function PatientView() {
           <Basics />
           <div className="rounded-xl border border-border bg-card p-4">
             <h3 className="mb-3 text-base font-semibold text-foreground">Things you can influence</h3>
-            {/* key forces a remount on reset — ModifiableFactorsPanel only
-                re-syncs a few fields from the record on update, not all of
-                them, so a wholesale record replacement needs a fresh mount. */}
-            <ModifiableFactorsPanel key={resetVersion} />
+            <ModifiableFactorsPanel />
           </div>
         </div>
       </div>
