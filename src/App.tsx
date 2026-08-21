@@ -134,6 +134,10 @@ export default function App() {
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
       {patientView ? <PatientViewHeader /> : <AppHeader />}
 
+      <div className="flex shrink-0 items-center justify-center border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-600 dark:text-amber-400 sm:text-[11px]">
+        Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment. Avoid photographing screens showing patient information.
+      </div>
+
       {/*
         Single content area — ThreeCanvas mounted once here so the WebGL context
         is never destroyed when switching tabs or workspaces. The canvas wrapper
@@ -167,6 +171,9 @@ export default function App() {
           </div>
           {patientView && patientView3DOpen && (
             <>
+              <div className="absolute inset-x-0 top-0 z-50 flex items-center justify-center border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-400 sm:text-[11px]">
+                Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment. Avoid photographing screens showing patient information.
+              </div>
               <OrientationBadge />
               <Button
                 variant="secondary"
