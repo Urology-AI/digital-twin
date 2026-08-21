@@ -135,7 +135,7 @@ export default function App() {
       {patientView ? <PatientViewHeader /> : <AppHeader />}
 
       <div className="flex shrink-0 items-center justify-center border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-600 dark:text-amber-400 sm:text-[11px]">
-        Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment. Avoid photographing screens showing patient information.
+        Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment.
       </div>
 
       {/*
@@ -172,7 +172,7 @@ export default function App() {
           {patientView && patientView3DOpen && (
             <>
               <div className="absolute inset-x-0 top-0 z-50 flex items-center justify-center border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-400 sm:text-[11px]">
-                Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment. Avoid photographing screens showing patient information.
+                Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment.
               </div>
               <OrientationBadge />
               <Button
