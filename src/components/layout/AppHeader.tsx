@@ -54,7 +54,7 @@ export function AppHeader() {
   const active = patients.find((p) => p.id === activeId);
 
   return (
-    <header className="z-40 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-card/95 px-3 backdrop-blur-md sm:px-4 supports-[backdrop-filter]:bg-card/85">
+    <header className="z-40 flex h-14 shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-card/95 px-3 backdrop-blur-md sm:px-4 supports-[backdrop-filter]:bg-card/85">
       {/* Brand — click to reopen welcome screen */}
       <button
         type="button"

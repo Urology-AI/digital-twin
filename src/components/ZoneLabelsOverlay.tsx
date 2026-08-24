@@ -90,7 +90,7 @@ export function ZoneLabelsOverlay() {
                         : "text-red-400",
                       )}
                     >
-                      {item.pct}%
+                      {item.pct}% {overlayName}
                     </span>
                   </div>
                   {/* Mini progress bar */}

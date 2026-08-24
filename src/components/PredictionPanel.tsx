@@ -244,6 +244,11 @@ export function PredictionPanel() {
                     <td className={cn("py-1.5 px-2", riskCls(predictions.eceL))}>{Math.round(predictions.eceL * 100)}%</td>
                     <td className={cn("py-1.5 px-2", riskCls(predictions.eceR))}>{Math.round(predictions.eceR * 100)}%</td>
                   </tr>
+                  <tr className="border-b border-border/60">
+                    <td className="py-1.5 font-medium">Side SVI</td>
+                    <td className={cn("py-1.5 px-2", riskCls(predictions.sviL))}>{Math.round(predictions.sviL * 100)}%</td>
+                    <td className={cn("py-1.5 px-2", riskCls(predictions.sviR))}>{Math.round(predictions.sviR * 100)}%</td>
+                  </tr>
                   {predictions.ece >= 0.05 && (
                     <tr className="border-b border-border/60 text-muted-foreground">
                       <td className="py-1.5">If ECE</td>

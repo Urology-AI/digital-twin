@@ -204,12 +204,12 @@ function ZoneCell({ zone, data, cancer, selected, onClick }: {
   const filled = hasData(data);
   const pct = Math.round(cancer * 100);
   return (
-    <button type="button" onClick={onClick}
+    <button type="button" onClick={onClick} title={zone.label}
       className={cn(
         "relative flex flex-col items-center justify-between rounded-md border p-2 transition-all w-full min-h-[80px]",
         riskBorder(cancer, selected, filled),
       )}>
-      <span className="text-[11px] font-semibold leading-tight text-center text-foreground/90">{zone.label}</span>
+      <span className="text-[11px] font-semibold leading-tight text-center text-foreground/90">{zone.shortLabel}</span>
       <div className="flex gap-0.5 mt-1">
         {data?.pirads && data.pirads > 0 ? <span className="inline-flex h-[14px] w-[14px] items-center justify-center rounded-sm bg-blue-500 text-[8px] font-bold text-white">M</span> : null}
         {data?.primus && data.primus > 0 ? <span className="inline-flex h-[14px] w-[14px] items-center justify-center rounded-sm bg-teal-500 text-[8px] font-bold text-white">U</span> : null}
