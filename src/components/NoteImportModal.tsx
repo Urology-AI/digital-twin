@@ -138,7 +138,7 @@ interface Props {
   onApply: (rows: LesionRow[], clinical: NoteImportClinical) => void;
 }
 
-type Step = "example" | "paste" | "check" | "fix";
+type Step = "example" | "paste" | "check" | "fix" | "done";
 
 const STEP_DEFS: { key: Step; label: string; sub: string }[] = [
   { key: "example", label: "Show example",  sub: "See the expected format" },
@@ -207,7 +207,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
 
   function handleApply() {
     onApply(reviewEntriesToRows(entries), clinical);
-    onClose();
+    setStep("done");
   }
 
   const stepIdx = STEP_DEFS.findIndex((s) => s.key === step);
@@ -491,6 +491,25 @@ export function NoteImportModal({ onClose, onApply }: Props) {
                   Apply to grid ({entries.length})
                 </Button>
               </div>
+            </div>
+          </>
+        )}
+
+        {/* ── Step 5: Confirmation ── */}
+        {step === "done" && (
+          <>
+            <div className="flex-1 space-y-3 px-5 py-6">
+              <p className="text-sm font-semibold text-emerald-400">✓ Applied to the zone grid</p>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li>{entries.length} lesion {entries.length === 1 ? "entry" : "entries"} added across the zone grid</li>
+                {Object.keys(clinical).length > 0 && (
+                  <li>{Object.keys(clinical).length} demographic/clinical field{Object.keys(clinical).length === 1 ? "" : "s"} updated</li>
+                )}
+              </ul>
+              <p className="text-xs text-muted-foreground/70">Review the Zone Locations tab to confirm the values look right.</p>
+            </div>
+            <div className="flex shrink-0 items-center justify-end border-t border-border px-5 py-3">
+              <Button size="sm" onClick={onClose}>Done</Button>
             </div>
           </>
         )}

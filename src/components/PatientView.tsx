@@ -25,12 +25,12 @@ export function PatientViewHeader() {
   const setPatientView3DOpen = useUiStore((s) => s.setPatientView3DOpen);
   const patientViewLocked = useUiStore((s) => s.patientViewLocked);
   return (
-    <div className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3">
-      <div>
-        <div className="text-lg font-bold text-foreground">COMPASS — your summary</div>
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-4 py-3">
+      <div className="min-w-0">
+        <div className="truncate text-lg font-bold text-foreground">COMPASS — your summary</div>
         <div className="text-xs text-muted-foreground">A simplified view of your case — talk to your care team about any of this.</div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => setPatientView3DOpen(true)} className="gap-1.5">
           <Box className="h-4 w-4" /> View 3D model
         </Button>
