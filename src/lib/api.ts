@@ -184,6 +184,10 @@ export interface ParsedClinicalFields {
   mus_ece?: number;
   mus_svi?: number;
   psma_lesion_count?: number;
+  bmi?: number;
+  decipher?: string;
+  shim?: number;
+  ipss?: number;
 }
 
 const PARSE_SYSTEM =
@@ -196,7 +200,8 @@ const PARSE_SYSTEM =
   "mri_abutment (0-1 fraction or 0/1), mri_adc (ADC value), " +
   "laterality (\"left\", \"right\", or \"bilateral\"), gg_left, gg_right, cores_left, cores_right, " +
   "suv (max PSMA SUV), psma_ln (0 or 1), psma_svi (0 or 1), mus_ece (0 or 1), mus_svi (0 or 1), " +
-  "psma_lesion_count (integer).\n" +
+  "psma_lesion_count (integer), bmi (body mass index), decipher (Decipher risk category string), " +
+  "shim (SHIM erectile function score 1-25), ipss (IPSS urinary symptom score 0-35).\n" +
   "Return only a JSON object. Do not guess values not present in the text.";
 
 export async function parseClinicalText(text: string): Promise<ParsedClinicalFields> {
