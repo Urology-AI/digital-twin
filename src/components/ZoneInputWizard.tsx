@@ -542,6 +542,31 @@ export function ZoneInputWizard() {
       if (clinical.gg !== undefined) updateClinicalForm({ gg: clinical.gg });
       if (clinical.cores !== undefined) updateClinicalForm({ cores: clinical.cores });
       if (clinical.maxcore !== undefined) updateClinicalForm({ maxcore: clinical.maxcore });
+      if (clinical.age !== undefined) {
+        setAge(String(clinical.age));
+        updateClinicalForm({ age: clinical.age });
+      }
+      if (clinical.psa !== undefined) {
+        setPsa(String(clinical.psa));
+        updateClinicalForm({ psa: clinical.psa });
+      }
+      if (clinical.bmi !== undefined) {
+        setBmiMode("bmi");
+        setBmiDirectVal(String(clinical.bmi));
+        updateClinicalForm({ bmi: clinical.bmi });
+      }
+      if (clinical.decipher !== undefined) {
+        setDecipher(clinical.decipher);
+        updateClinicalForm({ decipher: clinical.decipher });
+      }
+      if (clinical.shim !== undefined) {
+        setShim(String(clinical.shim));
+        updateClinicalForm({ shim: clinical.shim });
+      }
+      if (clinical.ipss !== undefined) {
+        setIpss(String(clinical.ipss));
+        updateClinicalForm({ ipss: clinical.ipss });
+      }
       pushHistory();
     },
     [zoneData, updateLesionRows, updateClinicalForm, pushHistory],
@@ -579,7 +604,7 @@ export function ZoneInputWizard() {
     <div className="flex h-full flex-col overflow-hidden">
 
       {/* ── Tab bar ── */}
-      <div className="flex shrink-0 border-b border-border bg-muted/20">
+      <div className="flex shrink-0 items-center border-b border-border bg-muted/20">
         {TABS.map((tab) => (
           <button
             key={tab.n}
@@ -604,7 +629,21 @@ export function ZoneInputWizard() {
             )}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setShowNoteImport(true)}
+          className="mr-3 flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-border/80 hover:bg-muted/50 hover:text-foreground"
+        >
+          ↑ Import note
+        </button>
       </div>
+
+      {showNoteImport && (
+        <NoteImportModal
+          onClose={() => setShowNoteImport(false)}
+          onApply={applyNoteImport}
+        />
+      )}
 
       {/* ── Tab 1: Demographics ── */}
       {activeTab === 1 && (
@@ -866,22 +905,8 @@ export function ZoneInputWizard() {
                     Clear all locations
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setShowNoteImport(true)}
-                  className="flex items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-border/80 hover:bg-muted/50 hover:text-foreground"
-                >
-                  ↑ Import note
-                </button>
               </div>
             </div>
-
-            {showNoteImport && (
-              <NoteImportModal
-                onClose={() => setShowNoteImport(false)}
-                onApply={applyNoteImport}
-              />
-            )}
 
             {/* Posterior grid */}
             <div className="shrink-0 rounded-lg border border-border bg-muted/10 p-3">

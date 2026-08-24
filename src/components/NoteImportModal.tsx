@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { parseClinicNote } from "@/lib/parseClinicNote";
+import { parseClinicalText } from "@/lib/api";
 import { emptyLesion, type LesionRow, type LesionSource } from "@/types/lesion";
 import { cn } from "@/lib/utils";
 
@@ -124,6 +125,12 @@ export interface NoteImportClinical {
   gg?: number;
   cores?: number;
   maxcore?: number;
+  age?: number;
+  psa?: number;
+  bmi?: number;
+  decipher?: string;
+  shim?: number;
+  ipss?: number;
 }
 
 interface Props {
@@ -147,18 +154,41 @@ export function NoteImportModal({ onClose, onApply }: Props) {
   const [clinical, setClinical] = useState<NoteImportClinical>({});
   const [parseError, setParseError] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [extracting, setExtracting] = useState(false);
 
-  function handleExtract() {
+  async function handleExtract() {
     setParseError("");
-    const parsed = parseClinicNote(noteText);
-    if (parsed.lesions.length === 0 && !parsed.prostateVolumeCc && parsed.biopsyGG === undefined) {
-      setParseError("No recognizable data found. Make sure your note has section headers: Biopsy, MRI, MUS, PSMA.");
-      return;
+    setExtracting(true);
+    try {
+      // Zone/lesion table always comes from the deterministic text parser —
+      // it's the source of truth for the per-zone grid the "fix" step edits.
+      const parsed = parseClinicNote(noteText);
+      if (parsed.lesions.length === 0 && !parsed.prostateVolumeCc && parsed.biopsyGG === undefined) {
+        setParseError("No recognizable data found. Make sure your note has section headers: Biopsy, MRI, MUS, PSMA.");
+        return;
+      }
+      const noteWarnings = [...(parsed.warnings ?? [])];
+      let demographics: NoteImportClinical = {};
+      try {
+        const llm = await parseClinicalText(noteText);
+        demographics = { age: llm.age, psa: llm.psa, bmi: llm.bmi, decipher: llm.decipher, shim: llm.shim, ipss: llm.ipss };
+      } catch {
+        noteWarnings.push("LLM-assisted demographic extraction unavailable — only zone/volume data from text patterns was used.");
+      }
+
+      setEntries(collapseToReviewEntries(parsed.lesions));
+      setClinical({
+        vol: parsed.prostateVolumeCc,
+        gg: parsed.biopsyGG,
+        cores: parsed.biopsyTotalCores,
+        maxcore: parsed.biopsyMaxCorePct,
+        ...demographics,
+      });
+      setWarnings(noteWarnings);
+      setStep("check");
+    } finally {
+      setExtracting(false);
     }
-    setEntries(collapseToReviewEntries(parsed.lesions));
-    setClinical({ vol: parsed.prostateVolumeCc, gg: parsed.biopsyGG, cores: parsed.biopsyTotalCores, maxcore: parsed.biopsyMaxCorePct });
-    setWarnings(parsed.warnings ?? []);
-    setStep("check");
   }
 
   function update(id: string, patch: Partial<ReviewEntry>) {
@@ -306,7 +336,9 @@ export function NoteImportModal({ onClose, onApply }: Props) {
               <Button variant="ghost" size="sm" onClick={() => setStep("example")}>← Back</Button>
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-                <Button size="sm" disabled={!noteText.trim()} onClick={handleExtract}>Check data →</Button>
+                <Button size="sm" disabled={!noteText.trim() || extracting} onClick={handleExtract}>
+                  {extracting ? "Extracting…" : "Check data →"}
+                </Button>
               </div>
             </div>
           </>
@@ -345,6 +377,21 @@ export function NoteImportModal({ onClose, onApply }: Props) {
                     {clinical.gg !== undefined && <span className="text-muted-foreground">Max GG <span className="font-semibold text-foreground">{clinical.gg}</span></span>}
                     {clinical.cores !== undefined && <span className="text-muted-foreground">+ve cores <span className="font-semibold text-foreground">{clinical.cores}</span></span>}
                     {clinical.maxcore !== undefined && <span className="text-muted-foreground">Max core% <span className="font-semibold text-foreground">{clinical.maxcore}%</span></span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Demographics (LLM-extracted) */}
+              {(clinical.age !== undefined || clinical.psa !== undefined || clinical.bmi !== undefined || clinical.decipher !== undefined || clinical.shim !== undefined || clinical.ipss !== undefined) && (
+                <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Demographics extracted (LLM)</p>
+                  <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                    {clinical.age !== undefined && <span className="text-muted-foreground">Age <span className="font-semibold text-foreground">{clinical.age}</span></span>}
+                    {clinical.psa !== undefined && <span className="text-muted-foreground">PSA <span className="font-semibold text-foreground">{clinical.psa} ng/mL</span></span>}
+                    {clinical.bmi !== undefined && <span className="text-muted-foreground">BMI <span className="font-semibold text-foreground">{clinical.bmi}</span></span>}
+                    {clinical.decipher !== undefined && <span className="text-muted-foreground">Decipher <span className="font-semibold text-foreground">{clinical.decipher}</span></span>}
+                    {clinical.shim !== undefined && <span className="text-muted-foreground">SHIM <span className="font-semibold text-foreground">{clinical.shim}</span></span>}
+                    {clinical.ipss !== undefined && <span className="text-muted-foreground">IPSS <span className="font-semibold text-foreground">{clinical.ipss}</span></span>}
                   </div>
                 </div>
               )}
