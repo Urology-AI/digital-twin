@@ -9,6 +9,7 @@ import {
   deriveClinicalFromLesions,
   lesionsFromRows,
 } from "@/lib/utils/normalization";
+import { defaultClinicalState } from "@/types/patient";
 import type { ClinicalState, Prostate3DInputV1, ZoneMap } from "@/types/patient";
 import type { LesionRow } from "@/types/lesion";
 import type { CompassPredictions, ThreeZoneRuntime } from "@/types/prediction";
@@ -73,6 +74,7 @@ interface PatientState {
   updateClinicalForm: (patch: Partial<import("@/types/patient").ClinicalState>) => void;
   /** Wholesale-replaces one patient's record + lesions — used by patient view's "reset to original" after local-only edits (e.g. Modifiable Factors exploration). */
   restorePatientRecord: (id: string, record: Prostate3DInputV1, lesionRows: LesionRow[]) => void;
+  newCase: () => void;
   importJsonFile: (text: string, label?: string) => void;
   exportActiveJson: () => string;
   resetActiveToSeed: () => void;
@@ -342,6 +344,20 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       );
       set({ patients: next });
       get().recompute();
+    },
+
+    newCase: () => {
+      const record = buildProstateRecord(defaultClinicalState(), []);
+      const id = `case-${Date.now()}`;
+      const entry: PatientEntry = {
+        id,
+        name: "New Case",
+        record,
+        lesionRows: [],
+      };
+      set({ patients: [...get().patients, entry], activeId: id });
+      get().recompute();
+      get().pushHistory();
     },
 
     importJsonFile: (text, label) => {

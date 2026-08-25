@@ -8,6 +8,7 @@ import {
   Layers,
   MessageCircle,
   Moon,
+  Plus,
   Printer,
   Redo2,
   Share2,
@@ -48,6 +49,7 @@ export function AppHeader() {
   const activeId = usePatientStore((s) => s.activeId);
   const loading = usePatientStore((s) => s.loading);
   const setActive = usePatientStore((s) => s.setActive);
+  const newCase = usePatientStore((s) => s.newCase);
   const undo = usePatientStore((s) => s.undo);
   const redo = usePatientStore((s) => s.redo);
 
@@ -106,6 +108,18 @@ export function AppHeader() {
             Shared · {active.record._shareId.slice(0, 8)}
           </span>
         )}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 shrink-0 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+          aria-label="New case"
+          title="New case"
+          onClick={() => newCase()}
+        >
+          <Plus className="h-[15px] w-[15px]" />
+          <span className="hidden text-xs font-medium lg:inline">New case</span>
+        </Button>
       </div>
 
       {/* Desktop tab switcher */}
