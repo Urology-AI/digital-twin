@@ -18,7 +18,7 @@ export function OutcomesWorkspace() {
           onClick={() => setPatientView(true)}
         >
           <UserRound className="h-3.5 w-3.5" />
-          Patient view
+          Patient summary
         </Button>
       </div>
       <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">

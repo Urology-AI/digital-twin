@@ -211,12 +211,12 @@ export function AppHeader() {
           variant="ghost"
           size="sm"
           className="h-8 gap-1.5 px-2 text-blue-400 hover:text-blue-300"
-          aria-label="Switch to patient view"
-          title="Patient view"
+          aria-label="Switch to patient summary"
+          title="Patient summary"
           onClick={() => setPatientView(true)}
         >
           <UserRound className="h-[15px] w-[15px]" />
-          <span className="hidden text-xs font-medium lg:inline">Patient view</span>
+          <span className="hidden text-xs font-medium lg:inline">Patient summary</span>
         </Button>
 
         <Button
@@ -227,12 +227,12 @@ export function AppHeader() {
             "h-8 gap-1.5 px-2",
             presenterView ? "text-violet-300 bg-violet-500/15" : "text-violet-400 hover:text-violet-300",
           )}
-          aria-label={presenterView ? "Exit presenter view" : "Open presenter view"}
-          title="Presenter view"
+          aria-label={presenterView ? "Exit overview mode" : "Open overview mode"}
+          title="Overview mode"
           onClick={() => setPresenterView(!presenterView)}
         >
           <Monitor className="h-[15px] w-[15px]" />
-          <span className="hidden text-xs font-medium lg:inline">Presenter</span>
+          <span className="hidden text-xs font-medium lg:inline">Overview</span>
         </Button>
 
         <Button
