@@ -107,6 +107,8 @@ interface UiState {
   patientViewLocked: boolean;
   /** Full-screen 3D model overlay, opened on demand from within patient view. */
   patientView3DOpen: boolean;
+  /** Full-screen presenter overlay — big-type highlight of ECE/SVI/potency/continence for showing to a patient or in a meeting. */
+  presenterView: boolean;
   /** Local autosave status, shown as a header dot — reflects localStorage writes only, not cloud sync. */
   saveStatus: "saving" | "saved";
   setSaveStatus: (v: "saving" | "saved") => void;
@@ -129,6 +131,7 @@ interface UiState {
   setDesktopTab: (t: DesktopTab) => void;
   setPatientView: (v: boolean) => void;
   setPatientView3DOpen: (v: boolean) => void;
+  setPresenterView: (v: boolean) => void;
   startTutorial: () => void;
   nextTutorialStep: () => void;
   prevTutorialStep: () => void;
@@ -166,6 +169,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   patientView: initialPatientView,
   patientViewLocked: initialPatientViewLocked,
   patientView3DOpen: false,
+  presenterView: false,
   saveStatus: "saved",
   setSaveStatus: (v) => set({ saveStatus: v }),
   setDark: (v) => {
@@ -204,6 +208,7 @@ export const useUiStore = create<UiState>((set, get) => ({
     set({ patientView: v, patientViewLocked: locked, patientView3DOpen: false });
   },
   setPatientView3DOpen: (v) => set({ patientView3DOpen: v }),
+  setPresenterView: (v) => set({ presenterView: v }),
   startTutorial: () => {
     try { localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch { /* private mode */ }
     set({ tutorialStep: 0, welcomeOpen: false, desktopTab: "input", wizardTab: null });
