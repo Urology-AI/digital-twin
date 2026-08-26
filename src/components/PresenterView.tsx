@@ -31,23 +31,23 @@ function riskTone(v: number): { label: string; text: string; bg: string; ring: s
 function RiskTile({ title, value }: { title: string; value: number }) {
   const tone = riskTone(value);
   return (
-    <div className={cn("flex flex-col items-center justify-center gap-2 rounded-2xl p-8 text-center ring-1", tone.bg, tone.ring)}>
-      <span className="text-sm font-medium uppercase tracking-wide text-muted-foreground">{title}</span>
-      <span className={cn("text-6xl font-bold tabular-nums", tone.text)}>{Math.round(value * 100)}%</span>
-      <span className={cn("text-sm font-semibold", tone.text)}>{tone.label}</span>
+    <div className={cn("flex flex-col items-center justify-center gap-1.5 rounded-2xl p-6 text-center ring-1", tone.bg, tone.ring)}>
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</span>
+      <span className={cn("text-5xl font-bold tabular-nums", tone.text)}>{Math.round(value * 100)}%</span>
+      <span className={cn("text-xs font-semibold", tone.text)}>{tone.label}</span>
     </div>
   );
 }
 
 function RecoveryTile({ title, value }: { title: string; value: number | null }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-blue-500/10 p-8 text-center ring-1 ring-blue-500/30">
-      <span className="text-sm font-medium uppercase tracking-wide text-muted-foreground">{title}</span>
-      <span className="text-6xl font-bold tabular-nums text-blue-400">
+    <div className="flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-blue-500/10 p-6 text-center ring-1 ring-blue-500/30">
+      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</span>
+      <span className="text-5xl font-bold tabular-nums text-blue-400">
         {value === null ? "—" : `${Math.round(value)}%`}
       </span>
-      <span className="text-sm font-semibold text-blue-400">
-        {value === null ? "Not estimable" : "Predicted recovery at 12 months"}
+      <span className="text-xs font-semibold text-blue-400">
+        {value === null ? "Not estimable" : "Predicted at 12 months"}
       </span>
     </div>
   );
@@ -68,11 +68,11 @@ export function PresenterView() {
     : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto bg-background">
-      <div className="flex shrink-0 items-center justify-between border-b border-border/50 px-6 py-4">
+    <div className="flex flex-col gap-5">
+      <div className="flex items-center justify-between">
         <div>
-          <div className="text-lg font-semibold">Presenter view</div>
-          {entry && <div className="text-sm text-muted-foreground">{entry.name}</div>}
+          <div className="text-base font-semibold">Overview mode</div>
+          {entry && <div className="text-xs text-muted-foreground">{entry.name}</div>}
         </div>
         <Button
           type="button"
@@ -81,34 +81,28 @@ export function PresenterView() {
           className="gap-1.5"
           onClick={() => setPresenterView(false)}
         >
-          <X className="h-4 w-4" /> Close
+          <X className="h-3.5 w-3.5" /> Close
         </Button>
       </div>
 
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col justify-center gap-10 px-6 py-10">
-        {!predictions || !entry || !S ? (
-          <div className="text-center text-muted-foreground">No patient data available.</div>
-        ) : (
-          <>
-            <section>
-              <h2 className="mb-4 text-center text-xl font-semibold text-muted-foreground">Cancer extension risk</h2>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <RiskTile title="Extracapsular extension (ECE)" value={predictions.ece} />
-                <RiskTile title="Seminal vesicle invasion (SVI)" value={predictions.svi} />
-              </div>
-            </section>
+      {!predictions || !entry || !S ? (
+        <div className="py-8 text-center text-sm text-muted-foreground">No patient data available.</div>
+      ) : (
+        <>
+          <section>
+            <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Cancer extension risk</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <RiskTile title="Extracapsular extension (ECE)" value={predictions.ece} />
+              <RiskTile title="Seminal vesicle invasion (SVI)" value={predictions.svi} />
+            </div>
+          </section>
 
-            <section>
-              <h2 className="mb-4 text-center text-xl font-semibold text-muted-foreground">Functional recovery</h2>
-              <FunctionalTiles S={S} nsL={predictions.nsL as 1 | 2 | 3} nsR={predictions.nsR as 1 | 2 | 3} />
-            </section>
-
-            <p className="text-center text-xs text-muted-foreground">
-              Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment.
-            </p>
-          </>
-        )}
-      </div>
+          <section>
+            <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Functional recovery</h2>
+            <FunctionalTiles S={S} nsL={predictions.nsL as 1 | 2 | 3} nsR={predictions.nsR as 1 | 2 | 3} />
+          </section>
+        </>
+      )}
     </div>
   );
 }
@@ -134,7 +128,7 @@ function FunctionalTiles({
   });
 
   return (
-    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <RecoveryTile title="Sexual function (potency)" value={result.shimValid ? result.potency12 : null} />
       <RecoveryTile title="Urinary continence" value={result.continence12} />
     </div>
