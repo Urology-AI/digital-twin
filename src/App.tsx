@@ -122,6 +122,9 @@ export default function App() {
   }, [bootstrapFromJson]);
 
   const onPredictions = desktopTab === "predictions";
+  // Presenter view shares the predictions tab's split layout — panel on one
+  // side, live 3D model on the other — so the 3D canvas needs to react to it too.
+  const showSplitCanvas = onPredictions || presenterView;
   const patientView3DOpen = useUiStore((s) => s.patientView3DOpen);
   const setPatientView3DOpen = useUiStore((s) => s.setPatientView3DOpen);
 
@@ -158,14 +161,14 @@ export default function App() {
             "bg-muted/20",
             patientView && patientView3DOpen
               ? "fixed inset-0 z-40"
-              : cn("absolute inset-0 z-0", onPredictions && "lg:left-1/2", onPredictions && "max-lg:top-[42%]"),
+              : cn("absolute inset-0 z-0", showSplitCanvas && "lg:left-1/2", showSplitCanvas && "max-lg:top-[42%]"),
           )}
         >
           <div className="absolute inset-0 min-h-0 min-w-0" data-tutorial="three-canvas">
             <ThreeCanvas />
           </div>
-          {/* Controls/labels: visible on the predictions tab (clinical view only) */}
-          <div className={cn((!onPredictions || patientView) && "hidden")}>
+          {/* Controls/labels: visible on the predictions tab and presenter view (clinical view only) */}
+          <div className={cn((!showSplitCanvas || patientView) && "hidden")}>
             <ControlsOverlay />
             <ZoneLabelsOverlay />
             <OrientationBadge />
@@ -204,7 +207,7 @@ export default function App() {
         <div
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
-            !patientView && desktopTab === "input" ? "flex flex-col" : "hidden",
+            !patientView && !presenterView && desktopTab === "input" ? "flex flex-col" : "hidden",
           )}
         >
           <ZoneInputWizard />
@@ -214,7 +217,7 @@ export default function App() {
         <div
           className={cn(
             "absolute z-10 overflow-y-auto overflow-x-hidden overscroll-contain bg-background app-scroll px-5 py-5",
-            !patientView && onPredictions ? "block" : "hidden",
+            !patientView && !presenterView && onPredictions ? "block" : "hidden",
             // Desktop: left half. Mobile: top half.
             "lg:left-0 lg:right-1/2 lg:top-0 lg:bottom-0",
             "max-lg:top-0 max-lg:bottom-[58%] max-lg:left-0 max-lg:right-0",
@@ -227,7 +230,7 @@ export default function App() {
         <div
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
-            !patientView && desktopTab === "outcomes" ? "flex" : "hidden",
+            !patientView && !presenterView && desktopTab === "outcomes" ? "flex" : "hidden",
           )}
         >
           <OutcomesWorkspace />
@@ -237,7 +240,7 @@ export default function App() {
         <div
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
-            !patientView && desktopTab === "inflammation" ? "flex" : "hidden",
+            !patientView && !presenterView && desktopTab === "inflammation" ? "flex" : "hidden",
           )}
         >
           <InflammationWorkspace />
@@ -253,9 +256,21 @@ export default function App() {
           <PatientView />
         </div>
 
+        {/* ── Presenter view: highlight panel (left/top) | live 3D model (right/bottom) ── */}
+        <div
+          className={cn(
+            "absolute z-10 overflow-y-auto overflow-x-hidden overscroll-contain bg-background app-scroll px-5 py-5",
+            !patientView && presenterView ? "block" : "hidden",
+            "lg:left-0 lg:right-1/2 lg:top-0 lg:bottom-0",
+            "max-lg:top-0 max-lg:bottom-[58%] max-lg:left-0 max-lg:right-0",
+          )}
+        >
+          <PresenterView />
+        </div>
+
       </div>
 
-      {!patientView && <MobileTabBar />}
+      {!patientView && !presenterView && <MobileTabBar />}
 
       {/* Desktop-only footer */}
       <footer className="hidden lg:flex h-7 shrink-0 items-center justify-end gap-3 border-t border-border/50 bg-card/60 px-4">
@@ -299,11 +314,10 @@ export default function App() {
       {/* Welcome screen and tutorial are clinical-onboarding UI — "Take the
           Tour" drives desktopTab, which is hidden behind patient view, so
           both are suppressed there rather than left to dead-end. */}
-      {welcomeOpen && !patientView && <WelcomeScreen />}
+      {welcomeOpen && !patientView && !presenterView && <WelcomeScreen />}
       {creditsOpen && <CreditsModal onClose={() => setCreditsOpen(false)} />}
-      {!patientView && <TutorialOverlay />}
+      {!patientView && !presenterView && <TutorialOverlay />}
       <PrintReportModal />
-      {presenterView && <PresenterView />}
 
       {explainKey && (
         <div
