@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
+import { Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
 import { emptyLesion, type LesionRow } from "@/types/lesion";
@@ -194,6 +201,27 @@ function FieldRow({
         {unit && <span className="shrink-0 text-[10px] text-muted-foreground">{unit}</span>}
       </div>
     </div>
+  );
+}
+
+// ── Info tooltip icon for field labels (reference ranges, units) ──────────────
+function InfoHint({ text }: { text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          tabIndex={-1}
+          className="ml-1 inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full text-muted-foreground/50 hover:text-primary"
+          aria-label="More info"
+        >
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[220px] text-xs">
+        {text}
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -601,6 +629,7 @@ export function ZoneInputWizard() {
   ];
 
   return (
+    <TooltipProvider delayDuration={200}>
     <div className="flex h-full flex-col overflow-hidden">
 
       {/* ── Tab bar ── */}
@@ -656,15 +685,15 @@ export function ZoneInputWizard() {
 
             <div className="grid grid-cols-3 gap-3 sm:gap-5">
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="text-sm font-semibold text-foreground" htmlFor="wiz-age">Age <span className="font-normal text-muted-foreground">(years)</span></label>
+                <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-age">Age <span className="font-normal text-muted-foreground">(years)</span><InfoHint text="Patient age at time of surgery. Used to calibrate several COMPASS risk models." /></label>
                 <Input id="wiz-age" type="number" min={18} max={120} inputMode="numeric" placeholder="65" value={age} onChange={(e) => handleAgeChange(e.target.value)} className="h-11 text-base" />
               </div>
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="text-sm font-semibold text-foreground" htmlFor="wiz-psa">PSA <span className="font-normal text-muted-foreground">(ng/mL)</span></label>
+                <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-psa">PSA <span className="font-normal text-muted-foreground">(ng/mL)</span><InfoHint text="Prostate-specific antigen. Typical normal range: 0–4 ng/mL; higher values increase ECE/SVI/upgrade risk." /></label>
                 <Input id="wiz-psa" type="number" step="0.1" inputMode="decimal" placeholder="6.5" value={psa} onChange={(e) => handlePsaChange(e.target.value)} className="h-11 text-base" />
               </div>
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="text-sm font-semibold text-foreground" htmlFor="wiz-vol">Volume <span className="font-normal text-muted-foreground">(cc)</span></label>
+                <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-vol">Volume <span className="font-normal text-muted-foreground">(cc)</span><InfoHint text="Prostate volume on imaging. Drives PSAD below — a key input for several models." /></label>
                 <Input id="wiz-vol" type="number" step="0.1" inputMode="decimal" placeholder="45" value={vol} onChange={(e) => handleVolChange(e.target.value)} className="h-11 text-base" />
               </div>
             </div>
@@ -686,17 +715,18 @@ export function ZoneInputWizard() {
 
             <div className="grid grid-cols-3 gap-3 sm:gap-5">
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="text-sm font-semibold text-foreground" htmlFor="wiz-dec">
+                <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-dec">
                   Decipher <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–1)</span>
+                  <InfoHint text="Decipher genomic classifier score. ≥0.6 is 'high' risk and raises upgrade/BCR predictions; leave blank if not tested." />
                 </label>
                 <Input id="wiz-dec" type="text" inputMode="decimal" placeholder="0.52" value={decipher} onChange={(e) => handleDecipherChange(e.target.value)} className="h-11 text-base" />
               </div>
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="text-sm font-semibold text-foreground" htmlFor="wiz-shim">SHIM <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–25)</span></label>
+                <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-shim">SHIM <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–25)</span><InfoHint text="Sexual Health Inventory for Men — baseline erectile function. 22–25 no dysfunction, 17–21 mild, 12–16 mild-moderate, 8–11 moderate, 1–7 severe." /></label>
                 <Input id="wiz-shim" type="number" min={0} max={25} inputMode="numeric" placeholder="21" value={shim} onChange={(e) => handleShimChange(e.target.value)} className="h-11 text-base" />
               </div>
               <div className="space-y-1.5 sm:space-y-2">
-                <label className="text-sm font-semibold text-foreground" htmlFor="wiz-ipss">IPSS <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–35)</span></label>
+                <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-ipss">IPSS <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–35)</span><InfoHint text="International Prostate Symptom Score — baseline urinary function. 0–7 mild, 8–19 moderate, 20–35 severe." /></label>
                 <Input id="wiz-ipss" type="number" min={0} max={35} inputMode="numeric" placeholder="8" value={ipss} onChange={(e) => handleIpssChange(e.target.value)} className="h-11 text-base" />
               </div>
             </div>
@@ -1029,5 +1059,6 @@ export function ZoneInputWizard() {
       )}
 
     </div>
+    </TooltipProvider>
   );
 }

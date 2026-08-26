@@ -158,6 +158,7 @@ export function AppHeader() {
             size="sm"
             className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
             aria-label="Undo"
+            title="Undo last change"
             onClick={() => undo()}
           >
             <Undo2 className="h-[15px] w-[15px]" />
@@ -169,6 +170,7 @@ export function AppHeader() {
             size="sm"
             className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
             aria-label="Redo"
+            title="Redo last undone change"
             onClick={() => redo()}
           >
             <Redo2 className="h-[15px] w-[15px]" />
@@ -184,6 +186,7 @@ export function AppHeader() {
           size="sm"
           className="h-8 gap-1.5 px-2"
           aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+          title={dark ? "Switch to light mode" : "Switch to dark mode"}
           onClick={() => setDark(!dark)}
         >
           {dark ? (
@@ -200,6 +203,7 @@ export function AppHeader() {
           size="sm"
           className="h-8 gap-1.5 px-2 text-emerald-500 hover:text-emerald-400"
           aria-label="Prospective case log"
+          title="Prospective case log"
           onClick={() => setCaseLogOpen(true)}
         >
           <BookOpen className="h-[15px] w-[15px]" />
