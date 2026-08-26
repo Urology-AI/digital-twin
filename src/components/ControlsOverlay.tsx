@@ -9,19 +9,19 @@ import type { OverlayType } from "@/types/prediction";
 import { cn } from "@/lib/utils";
 
 const VIEWS = [
-  { id: "anterior", label: "Ant" },
-  { id: "posterior", label: "Post" },
-  { id: "base", label: "Base" },
-  { id: "apex", label: "Apex" },
-  { id: "left", label: "Left" },
-  { id: "right", label: "Right" },
+  { id: "anterior", label: "Ant", title: "Anterior view (facing front)" },
+  { id: "posterior", label: "Post", title: "Posterior view (facing back)" },
+  { id: "base", label: "Base", title: "Base view (top, near bladder)" },
+  { id: "apex", label: "Apex", title: "Apex view (bottom, near sphincter)" },
+  { id: "left", label: "Left", title: "Left lateral view" },
+  { id: "right", label: "Right", title: "Right lateral view" },
 ] as const;
 
-const OVERLAYS: { id: OverlayType; label: string; activeColor: string }[] = [
-  { id: "cancer", label: "csPCa", activeColor: "text-red-400 border-red-500/60 bg-red-500/10" },
-  { id: "ece",    label: "ECE",   activeColor: "text-amber-400 border-amber-500/60 bg-amber-500/10" },
-  { id: "svi",    label: "SVI",   activeColor: "text-purple-400 border-purple-500/60 bg-purple-500/10" },
-  { id: "psm",    label: "PSM",   activeColor: "text-sky-400 border-sky-500/60 bg-sky-500/10" },
+const OVERLAYS: { id: OverlayType; label: string; activeColor: string; title: string }[] = [
+  { id: "cancer", label: "csPCa", activeColor: "text-red-400 border-red-500/60 bg-red-500/10", title: "Clinically significant cancer risk, by zone" },
+  { id: "ece",    label: "ECE",   activeColor: "text-amber-400 border-amber-500/60 bg-amber-500/10", title: "Extracapsular extension risk, by zone" },
+  { id: "svi",    label: "SVI",   activeColor: "text-purple-400 border-purple-500/60 bg-purple-500/10", title: "Seminal vesicle invasion risk, by zone" },
+  { id: "psm",    label: "PSM",   activeColor: "text-sky-400 border-sky-500/60 bg-sky-500/10", title: "Positive surgical margin risk, by zone" },
 ];
 
 const LEGEND: Record<OverlayType, { title: string; gradient: string; low: string; high: string; note: string }> = {
@@ -74,13 +74,13 @@ export function ControlsOverlay() {
   const activeId    = usePatientStore((s) => s.activeId);
   const entry       = patients.find((p) => p.id === activeId);
 
-  const [legendOpen, setLegendOpen] = useState(false);
+  const [legendOpen, setLegendOpen] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   const OPTIONS = [
-    { label: "Heatmap", active: heatmapVisible, toggle: toggleHeatmap },
-    { label: "Labels",  active: labelsVisible,  toggle: toggleLabels },
-    { label: "Lesions", active: lesionsOnly,    toggle: toggleLesionsOnly },
+    { label: "Heatmap", active: heatmapVisible, toggle: toggleHeatmap, title: "Toggle the zone risk color overlay on the 3D model" },
+    { label: "Labels",  active: labelsVisible,  toggle: toggleLabels, title: "Toggle the zone-by-zone risk panel" },
+    { label: "Lesions", active: lesionsOnly,    toggle: toggleLesionsOnly, title: "Show only zones containing a lesion" },
   ];
 
   return (
@@ -92,10 +92,11 @@ export function ControlsOverlay() {
       {/* Top-left: view preset buttons */}
       <div className="pointer-events-auto absolute left-2 top-2 z-10 hidden lg:flex flex-wrap gap-1">
         <div className="glass flex items-center gap-0.5 rounded-lg p-1">
-          {VIEWS.map(({ id, label }) => (
+          {VIEWS.map(({ id, label, title }) => (
             <button
               key={id}
               type="button"
+              title={title}
               onClick={() => setView(id)}
               className="rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground transition-all hover:bg-white/10 hover:text-foreground active:scale-95"
             >
@@ -112,16 +113,18 @@ export function ControlsOverlay() {
             <button
               key={o.id}
               type="button"
+              title={o.title}
               onClick={() => setOverlay(o.id)}
               className={cn(pillBase, overlay === o.id ? o.activeColor : "border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10")}
             >
               {o.label}
             </button>
           ))}
-          {OPTIONS.map(({ label, active, toggle }) => (
+          {OPTIONS.map(({ label, active, toggle, title }) => (
             <button
               key={label}
               type="button"
+              title={title}
               onClick={toggle}
               className={cn(pillBase, active ? "border-primary/60 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10")}
             >
@@ -254,10 +257,11 @@ export function ControlsOverlay() {
           <div>
             <p className={sectionLabel}>View</p>
             <div className="grid grid-cols-3 gap-1">
-              {VIEWS.map(({ id, label }) => (
+              {VIEWS.map(({ id, label, title }) => (
                 <button
                   key={id}
                   type="button"
+                  title={title}
                   onClick={() => setView(id)}
                   className="rounded-md border border-white/10 py-1.5 text-[11px] font-medium text-muted-foreground transition-all hover:bg-white/10 hover:text-foreground active:scale-95"
                 >
@@ -275,6 +279,7 @@ export function ControlsOverlay() {
                 <button
                   key={o.id}
                   type="button"
+                  title={o.title}
                   onClick={() => setOverlay(o.id)}
                   className={cn(
                     "rounded-md border py-1.5 text-[11px] font-medium transition-all active:scale-95",
@@ -291,10 +296,11 @@ export function ControlsOverlay() {
           <div>
             <p className={sectionLabel}>Options</p>
             <div className="flex flex-col gap-1">
-              {OPTIONS.map(({ label, active, toggle }) => (
+              {OPTIONS.map(({ label, active, toggle, title }) => (
                 <button
                   key={label}
                   type="button"
+                  title={title}
                   onClick={toggle}
                   className={cn(
                     "flex items-center justify-between rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-all",

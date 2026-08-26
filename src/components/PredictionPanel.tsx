@@ -51,6 +51,12 @@ function riskCls(v: number) {
   return "text-red-500";
 }
 
+function riskBarCls(v: number) {
+  if (v < 0.15) return "bg-emerald-500";
+  if (v < 0.3) return "bg-amber-500";
+  return "bg-red-500";
+}
+
 /** Approximate 90% CI on logit scale (SE ≈ 0.58 logit units, z = 1.64) */
 function computeCI(p: number): { lo: number; hi: number } {
   if (p <= 0.001 || p >= 0.999) return { lo: p, hi: p };
@@ -214,6 +220,12 @@ export function PredictionPanel() {
                         ? <div className="text-[10px] leading-tight text-muted-foreground/40 sm:text-xs">low</div>
                         : <div className="text-[10px] leading-tight text-muted-foreground/35 sm:text-xs">{Math.round(ci.lo * 100)}–{Math.round(ci.hi * 100)}%</div>
                       }
+                      <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted/60">
+                        <div
+                          className={cn("h-full rounded-full transition-all", p.neutral ? "bg-muted-foreground/30" : riskBarCls(p.v))}
+                          style={{ width: `${Math.min(100, Math.round(p.v * 100))}%` }}
+                        />
+                      </div>
                     </div>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-[220px]">
