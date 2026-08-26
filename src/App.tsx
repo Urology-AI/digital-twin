@@ -7,6 +7,7 @@ import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import { OutcomesWorkspace } from "@/components/OutcomesWorkspace";
 import { InflammationWorkspace } from "@/components/InflammationWorkspace";
 import { PatientView, PatientViewHeader } from "@/components/PatientView";
+import { PresenterView } from "@/components/PresenterView";
 import { ThreeCanvas } from "@/components/ThreeCanvas";
 import { ZoneLabelsOverlay } from "@/components/ZoneLabelsOverlay";
 import { OrientationBadge } from "@/components/OrientationBadge";
@@ -88,6 +89,7 @@ export default function App() {
   const dark = useUiStore((s) => s.dark);
   const desktopTab = useUiStore((s) => s.desktopTab);
   const patientView = useUiStore((s) => s.patientView);
+  const presenterView = useUiStore((s) => s.presenterView);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
@@ -301,6 +303,7 @@ export default function App() {
       {creditsOpen && <CreditsModal onClose={() => setCreditsOpen(false)} />}
       {!patientView && <TutorialOverlay />}
       <PrintReportModal />
+      {presenterView && <PresenterView />}
 
       {explainKey && (
         <div

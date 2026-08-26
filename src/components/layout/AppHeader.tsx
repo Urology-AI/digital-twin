@@ -7,6 +7,7 @@ import {
   Info,
   Layers,
   MessageCircle,
+  Monitor,
   Moon,
   Plus,
   Printer,
@@ -45,6 +46,7 @@ export function AppHeader() {
   const setWelcomeOpen = useUiStore((s) => s.setWelcomeOpen);
   const setCaseLogOpen = useUiStore((s) => s.setCaseLogOpen);
   const setPatientView = useUiStore((s) => s.setPatientView);
+  const setPresenterView = useUiStore((s) => s.setPresenterView);
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
   const loading = usePatientStore((s) => s.loading);
@@ -214,6 +216,19 @@ export function AppHeader() {
         >
           <UserRound className="h-[15px] w-[15px]" />
           <span className="hidden text-xs font-medium lg:inline">Patient view</span>
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1.5 px-2 text-violet-400 hover:text-violet-300"
+          aria-label="Open presenter view"
+          title="Presenter view"
+          onClick={() => setPresenterView(true)}
+        >
+          <Monitor className="h-[15px] w-[15px]" />
+          <span className="hidden text-xs font-medium lg:inline">Presenter</span>
         </Button>
 
         <Button
