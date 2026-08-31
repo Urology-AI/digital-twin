@@ -37,14 +37,11 @@ function resolveTri(
   recRationale: string,
   citation: string,
 ): PlanRec<boolean> {
-  if (override === null) return { value: rec, rationale: recRationale, citation };
-  if (override === rec)
-    return { value: rec, rationale: `Surgeon confirmed. ${recRationale}`, citation };
+  if (override === null || override === rec)
+    return { value: rec, rationale: recRationale, citation };
   return {
     value: override,
-    rationale: `Surgeon override: ${override ? "yes" : "no"} (model recommended ${
-      rec ? "yes" : "no"
-    } — ${recRationale})`,
+    rationale: `Set to ${override ? "yes" : "no"} — model recommends ${rec ? "yes" : "no"}.`,
     citation,
   };
 }
@@ -71,19 +68,18 @@ function buildSide(
 
   const { plane, note } = planeLabel(grade);
 
-  // Grade provenance
-  let gradeRationale = nsDetail.reason || `Model NS grade ${modelGrade}`;
-  let gradeCitation = NS_MODEL_CITATION + " · " + PLANE_TECHNIQUE.citation;
+  // Grade provenance — kept terse; full citations live in the Sources tab.
+  const reason = nsDetail.reason || `model NS grade ${modelGrade}`;
+  let gradeRationale = reason;
+  let gradeCitation = NS_MODEL_CITATION;
   if (inflEscalated) {
-    gradeRationale += ` · escalated to grade ${Math.min(3, modelGrade + esc.high_steps)} for severe periprostatic inflammation`;
+    gradeRationale = `${reason} · grade raised for severe periprostatic inflammation`;
     gradeCitation = NS_GRADE_ESCALATION.citation;
   } else if (infl.tier === "moderate") {
-    gradeRationale += " · moderate inflammation — a wider plane may be safer (surgeon judgement)";
+    gradeRationale = `${reason} · moderate inflammation flagged`;
   }
-  if (override != null && overridden) {
-    gradeRationale = `Surgeon override to grade ${override} (model: grade ${modelGrade}${
-      inflEscalated ? " + inflammation escalation" : ""
-    }). ${gradeRationale}`;
+  if (overridden) {
+    gradeRationale = `Set to grade ${override} — model recommends grade ${recommendedGrade}.`;
   }
 
   // Zone grades from raw zone ECE, then shifted by the net grade delta so an
@@ -106,13 +102,11 @@ function buildSide(
   const hydroRec = !bundleRemoved && postEce >= thr.minEce;
   const hydroRationale = bundleRemoved
     ? frankEpe
-      ? "Frank EPE on imaging — the bundle is being taken, no plane to hydrodissect."
-      : "A wide (grade-3) excision is planned — no bundle to preserve."
+      ? "Frank EPE — bundle is being taken."
+      : "Wide excision planned — no bundle to preserve."
     : hydroRec
-      ? `Posterolateral/base ECE ~${Math.round(postEce * 100)}% (≥ ${Math.round(
-          thr.minEce * 100,
-        )}%) — develop a saline plane to sweep the NVB off the at-risk capsule.`
-      : `Posterolateral/base ECE ~${Math.round(postEce * 100)}% is low — a standard plane is adequate.`;
+      ? `Posterolateral ECE ~${Math.round(postEce * 100)}% — buffer the NVB off the capsule.`
+      : `Posterolateral ECE ~${Math.round(postEce * 100)}% — low, standard plane is adequate.`;
   const hydrodissection = resolveTri(
     side === "left" ? S.plan_hydrodissection_l : S.plan_hydrodissection_r,
     hydroRec,
@@ -124,10 +118,10 @@ function buildSide(
   const svCut = SV_PRESERVATION.value.maxSideSvi;
   const svRec = sideSvi < svCut && !psmaSvi;
   const svRationale = psmaSvi
-    ? "PSMA-avid seminal vesicle — complete excision."
+    ? "PSMA-avid SV — complete excision."
     : svRec
-      ? `Side SVI risk ${Math.round(sideSvi * 100)}% (< ${Math.round(svCut * 100)}%) — SV tip-sparing is reasonable.`
-      : `Side SVI risk ${Math.round(sideSvi * 100)}% (≥ ${Math.round(svCut * 100)}%) — complete SV excision.`;
+      ? `Side SVI ${Math.round(sideSvi * 100)}% — tip-sparing reasonable.`
+      : `Side SVI ${Math.round(sideSvi * 100)}% — complete excision.`;
   const svPreservation = resolveTri(
     side === "left" ? S.plan_sv_preservation_l : S.plan_sv_preservation_r,
     svRec,
@@ -190,28 +184,26 @@ export function buildSurgicalPlan(
   let hoodRecWhy: string;
   if (wideSides === 0 && anteriorApexEce < hoodMaxEce && infl.tier !== "high" && !bigMedianLobe) {
     hoodRec = "bilateral";
-    hoodRecWhy =
-      "Both sides interfascial or better, low anterior/apical ECE — a bilateral anterior (Retzius-sparing) hood favours early continence.";
+    hoodRecWhy = "Low anterior/apical ECE, planes intact — favours early continence.";
   } else if (wideSides === 1 && anteriorApexEce < hoodMaxEce && !bigMedianLobe) {
     hoodRec = "unilateral";
-    hoodRecWhy =
-      "One side needs wide excision — preserve the anterior hood on the contralateral side only.";
+    hoodRecWhy = "Contralateral side only — one side needs wide excision.";
   } else {
     hoodRec = "none";
     hoodRecWhy = bigMedianLobe
-      ? "Large median lobe — anterior/bladder-neck reconstruction needed, hood not feasible."
+      ? "Large median lobe — hood not feasible."
       : infl.tier === "high"
-        ? "Obliterated periprostatic planes — a standard anterior approach is safer."
-        : "Bilateral high-risk disease — a standard anterior approach is safer.";
+        ? "Obliterated planes — standard anterior approach."
+        : "Bilateral high-risk disease — standard anterior approach.";
   }
 
   const hoodValue = S.plan_hood === "auto" ? hoodRec : S.plan_hood;
   const hood: SurgicalPlan["hood"] = {
     value: hoodValue,
     rationale:
-      S.plan_hood === "auto"
+      S.plan_hood === "auto" || S.plan_hood === hoodRec
         ? hoodRecWhy
-        : `Surgeon-selected: ${hoodValue} (model recommended ${hoodRec} — ${hoodRecWhy})`,
+        : `Set to ${hoodValue} — model recommends ${hoodRec}.`,
     citation: HOOD_DECISION.citation,
   };
 
@@ -224,12 +216,12 @@ export function buildSurgicalPlan(
     bnEce < bnpCut.maxBnEce &&
     S.vol < bnpCut.maxVolumeCc;
   const bnpRationale = bnpRec
-    ? "No large median lobe, bladder-neck-zone ECE low, gland not very large — preservation supports early continence."
+    ? "Supports early continence — no large median lobe, low BN-zone ECE."
     : bnEce >= bnpCut.maxBnEce
-      ? `Bladder-neck-zone ECE ~${Math.round(bnEce * 100)}% — take a wider bladder-neck margin.`
+      ? `BN-zone ECE ~${Math.round(bnEce * 100)}% — wider bladder-neck margin.`
       : S.median_lobe_grade >= bnpCut.maxMedianLobe
-        ? "Large median lobe — bladder-neck reconstruction rather than preservation."
-        : "Very large gland — bladder-neck preservation may not be achievable.";
+        ? "Large median lobe — reconstruct rather than preserve."
+        : "Very large gland — preservation may not be achievable.";
   const bnp = resolveTri(S.plan_bnp, bnpRec, bnpRationale, BNP_DECISION.citation);
 
   return { left, right, hood, bladderNeckPreservation: bnp };

@@ -19,11 +19,7 @@ import {
 } from "@/lib/compass/functionalOutcomes";
 import { bcrByPlan } from "@/lib/compass/bcrByPlan";
 import { useUiStore } from "@/store/uiStore";
-import {
-  INFLAMMATION_WEIGHTS,
-  MODIFIABLE_BCR,
-  NSG_OUTCOME_DATA,
-} from "@/lib/compass/planningEvidence";
+import { MODIFIABLE_BCR } from "@/lib/compass/planningEvidence";
 import type { ClinicalState } from "@/types/patient";
 import type { SidePlan } from "@/types/prediction";
 import { cn } from "@/lib/utils";
@@ -138,7 +134,6 @@ function TriToggle({
   title,
   resolved,
   detail,
-  cite,
   value,
   onChange,
 }: {
@@ -147,7 +142,6 @@ function TriToggle({
   /** the value the plan resolved to (shown as a chip when on "Auto") */
   resolved: boolean;
   detail: string;
-  cite?: string;
   value: boolean | null;
   onChange: (v: boolean | null) => void;
 }) {
@@ -195,9 +189,6 @@ function TriToggle({
             </div>
           </div>
           <p className="mt-1 text-xs leading-snug text-muted-foreground">{detail}</p>
-          {cite && (
-            <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground/60">{cite}</p>
-          )}
         </div>
       </div>
     </div>
@@ -315,11 +306,7 @@ function SideCard({
               { value: "3", label: "3", hint: "Wide" },
             ]}
           />
-          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{plan.planeNote}</p>
-          <p className="mt-1 text-xs leading-snug text-foreground/80">
-            <span className="font-medium">Why:</span> {plan.gradeRationale}
-          </p>
-          <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground/70">{plan.gradeCitation}</p>
+          <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{plan.gradeRationale}</p>
         </div>
 
         <div>
@@ -349,7 +336,6 @@ function SideCard({
             icon={<Droplets className="h-4 w-4" />}
             title="Hydrodissection of NVB"
             detail={plan.hydrodissection.rationale}
-            cite={plan.hydrodissection.citation}
             resolved={plan.hydrodissection.value}
             value={hydroOverride}
             onChange={onHydro}
@@ -358,7 +344,6 @@ function SideCard({
             icon={<ShieldCheck className="h-4 w-4" />}
             title="Seminal-vesicle tip-sparing"
             detail={plan.svPreservation.rationale}
-            cite={plan.svPreservation.citation}
             resolved={plan.svPreservation.value}
             value={svOverride}
             onChange={onSv}
@@ -490,24 +475,14 @@ export function SurgicalPlanPanel() {
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 pb-12">
       <div>
         <h2 className="text-lg font-semibold">Operative plan</h2>
-        <p className="text-xs text-muted-foreground">
-          Advisory. Every recommendation is COMPASS-data-driven or literature-based; items marked{" "}
-          <span className="font-semibold text-amber-600 dark:text-amber-400">provisional</span> are
-          not yet calibrated on COMPASS data. Research use only (IRB STUDY-14-00050).
-        </p>
+        <p className="text-xs text-muted-foreground">Advisory · research use only.</p>
       </div>
 
       {/* ── Impact ─────────────────────────────────────────────── */}
       <section>
         <SectionTitle icon={<Activity className="h-4 w-4" />}>
-          Impact of this plan vs. nerve-sparing grade alone
+          Impact vs. nerve-sparing grade alone
         </SectionTitle>
-        <p className="-mt-2 mb-3 text-[10px] leading-snug text-muted-foreground/70">
-          BCR from the {NSG_OUTCOME_DATA.label} projected with literature event-timing (Han 2003;
-          Freedland 2005). Continence / potency from the COMPASS functional-outcome nomogram
-          (provisional). Operative-choice deltas: {" "}
-          Rosenberg 2020, Menon 2018, Ma 2016, Patel 2012.
-        </p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <ImpactTile
             label="Continence"
@@ -553,9 +528,6 @@ export function SurgicalPlanPanel() {
             invert
           />
         </div>
-        <p className="mt-2 text-[10px] text-muted-foreground/70">
-          Erectile-recovery phenotype (super / healer / delayed healer) is on the Outcomes tab.
-        </p>
       </section>
 
       {/* ── Per-side plan ──────────────────────────────────────── */}
@@ -597,13 +569,11 @@ export function SurgicalPlanPanel() {
               ]}
             />
             <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{plan.hood.rationale}</p>
-            <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground/60">{plan.hood.citation}</p>
           </div>
           <TriToggle
             icon={<ShieldCheck className="h-4 w-4" />}
             title="Bladder-neck preservation"
             detail={plan.bladderNeckPreservation.rationale}
-            cite={plan.bladderNeckPreservation.citation}
             resolved={plan.bladderNeckPreservation.value}
             value={S.plan_bnp}
             onChange={(v) => updateClinicalForm({ plan_bnp: v })}
@@ -688,34 +658,26 @@ export function SurgicalPlanPanel() {
               </label>
             ))}
           </div>
-          <p className="text-[10px] leading-snug text-muted-foreground/80">{INFLAMMATION_WEIGHTS.citation}</p>
         </CardContent>
       </Card>
 
       {S.bmi >= 30 && (
         <p className="text-[11px] leading-snug text-muted-foreground">
-          <span className="font-semibold text-foreground">Modifiable factor —</span> BMI{" "}
-          {S.bmi.toFixed(0)} adds ~
+          BMI {S.bmi.toFixed(0)}: ~
           {Math.round(
             (S.bmi >= 35 ? MODIFIABLE_BCR.value.bmi_ge_35 : MODIFIABLE_BCR.value.bmi_ge_30) * 100,
           )}{" "}
-          pp to the BCR estimate (low-confidence — {MODIFIABLE_BCR.citation}). Pre-op weight loss is
-          the lever; it also improves continence and erectile recovery in the functional model on the
-          Outcomes tab.
+          pp on BCR (low-confidence). Weight loss also aids continence &amp; recovery.
         </p>
       )}
 
-      <p className="text-[11px] text-muted-foreground">
-        Every recommendation is COMPASS-data-driven or literature-based —{" "}
-        <button
-          type="button"
-          onClick={() => setInfoOpen(true)}
-          className="font-medium text-primary hover:underline"
-        >
-          Evidence &amp; sources
-        </button>{" "}
-        (methodology panel → Sources tab).
-      </p>
+      <button
+        type="button"
+        onClick={() => setInfoOpen(true)}
+        className="self-start text-[11px] font-medium text-primary hover:underline"
+      >
+        Evidence &amp; sources →
+      </button>
     </div>
   );
 }
