@@ -562,7 +562,7 @@ export function SurgicalPlanPanel() {
               value={S.plan_hood}
               onChange={(v) => updateClinicalForm({ plan_hood: v })}
               options={[
-                { value: "auto", label: "Auto", hint: plan.hood.value },
+                { value: "auto", label: "Auto" },
                 { value: "none", label: "None" },
                 { value: "unilateral", label: "Uni" },
                 { value: "bilateral", label: "Bilat" },

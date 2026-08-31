@@ -69,17 +69,16 @@ function buildSide(
   const { plane, note } = planeLabel(grade);
 
   // Grade provenance — kept terse; full citations live in the Sources tab.
+  // Always describe what the MODEL concluded; when overridden, the reset link
+  // above already shows the model grade, so this line explains why.
   const reason = nsDetail.reason || `model NS grade ${modelGrade}`;
   let gradeRationale = reason;
   let gradeCitation = NS_MODEL_CITATION;
   if (inflEscalated) {
-    gradeRationale = `${reason} · grade raised for severe periprostatic inflammation`;
+    gradeRationale = `${reason} · raised for severe inflammation`;
     gradeCitation = NS_GRADE_ESCALATION.citation;
   } else if (infl.tier === "moderate") {
     gradeRationale = `${reason} · moderate inflammation flagged`;
-  }
-  if (overridden) {
-    gradeRationale = `Set to grade ${override} — model recommends grade ${recommendedGrade}.`;
   }
 
   // Zone grades from raw zone ECE, then shifted by the net grade delta so an
