@@ -81,10 +81,11 @@ function buildSide(
     gradeRationale = `${reason} · moderate inflammation flagged`;
   }
 
-  // Zone grades from raw zone ECE, then shifted by the net grade delta so an
-  // overridden or escalated side stays internally consistent.
+  // Zone grades from raw zone ECE, shifted only by the inflammation escalation
+  // (a real per-zone risk signal). A surgeon's side-level plane override does
+  // NOT move the zone chips — those stay the recommended per-zone picture.
   const T = NS_ZONE_THRESHOLDS.value;
-  const gradeDelta = grade - modelGrade;
+  const gradeDelta = recommendedGrade - modelGrade;
   const zoneGrades: Record<string, number> = {};
   for (const z of ZONES) {
     const ece = nsDetail.zones[z] ?? 0;

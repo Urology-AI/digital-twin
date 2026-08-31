@@ -634,29 +634,43 @@ export function SurgicalPlanPanel() {
             </div>
           )}
 
-          <div className="flex gap-4 border-t border-border pt-3 text-xs">
-            {(["l", "r"] as const).map((sd) => (
-              <label key={sd} className="flex items-center gap-1.5 font-medium">
-                Intra-op grade {sd.toUpperCase()}
-                <select
-                  value={sd === "l" ? S.intraop_inflammation_l : S.intraop_inflammation_r}
-                  onChange={(e) =>
-                    updateClinicalForm(
-                      sd === "l"
-                        ? { intraop_inflammation_l: Number(e.target.value) }
-                        : { intraop_inflammation_r: Number(e.target.value) },
-                    )
-                  }
-                  className="rounded border border-border bg-background px-1.5 py-0.5"
-                >
-                  {[0, 1, 2, 3].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ))}
+          <div className="space-y-2 border-t border-border pt-3">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Intra-op inflammation grade (overrides the estimate)
+            </div>
+            {(["l", "r"] as const).map((sd) => {
+              const val = sd === "l" ? S.intraop_inflammation_l : S.intraop_inflammation_r;
+              return (
+                <div key={sd} className="flex items-center gap-3">
+                  <span className="w-6 text-xs font-semibold text-muted-foreground">
+                    {sd.toUpperCase()}
+                  </span>
+                  <div className="flex flex-1 overflow-hidden rounded-md border border-border divide-x divide-border">
+                    {[0, 1, 2, 3].map((n) => (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() =>
+                          updateClinicalForm(
+                            sd === "l"
+                              ? { intraop_inflammation_l: n }
+                              : { intraop_inflammation_r: n },
+                          )
+                        }
+                        className={cn(
+                          "flex-1 py-1.5 text-xs font-semibold transition-colors",
+                          val === n
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-card text-muted-foreground hover:bg-muted/60",
+                        )}
+                      >
+                        {n === 0 ? "None" : n}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>
