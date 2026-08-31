@@ -12,6 +12,7 @@ import {
   type AlcoholLevel,
   type SmokingStatus,
   type ExerciseLevel,
+  type PlanModifiers,
 } from "@/lib/compass/functionalOutcomes";
 import { cn } from "@/lib/utils";
 
@@ -468,10 +469,15 @@ export function FunctionalOutcomesPanel() {
     );
   }
 
-  const modelNsL = predictions.nsL as 1|2|3;
-  const modelNsR = predictions.nsR as 1|2|3;
-  const nsL: 1|2|3 = nsOverrideL ?? modelNsL;
-  const nsR: 1|2|3 = nsOverrideR ?? modelNsR;
+  const { plan, inflammation } = predictions;
+
+  // Default to the operative plan built on the Planning tab (grade incl.
+  // inflammation escalation + surgeon override). Local overrides here are a
+  // read-only "what if" — they don't change the plan.
+  const planNsL = Math.min(3, Math.max(1, Math.round(plan.left.nsGrade))) as 1 | 2 | 3;
+  const planNsR = Math.min(3, Math.max(1, Math.round(plan.right.nsGrade))) as 1 | 2 | 3;
+  const nsL: 1 | 2 | 3 = nsOverrideL ?? planNsL;
+  const nsR: 1 | 2 | 3 = nsOverrideR ?? planNsR;
 
   const fnInputs = {
     age: S.age, shim: S.shim, ipss: S.ipss, bmi: S.bmi,
@@ -482,7 +488,19 @@ export function FunctionalOutcomesPanel() {
     alcohol: (S.alcohol || "moderate") as AlcoholLevel,
     dm: S.dm, htn: S.htn, cad: S.cad,
   };
-  const result = computeFunctionalOutcomes({ nsL, nsR, ...fnInputs });
+
+  // Operative-plan modifiers (hood / BNP / hydrodissection / SV / inflammation)
+  // carry into the functional model so recovery reflects the actual plan.
+  const planMods: PlanModifiers = {
+    hood: plan.hood.value,
+    bnPreservation: plan.bladderNeckPreservation.value,
+    svPreservationL: plan.left.svPreservation.value,
+    svPreservationR: plan.right.svPreservation.value,
+    hydrodissectionL: plan.left.hydrodissection.value,
+    hydrodissectionR: plan.right.hydrodissection.value,
+    inflammationTier: inflammation.tier,
+  };
+  const result = computeFunctionalOutcomes({ nsL, nsR, ...fnInputs, plan: planMods });
   const factorRows = modifiableFactorBreakdown(fnInputs);
 
   return (
@@ -507,7 +525,7 @@ export function FunctionalOutcomesPanel() {
             >i</button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Model-predicted by default — override to plan a specific approach
+            From your operative plan — adjust here to explore an alternative (does not change the plan)
           </p>
         </CardHeader>
         <CardContent className="pt-0">
@@ -518,13 +536,12 @@ export function FunctionalOutcomesPanel() {
           {(nsOverrideL !== null || nsOverrideR !== null) && (
             <div className="mt-3 flex items-center justify-between rounded-md bg-muted/40 px-3 py-1.5">
               <span className="text-xs text-muted-foreground">
-                {nsOverrideL !== null && nsOverrideR !== null ? "Both sides" : nsOverrideL !== null ? "Left" : "Right"} overridden
-                {" "}(predicted L:{modelNsL} R:{modelNsR})
+                Exploring an alternative (plan L:{planNsL} R:{planNsR})
               </span>
               <button type="button"
                 onClick={() => { setNsOverrideL(null); setNsOverrideR(null); }}
                 className="text-xs font-semibold text-primary hover:underline"
-              >Reset</button>
+              >Back to plan</button>
             </div>
           )}
         </CardContent>
@@ -584,6 +601,7 @@ export function FunctionalOutcomesPanel() {
           </CardContent>
         </Card>
       </div>
+
 
       {/* Erectile-recovery phenotype */}
       {result.healerTier && result.healerBands && (
