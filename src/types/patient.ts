@@ -70,6 +70,54 @@ export interface Prostate3DInputV1 {
     } | null;
     median_lobe_grade?: number | null;
   };
+  /**
+   * Urologic / pelvic history feeding the periprostatic-inflammation
+   * ("obliterated planes") risk model. All optional — absent means "not known
+   * / not present". Added in schema working-set version 4.
+   */
+  history?: {
+    prior_turp?: boolean;
+    prior_urolift?: boolean;
+    prior_greenlight?: boolean;
+    prior_holep?: boolean;
+    prior_rezum?: boolean;
+    prior_pelvic_radiation?: boolean;
+    urinary_retention?: boolean;
+    recurrent_uti?: boolean;
+    treated_prostatitis?: boolean;
+    biopsy_shows_inflammation?: boolean;
+    /** number of separate biopsy sessions, including the current one */
+    biopsy_sessions?: number | null;
+    crohns?: boolean;
+    ulcerative_colitis?: boolean;
+    diverticulitis?: boolean;
+    pelvic_abscess?: boolean;
+    hernia_mesh?: boolean;
+    rectal_fistula?: boolean;
+    radiation_proctitis?: boolean;
+    /** radiologist read of periprostatic inflammation on MRI */
+    mri_periprostatic_inflammation?: "none" | "equivocal" | "present";
+    mri_periprostatic_fat_stranding?: boolean;
+    /** intra-operative inflammation grade 0–3 (Kacie's data) — recorded, not predicted */
+    intraop_inflammation_l?: number | null;
+    intraop_inflammation_r?: number | null;
+  };
+  /**
+   * Surgeon's editable operative plan. Persisted on the record so it round-trips
+   * with the case. `null` NS overrides mean "use the model's recommendation".
+   */
+  plan?: {
+    ns_override_l?: number | null;
+    ns_override_r?: number | null;
+    /** "auto" = follow the model recommendation */
+    hood?: "auto" | "none" | "unilateral" | "bilateral";
+    /** null = follow the model recommendation, true/false = surgeon decided */
+    bladder_neck_preservation?: boolean | null;
+    sv_preservation_l?: boolean | null;
+    sv_preservation_r?: boolean | null;
+    hydrodissection_l?: boolean | null;
+    hydrodissection_r?: boolean | null;
+  };
   biopsy: {
     max_grade_group: number | null;
     total_positive_cores: number | null;
@@ -175,6 +223,41 @@ export interface ClinicalState {
   mc_right: number;
   linear_left: number;
   linear_right: number;
+
+  // ── Anatomy / history for the surgical-plan + inflammation-risk models ──
+  median_lobe_grade: number;
+  prior_turp: boolean;
+  prior_urolift: boolean;
+  prior_greenlight: boolean;
+  prior_holep: boolean;
+  prior_rezum: boolean;
+  prior_pelvic_radiation: boolean;
+  urinary_retention: boolean;
+  recurrent_uti: boolean;
+  treated_prostatitis: boolean;
+  biopsy_shows_inflammation: boolean;
+  biopsy_sessions: number;
+  crohns: boolean;
+  ulcerative_colitis: boolean;
+  diverticulitis: boolean;
+  pelvic_abscess: boolean;
+  hernia_mesh: boolean;
+  rectal_fistula: boolean;
+  radiation_proctitis: boolean;
+  mri_periprostatic_inflammation: "none" | "equivocal" | "present";
+  mri_periprostatic_fat_stranding: boolean;
+  intraop_inflammation_l: number;
+  intraop_inflammation_r: number;
+
+  // ── Surgeon's editable operative plan (null / "auto" = follow the model) ──
+  plan_ns_override_l: number | null;
+  plan_ns_override_r: number | null;
+  plan_hood: "auto" | "none" | "unilateral" | "bilateral";
+  plan_bnp: boolean | null;
+  plan_sv_preservation_l: boolean | null;
+  plan_sv_preservation_r: boolean | null;
+  plan_hydrodissection_l: boolean | null;
+  plan_hydrodissection_r: boolean | null;
 }
 
 export function defaultClinicalState(): ClinicalState {
@@ -239,5 +322,38 @@ export function defaultClinicalState(): ClinicalState {
     mc_right: 0,
     linear_left: 0,
     linear_right: 0,
+
+    median_lobe_grade: 0,
+    prior_turp: false,
+    prior_urolift: false,
+    prior_greenlight: false,
+    prior_holep: false,
+    prior_rezum: false,
+    prior_pelvic_radiation: false,
+    urinary_retention: false,
+    recurrent_uti: false,
+    treated_prostatitis: false,
+    biopsy_shows_inflammation: false,
+    biopsy_sessions: 1,
+    crohns: false,
+    ulcerative_colitis: false,
+    diverticulitis: false,
+    pelvic_abscess: false,
+    hernia_mesh: false,
+    rectal_fistula: false,
+    radiation_proctitis: false,
+    mri_periprostatic_inflammation: "none",
+    mri_periprostatic_fat_stranding: false,
+    intraop_inflammation_l: 0,
+    intraop_inflammation_r: 0,
+
+    plan_ns_override_l: null,
+    plan_ns_override_r: null,
+    plan_hood: "auto",
+    plan_bnp: null,
+    plan_sv_preservation_l: null,
+    plan_sv_preservation_r: null,
+    plan_hydrodissection_l: null,
+    plan_hydrodissection_r: null,
   };
 }

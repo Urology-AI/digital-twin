@@ -18,7 +18,9 @@ import { emptyLesion } from "@/types/lesion";
 const STORAGE_KEY = "compass-digital-twin-state";
 // Bump this version whenever the blank-slate default changes so stale
 // localStorage data from previous sessions gets discarded automatically.
-const STORAGE_VERSION = 3;
+// v4: default schema gained the `history` (inflammation-risk inputs) and
+// `plan` (surgeon's operative plan) blocks.
+const STORAGE_VERSION = 4;
 const HISTORY_LIMIT = 40;
 // Separate key for cases saved via the CaseLog, so they persist in the dropdown.
 const PATIENT_LIBRARY_KEY = "compass-patient-library";
@@ -339,6 +341,39 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       if (patch.suv !== undefined) record.staging.max_suv = patch.suv;
       if (patch.psma_ln !== undefined)
         record.staging.lymph_nodes_psma = patch.psma_ln ? "positive" : undefined;
+      // ── Anatomy / history (inflammation-risk model) ──────────────────────
+      if (patch.median_lobe_grade !== undefined)
+        record.prostate.median_lobe_grade = patch.median_lobe_grade;
+      const H = (record.history ??= {});
+      const hSet: (keyof NonNullable<Prostate3DInputV1["history"]>)[] = [
+        "prior_turp", "prior_urolift", "prior_greenlight", "prior_holep",
+        "prior_rezum", "prior_pelvic_radiation", "urinary_retention",
+        "recurrent_uti", "treated_prostatitis", "biopsy_shows_inflammation",
+        "crohns", "ulcerative_colitis", "diverticulitis", "pelvic_abscess",
+        "hernia_mesh", "rectal_fistula", "radiation_proctitis",
+        "mri_periprostatic_fat_stranding",
+      ];
+      for (const k of hSet) {
+        const v = (patch as Record<string, unknown>)[k];
+        if (v !== undefined) (H as Record<string, unknown>)[k] = v;
+      }
+      if (patch.biopsy_sessions !== undefined) H.biopsy_sessions = patch.biopsy_sessions;
+      if (patch.mri_periprostatic_inflammation !== undefined)
+        H.mri_periprostatic_inflammation = patch.mri_periprostatic_inflammation;
+      if (patch.intraop_inflammation_l !== undefined)
+        H.intraop_inflammation_l = patch.intraop_inflammation_l || null;
+      if (patch.intraop_inflammation_r !== undefined)
+        H.intraop_inflammation_r = patch.intraop_inflammation_r || null;
+      // ── Surgeon's operative plan ─────────────────────────────────────────
+      const PL = (record.plan ??= {});
+      if (patch.plan_ns_override_l !== undefined) PL.ns_override_l = patch.plan_ns_override_l;
+      if (patch.plan_ns_override_r !== undefined) PL.ns_override_r = patch.plan_ns_override_r;
+      if (patch.plan_hood !== undefined) PL.hood = patch.plan_hood;
+      if (patch.plan_bnp !== undefined) PL.bladder_neck_preservation = patch.plan_bnp;
+      if (patch.plan_sv_preservation_l !== undefined) PL.sv_preservation_l = patch.plan_sv_preservation_l;
+      if (patch.plan_sv_preservation_r !== undefined) PL.sv_preservation_r = patch.plan_sv_preservation_r;
+      if (patch.plan_hydrodissection_l !== undefined) PL.hydrodissection_l = patch.plan_hydrodissection_l;
+      if (patch.plan_hydrodissection_r !== undefined) PL.hydrodissection_r = patch.plan_hydrodissection_r;
       const next = patients.map((x) =>
         x.id === activeId ? { ...x, record } : x,
       );

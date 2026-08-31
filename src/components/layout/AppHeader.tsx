@@ -28,7 +28,7 @@ const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[]
   { id: "input",        label: "Input",       Icon: ClipboardList },
   { id: "predictions",  label: "Predictions", Icon: Activity },
   { id: "outcomes",     label: "Outcomes",    Icon: Layers },
-  { id: "inflammation", label: "Inflammation", Icon: FlaskConical },
+  { id: "plan",         label: "Planning",    Icon: FlaskConical },
 ];
 
 export function AppHeader() {

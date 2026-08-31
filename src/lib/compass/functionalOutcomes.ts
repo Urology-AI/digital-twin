@@ -1,13 +1,45 @@
 /**
- * COMPASS Functional Outcomes predictor
- * Ported from COMPASS_final.html JavaScript logic
+ * COMPASS Functional Outcomes predictor.
+ *
+ * The NS-grade base rates (`POT`/`CONT`), modifiable-factor deltas (`MF`) and
+ * age/SHIM/IPSS adjustment factors below are the COMPASS RARP functional-outcome
+ * working nomogram (Mount Sinai; ported from COMPASS_final.html) — see
+ * `FUNCTIONAL_OUTCOMES_MODEL` in planningEvidence.ts for provenance. Recovery-
+ * trajectory shape follows Ficarra 2012 and Tewari 2012 systematic reviews.
+ * Not yet a formally published fitted model; surfaced in the UI as provisional.
+ *
+ * Operative-choice and inflammation deltas come from `PLAN_DELTAS` (literature).
  */
+import {
+  FUNCTIONAL_OUTCOMES_MODEL,
+  HEALER_THRESHOLD,
+  MODIFIABLE_BCR,
+  PLAN_DELTAS,
+} from "@/lib/compass/planningEvidence";
+
+/** Re-exported so panels can cite the functional model without a second import. */
+export const FUNCTIONAL_MODEL_CITATION = FUNCTIONAL_OUTCOMES_MODEL.citation;
 
 export type PfmtLevel = 'none' | 'basic' | 'moderate' | 'intensive';
 export type ExerciseLevel = 'sedentary' | 'light' | 'moderate' | 'active';
 export type SmokingStatus = 'never' | 'former' | 'current';
 export type Pde5Regimen = 'none' | 'prn' | 'daily';
 export type AlcoholLevel = 'none' | 'moderate' | 'heavy';
+
+export type HoodPlan = 'none' | 'unilateral' | 'bilateral';
+export type InflammationTierInput = 'low' | 'moderate' | 'high';
+export type HealerTier = 'super' | 'healer' | 'delayed' | 'non-recovery';
+
+/** Optional operative-plan modifiers applied on top of the NS-grade base rates. */
+export interface PlanModifiers {
+  hood: HoodPlan;
+  bnPreservation: boolean;
+  svPreservationL: boolean;
+  svPreservationR: boolean;
+  hydrodissectionL: boolean;
+  hydrodissectionR: boolean;
+  inflammationTier: InflammationTierInput;
+}
 
 export interface FunctionalInputs {
   nsL: number; // 1-3
@@ -24,6 +56,8 @@ export interface FunctionalInputs {
   dm: boolean;
   htn: boolean;
   cad: boolean;
+  /** operative-plan modifiers; omit to score the NS grade alone */
+  plan?: PlanModifiers;
 }
 
 export interface FunctionalOutcomesResult {
@@ -34,6 +68,13 @@ export interface FunctionalOutcomesResult {
   potencyAdj: number;
   continenceAdj: number;
   shimValid: boolean;
+  /** erectile-recovery phenotype from time-to-potency (null when SHIM < 12) */
+  healerTier: HealerTier | null;
+  /** probability mass in each recovery window, 0–1 (null when SHIM < 12) */
+  healerBands: { super: number; healer: number; delayed: number } | null;
+  /** net pp effect of the operative-plan modifiers (0 when no plan passed) */
+  planPotencyAdj: number;
+  planContinenceAdj: number;
 }
 
 // POT and CONT arrays: [6wk, 3mo, 6mo, 12mo, 12mo(main), 18mo, beyond]
@@ -86,6 +127,57 @@ const MF = {
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
+}
+
+/** pp deltas from the operative-plan modifiers. `contEarly` applies to the
+ *  6-week / 3-month continence points only (recovery-speed effect). */
+function planDeltas(p: PlanModifiers | undefined): {
+  pot: number;
+  cont: number;
+  contEarly: number;
+} {
+  if (!p) return { pot: 0, cont: 0, contEarly: 0 };
+  const D = PLAN_DELTAS.value;
+  let pot = 0;
+  let cont = 0;
+  let contEarly = 0;
+  const apply = (d: { pot: number; cont: number; contEarly: number }) => {
+    pot += d.pot;
+    cont += d.cont;
+    contEarly += d.contEarly;
+  };
+  if (p.hood === "bilateral") apply(D.hood_bilateral);
+  else if (p.hood === "unilateral") apply(D.hood_unilateral);
+  if (p.bnPreservation) apply(D.bladder_neck_preservation);
+  if (p.hydrodissectionL) apply(D.hydrodissection);
+  if (p.hydrodissectionR) apply(D.hydrodissection);
+  if (!p.svPreservationL) apply(D.sv_non_preservation);
+  if (!p.svPreservationR) apply(D.sv_non_preservation);
+  if (p.inflammationTier === "moderate") apply(D.inflammation_moderate);
+  else if (p.inflammationTier === "high") apply(D.inflammation_high);
+  return { pot, cont, contEarly };
+}
+
+function healerTierFromTimeline(timeline: (number | null)[]): HealerTier | null {
+  if (timeline.some((v) => v === null)) return null;
+  const t = timeline as number[];
+  const thr = HEALER_THRESHOLD.value;
+  // [6wk, 3mo, 6mo, 12mo, 18mo]
+  if (t[0]! >= thr || t[1]! >= thr) return "super";
+  if (t[2]! >= thr || t[3]! >= thr) return "healer";
+  if (t[4]! >= thr) return "delayed";
+  return "non-recovery";
+}
+
+function healerBandsFromTimeline(
+  timeline: (number | null)[],
+): { super: number; healer: number; delayed: number } | null {
+  if (timeline.some((v) => v === null)) return null;
+  const t = timeline as number[];
+  const sup = clamp(t[1]! / 100, 0, 1);
+  const heal = clamp((t[3]! - t[1]!) / 100, 0, 1);
+  const del = clamp((t[4]! - t[3]!) / 100, 0, 1);
+  return { super: sup, healer: heal, delayed: del };
 }
 
 function blend(a: number[], b: number[], w: number): number[] {
@@ -168,6 +260,13 @@ export function computeFunctionalOutcomes(inputs: FunctionalInputs): FunctionalO
   if (htn) { pA += MF.comorbid.htn.pot; cA += MF.comorbid.htn.cont; }
   if (cad) { pA += MF.comorbid.cad.pot; cA += MF.comorbid.cad.cont; }
 
+  // Operative-plan modifiers (hood / bladder-neck / hydrodissection / SV / inflammation)
+  const pdel = planDeltas(inputs.plan);
+  pA += pdel.pot;
+  cA += pdel.cont;
+  const planPotencyAdj = pdel.pot;
+  const planContinenceAdj = pdel.cont + pdel.contEarly;
+
   // Base predictions at 12mo
   const pB = Math.round((pd[4] ?? 0) * aA * sA);
   const cB = Math.round((cd[4] ?? 0) * (age >= 70 ? 0.95 : 1.0));
@@ -190,8 +289,8 @@ export function computeFunctionalOutcomes(inputs: FunctionalInputs): FunctionalO
 
   // Continence timeline: [6wk, 3mo, 6mo, 12mo, 18mo]
   const continenceTimeline: number[] = [
-    clamp(Math.round(cd[0] ?? 0) + Math.round(cA * 0.5), 30, 85),
-    clamp(Math.round(cd[1] ?? 0) + Math.round(cA * 0.7), 50, 92),
+    clamp(Math.round(cd[0] ?? 0) + Math.round(cA * 0.5) + pdel.contEarly, 30, 85),
+    clamp(Math.round(cd[1] ?? 0) + Math.round(cA * 0.7) + pdel.contEarly, 50, 92),
     clamp(Math.round(cd[2] ?? 0) + Math.round(cA * 0.9), 70, 97),
     cF,
     clamp(Math.round(cd[5] ?? 0) + cA, 80, 99),
@@ -205,5 +304,107 @@ export function computeFunctionalOutcomes(inputs: FunctionalInputs): FunctionalO
     potencyAdj: pA,
     continenceAdj: cA,
     shimValid,
+    healerTier: healerTierFromTimeline(potencyTimeline),
+    healerBands: healerBandsFromTimeline(potencyTimeline),
+    planPotencyAdj,
+    planContinenceAdj,
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* Per-factor breakdown — for the "modifiable factors" impact view    */
+/* ------------------------------------------------------------------ */
+
+export interface FactorContribution {
+  label: string;
+  detail: string;
+  /** pp effect on 12-month potency (higher = better) */
+  pot: number;
+  /** pp effect on 12-month continence (higher = better) */
+  cont: number;
+  /** pp effect on BCR risk (higher = worse); only BMI has a pathway */
+  bcrRisk: number;
+  /** true if the patient can change it before surgery */
+  modifiable: boolean;
+}
+
+type BreakdownInput = Pick<
+  FunctionalInputs,
+  "bmi" | "pfmt" | "exercise" | "pde5" | "smoking" | "alcohol" | "dm" | "htn" | "cad" | "ipss"
+>;
+
+export function modifiableFactorBreakdown(i: BreakdownInput): FactorContribution[] {
+  const bmiBcr =
+    i.bmi >= 35 ? MODIFIABLE_BCR.value.bmi_ge_35 : i.bmi >= 30 ? MODIFIABLE_BCR.value.bmi_ge_30 : 0;
+  const ipssCont = i.ipss <= 7 ? 0 : i.ipss <= 14 ? -3 : i.ipss <= 19 ? -6 : -10;
+
+  const rows: FactorContribution[] = [
+    {
+      label: "BMI",
+      detail: `${Math.round(i.bmi)} kg/m²`,
+      pot: MF.bmi.pot(i.bmi),
+      cont: MF.bmi.cont(i.bmi),
+      bcrRisk: Math.round(bmiBcr * 100),
+      modifiable: true,
+    },
+    {
+      label: "Pelvic floor training",
+      detail: i.pfmt,
+      pot: MF.pfmt.pot[i.pfmt],
+      cont: MF.pfmt.cont[i.pfmt],
+      bcrRisk: 0,
+      modifiable: true,
+    },
+    {
+      label: "Exercise",
+      detail: i.exercise,
+      pot: MF.exercise.pot[i.exercise],
+      cont: MF.exercise.cont[i.exercise],
+      bcrRisk: 0,
+      modifiable: true,
+    },
+    {
+      label: "PDE5 inhibitor",
+      detail: i.pde5,
+      pot: MF.pde5.pot[i.pde5],
+      cont: 0,
+      bcrRisk: 0,
+      modifiable: true,
+    },
+    {
+      label: "Smoking",
+      detail: i.smoking,
+      pot: MF.smoking.pot[i.smoking],
+      cont: MF.smoking.cont[i.smoking],
+      bcrRisk: 0,
+      modifiable: true,
+    },
+    {
+      label: "Alcohol",
+      detail: i.alcohol,
+      pot: MF.alcohol.pot[i.alcohol],
+      cont: MF.alcohol.cont[i.alcohol],
+      bcrRisk: 0,
+      modifiable: true,
+    },
+    {
+      label: "Voiding symptoms (IPSS)",
+      detail: String(i.ipss),
+      pot: 0,
+      cont: ipssCont,
+      bcrRisk: 0,
+      modifiable: true,
+    },
+    ...(i.dm
+      ? [{ label: "Diabetes", detail: "present", pot: MF.comorbid.dm.pot, cont: MF.comorbid.dm.cont, bcrRisk: 0, modifiable: false }]
+      : []),
+    ...(i.htn
+      ? [{ label: "Hypertension", detail: "present", pot: MF.comorbid.htn.pot, cont: MF.comorbid.htn.cont, bcrRisk: 0, modifiable: false }]
+      : []),
+    ...(i.cad
+      ? [{ label: "Coronary disease", detail: "present", pot: MF.comorbid.cad.pot, cont: MF.comorbid.cad.cont, bcrRisk: 0, modifiable: false }]
+      : []),
+  ];
+
+  return rows.filter((r) => r.pot !== 0 || r.cont !== 0 || r.bcrRisk !== 0);
 }

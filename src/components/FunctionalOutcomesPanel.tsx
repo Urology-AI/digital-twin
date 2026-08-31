@@ -5,13 +5,86 @@ import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normaliz
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import {
   computeFunctionalOutcomes,
+  modifiableFactorBreakdown,
+  FUNCTIONAL_MODEL_CITATION,
   type PfmtLevel,
   type Pde5Regimen,
   type AlcoholLevel,
   type SmokingStatus,
   type ExerciseLevel,
+  type PlanModifiers,
 } from "@/lib/compass/functionalOutcomes";
 import { cn } from "@/lib/utils";
+
+/** Small ±pp cell, green good / red bad. `invert` flips the colour sense. */
+function PpCell({ v, invert = false }: { v: number; invert?: boolean }) {
+  if (v === 0) return <span className="text-muted-foreground/40">·</span>;
+  const good = invert ? v < 0 : v > 0;
+  return (
+    <span className={good ? "text-emerald-500" : "text-red-500"}>
+      {v > 0 ? "+" : ""}
+      {v}
+    </span>
+  );
+}
+
+function ModifiableFactorBreakdown({
+  rows,
+}: {
+  rows: ReturnType<typeof modifiableFactorBreakdown>;
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-semibold">Factor contributions</CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Percentage-point effect of each active factor on the 12-month numbers. Modifiable factors
+          are the levers a patient can pull before surgery.
+        </p>
+        <p className="text-[10px] leading-snug text-muted-foreground/60">{FUNCTIONAL_MODEL_CITATION}</p>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 text-sm tabular-nums">
+          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Factor
+          </div>
+          <div className="text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Potency
+          </div>
+          <div className="text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Contin.
+          </div>
+          <div className="text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            BCR risk
+          </div>
+          {rows.map((r) => (
+            <div key={r.label} className="contents">
+              <div className="truncate">
+                <span className={r.modifiable ? "text-foreground" : "text-muted-foreground"}>
+                  {r.label}
+                </span>{" "}
+                <span className="text-xs capitalize text-muted-foreground/60">{r.detail}</span>
+                {!r.modifiable && (
+                  <span className="ml-1 text-[9px] uppercase text-muted-foreground/50">fixed</span>
+                )}
+              </div>
+              <div className="text-right">
+                <PpCell v={r.pot} />
+              </div>
+              <div className="text-right">
+                <PpCell v={r.cont} />
+              </div>
+              <div className="text-right">
+                <PpCell v={r.bcrRisk} invert />
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 /** Approximate 90% CI on logit scale (SE ≈ 0.58 logit units, z = 1.64) */
 function computeCI(pct: number): { lo: number; hi: number } {
@@ -279,7 +352,7 @@ function RecoveryLineChart({ potency, continence, height = 140, large = false }:
   // the two curves converge near the top of the chart.
   function labelOffsets(i: number): { continence: number; potency: number } {
     const c = continence[i], p = potency[i];
-    if (c === null || p === null || !potencyHasData) {
+    if (c == null || p == null || !potencyHasData) {
       return { continence: labelGap, potency: -labelGap * 0.65 };
     }
     const dy = Math.abs(yOf(c) - yOf(p));
@@ -396,13 +469,17 @@ export function FunctionalOutcomesPanel() {
     );
   }
 
-  const modelNsL = predictions.nsL as 1|2|3;
-  const modelNsR = predictions.nsR as 1|2|3;
-  const nsL: 1|2|3 = nsOverrideL ?? modelNsL;
-  const nsR: 1|2|3 = nsOverrideR ?? modelNsR;
+  const { plan, inflammation } = predictions;
 
-  const result = computeFunctionalOutcomes({
-    nsL, nsR,
+  // Default to the operative plan built on the Planning tab (grade incl.
+  // inflammation escalation + surgeon override). Local overrides here are a
+  // read-only "what if" — they don't change the plan.
+  const planNsL = Math.min(3, Math.max(1, Math.round(plan.left.nsGrade))) as 1 | 2 | 3;
+  const planNsR = Math.min(3, Math.max(1, Math.round(plan.right.nsGrade))) as 1 | 2 | 3;
+  const nsL: 1 | 2 | 3 = nsOverrideL ?? planNsL;
+  const nsR: 1 | 2 | 3 = nsOverrideR ?? planNsR;
+
+  const fnInputs = {
     age: S.age, shim: S.shim, ipss: S.ipss, bmi: S.bmi,
     pfmt: toPfmtLevel(S.pfmt),
     exercise: toExerciseLevel(S.exercise),
@@ -410,7 +487,21 @@ export function FunctionalOutcomesPanel() {
     pde5: toPde5Regimen(S.pde5),
     alcohol: (S.alcohol || "moderate") as AlcoholLevel,
     dm: S.dm, htn: S.htn, cad: S.cad,
-  });
+  };
+
+  // Operative-plan modifiers (hood / BNP / hydrodissection / SV / inflammation)
+  // carry into the functional model so recovery reflects the actual plan.
+  const planMods: PlanModifiers = {
+    hood: plan.hood.value,
+    bnPreservation: plan.bladderNeckPreservation.value,
+    svPreservationL: plan.left.svPreservation.value,
+    svPreservationR: plan.right.svPreservation.value,
+    hydrodissectionL: plan.left.hydrodissection.value,
+    hydrodissectionR: plan.right.hydrodissection.value,
+    inflammationTier: inflammation.tier,
+  };
+  const result = computeFunctionalOutcomes({ nsL, nsR, ...fnInputs, plan: planMods });
+  const factorRows = modifiableFactorBreakdown(fnInputs);
 
   return (
     <div className="flex flex-col gap-4">
@@ -434,7 +525,7 @@ export function FunctionalOutcomesPanel() {
             >i</button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Model-predicted by default — override to plan a specific approach
+            From your operative plan — adjust here to explore an alternative (does not change the plan)
           </p>
         </CardHeader>
         <CardContent className="pt-0">
@@ -445,13 +536,12 @@ export function FunctionalOutcomesPanel() {
           {(nsOverrideL !== null || nsOverrideR !== null) && (
             <div className="mt-3 flex items-center justify-between rounded-md bg-muted/40 px-3 py-1.5">
               <span className="text-xs text-muted-foreground">
-                {nsOverrideL !== null && nsOverrideR !== null ? "Both sides" : nsOverrideL !== null ? "Left" : "Right"} overridden
-                {" "}(predicted L:{modelNsL} R:{modelNsR})
+                Exploring an alternative (plan L:{planNsL} R:{planNsR})
               </span>
               <button type="button"
                 onClick={() => { setNsOverrideL(null); setNsOverrideR(null); }}
                 className="text-xs font-semibold text-primary hover:underline"
-              >Reset</button>
+              >Back to plan</button>
             </div>
           )}
         </CardContent>
@@ -513,6 +603,54 @@ export function FunctionalOutcomesPanel() {
       </div>
 
 
+      {/* Erectile-recovery phenotype */}
+      {result.healerTier && result.healerBands && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="mb-2 flex items-baseline gap-2">
+              <CardTitle className="text-base font-semibold">
+                {result.healerTier === "super"
+                  ? "Super healer"
+                  : result.healerTier === "healer"
+                    ? "Healer"
+                    : result.healerTier === "delayed"
+                      ? "Delayed healer"
+                      : "Unlikely to recover unaided"}
+              </CardTitle>
+              <span className="text-xs text-muted-foreground">
+                {result.healerTier === "super"
+                  ? "potency ≥ 50% by 3 months"
+                  : result.healerTier === "healer"
+                    ? "potency ≥ 50% by 12 months"
+                    : result.healerTier === "delayed"
+                      ? "potency ≥ 50% around 18 months"
+                      : "does not reach 50% unaided"}
+              </span>
+            </div>
+            <div className="flex h-3 overflow-hidden rounded-full border border-border">
+              <div className="bg-emerald-500" style={{ width: `${result.healerBands.super * 100}%` }} />
+              <div className="bg-sky-500" style={{ width: `${result.healerBands.healer * 100}%` }} />
+              <div className="bg-amber-500" style={{ width: `${result.healerBands.delayed * 100}%` }} />
+              <div className="flex-1 bg-muted" />
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" /> super{" "}
+                {Math.round(result.healerBands.super * 100)}%
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-sky-500" /> healer{" "}
+                {Math.round(result.healerBands.healer * 100)}%
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-amber-500" /> delayed{" "}
+                {Math.round(result.healerBands.delayed * 100)}%
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Recovery timeline */}
       <Card>
         <CardHeader className="pb-2">
@@ -554,7 +692,12 @@ export function FunctionalOutcomesPanel() {
         </CardContent>
       </Card>
 
+      <ModifiableFactorBreakdown rows={factorRows} />
 
+      <p className="text-[11px] text-muted-foreground">
+        Model provenance and the full bibliography are in the methodology panel (ⓘ) →{" "}
+        <span className="font-medium">Sources</span> tab.
+      </p>
     </div>
   );
 }

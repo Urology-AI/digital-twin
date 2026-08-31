@@ -22,6 +22,7 @@ const OVERLAYS: { id: OverlayType; label: string; activeColor: string; title: st
   { id: "ece",    label: "ECE",   activeColor: "text-amber-400 border-amber-500/60 bg-amber-500/10", title: "Extracapsular extension risk, by zone" },
   { id: "svi",    label: "SVI",   activeColor: "text-purple-400 border-purple-500/60 bg-purple-500/10", title: "Seminal vesicle invasion risk, by zone" },
   { id: "psm",    label: "PSM",   activeColor: "text-sky-400 border-sky-500/60 bg-sky-500/10", title: "Positive surgical margin risk, by zone" },
+  { id: "plan",   label: "Plan",  activeColor: "text-teal-400 border-teal-500/60 bg-teal-500/10", title: "Recommended nerve-sparing grade, by zone" },
 ];
 
 const LEGEND: Record<OverlayType, { title: string; gradient: string; low: string; high: string; note: string }> = {
@@ -48,6 +49,12 @@ const LEGEND: Record<OverlayType, { title: string; gradient: string; low: string
     gradient: "linear-gradient(to right,#3080c0,#60a0e0,#ef4444)",
     low: "Low", high: "High",
     note: "Blue <15% · Amber 15–35% · Red >35%",
+  },
+  plan: {
+    title: "NS plan",
+    gradient: "linear-gradient(to right,#22c55e,#f59e0b,#ef4444)",
+    low: "Grade 1", high: "Grade 3",
+    note: "Green intrafascial · Amber interfascial · Red wide",
   },
 };
 
