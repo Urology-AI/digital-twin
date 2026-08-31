@@ -56,6 +56,15 @@ function baseInputs(S: ClinicalState): Omit<FunctionalInputs, "nsL" | "nsR" | "p
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
+const HEALER_LABEL: Record<string, string> = {
+  super: "Super healer",
+  healer: "Healer",
+  delayed: "Delayed healer",
+  "non-recovery": "Unaided recovery unlikely",
+};
+/** worse → better order, for colouring the shift */
+const HEALER_ORDER = ["super", "healer", "delayed", "non-recovery"];
+
 const NS_META: Record<number, { name: string; tone: string }> = {
   1: { name: "Intrafascial", tone: "emerald" },
   2: { name: "Interfascial", tone: "amber" },
@@ -528,6 +537,28 @@ export function SurgicalPlanPanel() {
             invert
           />
         </div>
+
+        {baseline.healerTier && withPlan.healerTier && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-border px-3 py-2 text-sm">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Erectile-recovery phenotype
+            </span>
+            <span className="text-muted-foreground">{HEALER_LABEL[baseline.healerTier]}</span>
+            <span className="text-muted-foreground/50">→</span>
+            <span
+              className={cn(
+                "font-semibold",
+                baseline.healerTier === withPlan.healerTier
+                  ? "text-muted-foreground"
+                  : HEALER_ORDER.indexOf(withPlan.healerTier) > HEALER_ORDER.indexOf(baseline.healerTier)
+                    ? "text-red-500"
+                    : "text-emerald-500",
+              )}
+            >
+              {HEALER_LABEL[withPlan.healerTier]}
+            </span>
+          </div>
+        )}
       </section>
 
       {/* ── Per-side plan ──────────────────────────────────────── */}
