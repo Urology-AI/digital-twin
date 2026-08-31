@@ -24,26 +24,8 @@ import {
   lesionsFromRows,
 } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
+import { NSG_DATA, STATION_FP } from "@/lib/compass/nsgOutcomes";
 import { cn } from "@/lib/utils";
-
-// NS Grade → PSM → BCR data from 5,003-side database
-const NSG_DATA = {
-  1: { psm: 11.6, bcr_no: 3.4, bcr_psm: 3.3, apex_psm: 3.0, apex_bcr: 5, pl_psm: 0.8, pl_bcr: 0, base_psm: 1.6, base_bcr: 0, ant_psm: 1.7, ant_bcr: 0, post_psm: 3.0, post_bcr: 0 },
-  2: { psm: 12.0, bcr_no: 9.2, bcr_psm: 16.0, apex_psm: 2.5, apex_bcr: 20, pl_psm: 1.2, pl_bcr: 8, base_psm: 1.8, base_bcr: 23, ant_psm: 1.5, ant_bcr: 6, post_psm: 3.0, post_bcr: 20 },
-  3: { psm: 16.7, bcr_no: 21.6, bcr_psm: 27.6, apex_psm: 1.8, apex_bcr: 15, pl_psm: 0.7, pl_bcr: 25, base_psm: 4.4, base_bcr: 37, ant_psm: 1.4, ant_bcr: 25, post_psm: 3.3, post_bcr: 28 },
-} as const;
-
-const STATION_FP: Record<string, { fp: number; note: string }> = {
-  "external iliac": { fp: 90, note: "Highest FP rate — 90% benign. Predominantly low-grade patients." },
-  "internal iliac": { fp: 20, note: "Low FP rate — high clinical significance." },
-  "obturator": { fp: 25, note: "Low FP rate — clinically significant when positive." },
-  "common iliac": { fp: 50, note: "Moderate FP rate. Concerning if high SUV." },
-  "perirectal": { fp: 15, note: "Rare but concerning. Low FP rate." },
-  "presacral": { fp: 30, note: "Moderate concern." },
-  "paraaortic": { fp: 40, note: "Extended field. May indicate higher stage." },
-  "inguinal": { fp: 70, note: "Often reactive." },
-  "retroperitoneal": { fp: 50, note: "Moderate concern. Check SUVmax." },
-};
 
 function riskCls(v: number) {
   if (v < 0.15) return "text-emerald-500";
@@ -76,6 +58,23 @@ interface LnNode {
   location?: string;
   suv?: number;
   side?: string;
+}
+
+function StatBox({
+  label,
+  value,
+  tone = "text-foreground",
+}: {
+  label: string;
+  value: React.ReactNode;
+  tone?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border/70 bg-muted/20 p-2.5 text-center">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={cn("mt-0.5 text-lg font-bold tabular-nums", tone)}>{value}</div>
+    </div>
+  );
 }
 
 function NsGradeTag({ grade }: { grade: number }) {
@@ -211,7 +210,13 @@ export function PredictionPanel() {
               return (
                 <Tooltip key={p.k}>
                   <TooltipTrigger asChild>
-                    <div className="rounded-xl border border-border/70 bg-card px-2 py-2 text-center shadow-sm transition-shadow hover:shadow-md cursor-default sm:px-3 sm:py-3">
+                    <div className="relative overflow-hidden rounded-xl border border-border/70 bg-card px-2 py-2 text-center shadow-sm transition-shadow hover:shadow-md cursor-default sm:px-3 sm:py-3">
+                      <div
+                        className={cn(
+                          "absolute inset-x-0 top-0 h-[3px]",
+                          p.neutral ? "bg-muted-foreground/20" : riskBarCls(p.v),
+                        )}
+                      />
                       <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">{p.k}</div>
                       <div className={cn("text-xl font-bold tabular-nums sm:text-2xl lg:text-3xl", p.neutral ? "text-muted-foreground/50" : riskCls(p.v))}>
                         {Math.round(p.v * 100)}%
@@ -305,18 +310,9 @@ export function PredictionPanel() {
                   <div key={gs.label} className={cn(idx > 0 && "mt-3 border-t border-border pt-3")}>
                     <div className="mb-2 text-sm font-semibold uppercase tracking-wide text-primary">Surgical Consequence — {gs.label}</div>
                     <div className="grid grid-cols-3 gap-2">
-                      <div className="rounded border border-border bg-muted/30 p-2 text-center">
-                        <div className="text-xs text-muted-foreground">PSM Rate</div>
-                        <div className="text-base font-bold text-amber-500">{gd.psm}%</div>
-                      </div>
-                      <div className="rounded border border-border bg-muted/30 p-2 text-center">
-                        <div className="text-xs text-muted-foreground">BCR if PSM−</div>
-                        <div className={cn("text-base font-bold", bcrColor(gd.bcr_no))}>{gd.bcr_no}%</div>
-                      </div>
-                      <div className="rounded border border-border bg-muted/30 p-2 text-center">
-                        <div className="text-xs text-muted-foreground">BCR if PSM+</div>
-                        <div className={cn("text-base font-bold", bcrColor(gd.bcr_psm))}>{gd.bcr_psm}%</div>
-                      </div>
+                      <StatBox label="PSM Rate" value={`${gd.psm}%`} tone="text-amber-500" />
+                      <StatBox label="BCR if PSM−" value={`${gd.bcr_no}%`} tone={bcrColor(gd.bcr_no)} />
+                      <StatBox label="BCR if PSM+" value={`${gd.bcr_psm}%`} tone={bcrColor(gd.bcr_psm)} />
                     </div>
                   </div>
                 );
@@ -326,22 +322,25 @@ export function PredictionPanel() {
                 "mb-2 text-sm font-semibold uppercase tracking-wide text-primary",
                 gradesToShow.length > 0 && "mt-3 border-t border-border pt-3",
               )}>PLND decision</div>
-              <div className={cn("mb-3 rounded-md border border-border border-l-4 bg-muted/30 p-3", plndColor)}>
+              <div className={cn("mb-3 rounded-lg border border-border border-l-4 bg-muted/20 p-3", plndColor)}>
                 <div className="text-base font-bold">{plndTitle}</div>
               </div>
               <div className="mb-3 grid grid-cols-3 gap-2">
-                <div className="rounded border border-border bg-muted/30 p-2.5 text-center">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">LNI Risk</div>
-                  <div className={cn("text-lg font-bold", lniRisk < 0.05 ? "text-emerald-500" : lniRisk < 0.15 ? "text-amber-500" : "text-red-500")}>{Math.round(lniRisk * 100)}%</div>
-                </div>
-                <div className="rounded border border-border bg-muted/30 p-2.5 text-center">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">NCCN Risk</div>
-                  <div className={cn("text-lg font-bold", isHighRisk ? "text-red-500" : "text-emerald-500")}>{isHighRisk ? "High" : "Non-High"}</div>
-                </div>
-                <div className="rounded border border-border bg-muted/30 p-2.5 text-center">
-                  <div className="text-xs uppercase tracking-wide text-muted-foreground">PSMA LN</div>
-                  <div className={cn("text-lg font-bold", psmaLn ? "text-red-500" : "text-emerald-500")}>{psmaLn ? "Positive" : "Negative"}</div>
-                </div>
+                <StatBox
+                  label="LNI Risk"
+                  value={`${Math.round(lniRisk * 100)}%`}
+                  tone={lniRisk < 0.05 ? "text-emerald-500" : lniRisk < 0.15 ? "text-amber-500" : "text-red-500"}
+                />
+                <StatBox
+                  label="NCCN Risk"
+                  value={isHighRisk ? "High" : "Non-High"}
+                  tone={isHighRisk ? "text-red-500" : "text-emerald-500"}
+                />
+                <StatBox
+                  label="PSMA LN"
+                  value={psmaLn ? "Positive" : "Negative"}
+                  tone={psmaLn ? "text-red-500" : "text-emerald-500"}
+                />
               </div>
 
               {psmaLn > 0 && Array.isArray(lymphNodes) && lymphNodes.length > 0 && (

@@ -204,5 +204,52 @@ export function clinicalStateFromRecord(
 
   S.psma_ln = parsePsmaLn(st);
 
+  if (pr.median_lobe_grade !== null && pr.median_lobe_grade !== undefined)
+    S.median_lobe_grade = pr.median_lobe_grade;
+
+  const h = P.history;
+  if (h) {
+    S.prior_turp = !!h.prior_turp;
+    S.prior_urolift = !!h.prior_urolift;
+    S.prior_greenlight = !!h.prior_greenlight;
+    S.prior_holep = !!h.prior_holep;
+    S.prior_rezum = !!h.prior_rezum;
+    S.prior_pelvic_radiation = !!h.prior_pelvic_radiation;
+    S.urinary_retention = !!h.urinary_retention;
+    S.recurrent_uti = !!h.recurrent_uti;
+    S.treated_prostatitis = !!h.treated_prostatitis;
+    S.biopsy_shows_inflammation = !!h.biopsy_shows_inflammation;
+    if (h.biopsy_sessions !== null && h.biopsy_sessions !== undefined)
+      S.biopsy_sessions = h.biopsy_sessions;
+    S.crohns = !!h.crohns;
+    S.ulcerative_colitis = !!h.ulcerative_colitis;
+    S.diverticulitis = !!h.diverticulitis;
+    S.pelvic_abscess = !!h.pelvic_abscess;
+    S.hernia_mesh = !!h.hernia_mesh;
+    S.rectal_fistula = !!h.rectal_fistula;
+    S.radiation_proctitis = !!h.radiation_proctitis;
+    if (h.mri_periprostatic_inflammation)
+      S.mri_periprostatic_inflammation = h.mri_periprostatic_inflammation;
+    S.mri_periprostatic_fat_stranding = !!h.mri_periprostatic_fat_stranding;
+    if (h.intraop_inflammation_l !== null && h.intraop_inflammation_l !== undefined)
+      S.intraop_inflammation_l = h.intraop_inflammation_l;
+    if (h.intraop_inflammation_r !== null && h.intraop_inflammation_r !== undefined)
+      S.intraop_inflammation_r = h.intraop_inflammation_r;
+  }
+
+  const pl = P.plan;
+  if (pl) {
+    const tri = (v: boolean | null | undefined): boolean | null =>
+      v === undefined ? null : v;
+    S.plan_ns_override_l = pl.ns_override_l ?? null;
+    S.plan_ns_override_r = pl.ns_override_r ?? null;
+    if (pl.hood) S.plan_hood = pl.hood;
+    S.plan_bnp = tri(pl.bladder_neck_preservation);
+    S.plan_sv_preservation_l = tri(pl.sv_preservation_l);
+    S.plan_sv_preservation_r = tri(pl.sv_preservation_r);
+    S.plan_hydrodissection_l = tri(pl.hydrodissection_l);
+    S.plan_hydrodissection_r = tri(pl.hydrodissection_r);
+  }
+
   return S;
 }

@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { OverlayType } from "@/types/prediction";
 import { VIEWS } from "@/lib/three/prostateScene";
 
-export type DesktopTab = "input" | "predictions" | "outcomes" | "inflammation";
+export type DesktopTab = "input" | "predictions" | "outcomes" | "plan";
 
 const WELCOME_SEEN_KEY = "compass-welcome-seen";
 const TUTORIAL_TOTAL_STEPS = 8;

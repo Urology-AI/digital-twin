@@ -1,5 +1,8 @@
+import { ZONE_ANATOMY } from "@/lib/compass/constants";
+import { predictInflammationRisk } from "@/lib/compass/inflammationRisk";
 import { mapZoneDataToThree } from "@/lib/compass/mapZoneData";
 import { getNsGradeZoneAware } from "@/lib/compass/nsGrade";
+import { buildSurgicalPlan } from "@/lib/compass/surgicalPlan";
 import { predictBcrPreop } from "@/lib/models/bcr";
 import {
   clampEcePatient,
@@ -86,6 +89,17 @@ export function runCompassModels(
 
   const bcr = clamp(predictBcrPreop(S), 0.03, 0.75);
 
+  const inflammation = predictInflammationRisk(S);
+  const plan = buildSurgicalPlan(S, nsDetailL, nsDetailR, sviL, sviR, inflammation);
+
+  // Per-zone recommended NS grade → drives the "plan" 3D overlay.
+  for (const z of threeZones) {
+    const a = ZONE_ANATOMY[z.id];
+    if (!a) continue;
+    const side = a.side === "L" ? plan.left : plan.right;
+    z.planGrade = side.zoneGrades[a.zone] ?? side.nsGrade;
+  }
+
   const predictions: CompassPredictions = {
     ece,
     svi,
@@ -102,6 +116,8 @@ export function runCompassModels(
     sviR,
     nsDetailL,
     nsDetailR,
+    inflammation,
+    plan,
   };
 
   mapZoneDataToThree(P.zones, threeZones, predictions);

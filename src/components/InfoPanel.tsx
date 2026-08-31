@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { EvidencePanel } from "@/components/EvidencePanel";
 
 const H2 = ({ children }: { children: React.ReactNode }) => (
   <h2 className="text-base font-semibold uppercase tracking-wide text-primary mb-2">{children}</h2>
@@ -19,7 +20,7 @@ const Note = ({ children }: { children: React.ReactNode }) => (
   <p className="mt-2 text-[10px] text-muted-foreground">{children}</p>
 );
 
-const TABS = ["Overview", "ECE", "SVI", "LNI", "Upgrade", "PSM", "BCR", "Score", "NS"] as const;
+const TABS = ["Overview", "ECE", "SVI", "LNI", "Upgrade", "PSM", "BCR", "Score", "NS", "Sources"] as const;
 type Tab = (typeof TABS)[number];
 
 interface InfoPanelProps {
@@ -1603,6 +1604,24 @@ function NsTab() {
 }
 
 // ── Main Component ───────────────────────────────────────────────────────────
+// ── Sources (surgical-planning & functional-outcome evidence) ──────────────
+function SourcesTab() {
+  return (
+    <>
+      <section>
+        <H2>Evidence &amp; sources</H2>
+        <p className="text-muted-foreground text-[11px] mb-3">
+          Every value and decision rule in the surgical-planning, inflammation-risk, healer-tier and
+          BCR-by-plan modules, grouped by whether it is COMPASS-data-driven, literature-based, or a
+          provisional expert prior. Full bibliography (Mount Sinai / Tewari group first) is at the
+          bottom.
+        </p>
+        <EvidencePanel defaultOpen />
+      </section>
+    </>
+  );
+}
+
 export function InfoPanel({ onClose }: InfoPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
 
@@ -1652,6 +1671,7 @@ export function InfoPanel({ onClose }: InfoPanelProps) {
           {activeTab === "BCR" && <BcrTab />}
           {activeTab === "Score" && <ScoreTab />}
           {activeTab === "NS" && <NsTab />}
+          {activeTab === "Sources" && <SourcesTab />}
         </div>
       </div>
     </div>

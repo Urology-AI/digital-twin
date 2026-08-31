@@ -1,0 +1,166 @@
+{
+  "_meta": {
+    "schema_version": "2.0",
+    "description": "Human-readable mirror of src/lib/compass/planningEvidence.ts. Every value used by the surgical-plan, inflammation-risk, healer-tier and BCR-by-plan modules, tagged by source. The TypeScript file is the runtime source of truth.",
+    "sources": {
+      "institutional": "derived from the Mount Sinai RARP cohort / an existing fitted COMPASS model",
+      "literature": "a published estimate (paper cited)",
+      "provisional": "expert-prior default not yet calibrated on COMPASS data; flagged as such in the UI"
+    },
+    "does_not_affect": "the six core COMPASS predictions (ECE, SVI, upgrade, PSM, BCR, LNI)"
+  },
+
+  "ns_base_model": {
+    "source": "institutional",
+    "citation": "COMPASS zone-aware NS grade (MODEL_CARD.md §9); side ECE/SVI from the fitted COMPASS side-specific models (Mount Sinai RARP cohort, N≈5,352)."
+  },
+
+  "ns_minimal_disease": {
+    "source": "literature",
+    "citation": "Tewari 2012 risk-stratified nerve-sparing; Patel 2015 grade of nerve-sparing",
+    "max_gg": 2, "max_positive_cores": 2, "max_ece_fraction": 0.1
+  },
+
+  "ns_zone_thresholds_ece_fraction": {
+    "source": "literature",
+    "citation": "posterolateral/base from existing COMPASS NS_THRESHOLDS; apex/anterior/bladder-neck from zone-specific PSM literature (Preisser 2019; Martini 2017)",
+    "posterolateral": { "grade2": 0.1, "grade3": 0.3 },
+    "base": { "grade2": 0.1, "grade3": 0.35 },
+    "apex": { "grade2": 0.1, "grade3": 0.3 },
+    "anterior": { "grade2": 0.12, "grade3": 0.35 },
+    "bladder_neck": { "grade2": 0.1, "grade3": 0.3 }
+  },
+
+  "ns_zone_ece_fallback_split": {
+    "source": "literature",
+    "citation": "ECE-site distribution on whole-mount RP series (Martini 2017; Ball 2015)",
+    "posterolateral": 0.35, "base": 0.3, "apex": 0.2, "anterior": 0.1, "bladder_neck": 0.05
+  },
+
+  "gg_boost_zone": {
+    "source": "provisional",
+    "citation": "monotone prior mapping biopsy GG (+ core involvement) to zone csPCa probability; expert prior pending COMPASS fitting",
+    "by_grade": { "1": 0.3, "2": 0.55, "3": 0.7, "4": 0.8, "5": 0.9 },
+    "core_involvement_weight": 0.3
+  },
+
+  "ns_alert_thresholds": {
+    "source": "literature",
+    "citation": "Preisser 2019 apical margins; Tewari 2011 NVB anatomy; PSMA-positive-at-base 43% ECE (Hofman 2020)",
+    "apex": 0.1, "apex_high": 0.2, "anterior": 0.1, "anterior_high": 0.2,
+    "bladder_neck": 0.1, "bladder_neck_high": 0.2, "nvb": 0.15, "nvb_high": 0.3,
+    "svi_grade2": 0.15, "svi_grade3": 0.25, "svi_high": 0.3,
+    "mri_epe_posterior": 0.15, "psma_base": 0.08, "psma_base_high": 0.25,
+    "zone_data_present": 0.03, "zone_weight_alert": 0.05
+  },
+
+  "plane_technique": {
+    "source": "literature",
+    "citation": "Tewari 2011 anatomic fascial planes; Martini 2018 incremental nerve-sparing grades",
+    "grade1": "Intrafascial", "grade2": "Interfascial", "grade3": "Extrafascial (wide)"
+  },
+
+  "ns_grade_escalation": {
+    "source": "literature",
+    "citation": "Martini 2018; Srivastava 2013 athermal technique",
+    "high_inflammation_steps": 1, "moderate_inflammation_steps": 0
+  },
+
+  "inflammation_risk_weights": {
+    "source": "provisional",
+    "citation": "Martini 2018; Mandel 2018 salvage RP; Cheng 2021 PPAT inflammation; Rud 2015 post-biopsy MRI change. BPH sub-weights ranked by dissection burden. Expert priors pending fitting against whole-mount inflammation grade.",
+    "intercept": -1.9,
+    "points": {
+      "age_gt_70": 0.35, "volume_gt_80": 0.4, "volume_gt_100_additional": 0.35,
+      "prior_turp": 0.55, "prior_holep": 0.7, "prior_greenlight": 0.6,
+      "prior_urolift": 0.3, "prior_rezum": 0.25, "prior_bph_cap": 1.4,
+      "prior_pelvic_radiation": 1.1, "radiation_proctitis": 0.6,
+      "urinary_retention": 0.4, "recurrent_uti": 0.35, "ipss_gt_19": 0.3,
+      "pelvic_abscess": 0.9, "hernia_mesh": 0.7, "rectal_fistula": 0.9,
+      "ibd": 0.7, "diverticulitis": 0.45, "biopsy_inflammation": 0.4,
+      "multiple_biopsies": 0.35, "treated_prostatitis": 0.5, "bmi_gt_30": 0.3,
+      "mri_inflammation_equivocal": 0.5, "mri_inflammation_present": 1.0,
+      "mri_fat_stranding": 0.4, "intraop_per_grade": 1.0
+    },
+    "intraop_override": "score = max(pre-op risk-factor score, intra-op-grade score); never de-escalates below the pre-op estimate"
+  },
+
+  "inflammation_tier_cutpoints": {
+    "source": "provisional",
+    "citation": "provisional tertile-style cutpoints; to be calibrated against whole-mount inflammation grade + an intra-op difficulty score",
+    "moderate": 0.3, "high": 0.55
+  },
+
+  "hood_decision": {
+    "source": "literature",
+    "citation": "Rosenberg 2020 Cochrane; Menon 2018 RCT; Galfano 2013 Retzius-sparing technique",
+    "anterior_apex_ece_max": 0.15
+  },
+
+  "bnp_decision": {
+    "source": "literature",
+    "citation": "Ma 2016 meta-analysis; Nyarangi-Dix 2013 RCT",
+    "max_median_lobe_grade": 2, "max_bladder_neck_ece": 0.1, "max_volume_cc": 120
+  },
+
+  "sv_preservation": {
+    "source": "literature",
+    "citation": "John & Hauri 2000; Gilbert 2017",
+    "max_side_svi_probability": 0.1
+  },
+
+  "hydrodissection_threshold": {
+    "source": "literature",
+    "citation": "Patel 2012; Kowalczyk 2011 peri-NVB dissection",
+    "posterolateral_ece_min": 0.15,
+    "not_applicable_when": "frank EPE on imaging, or a planned grade-3 wide excision"
+  },
+
+  "functional_outcome_model": {
+    "source": "provisional",
+    "citation": "COMPASS RARP functional-outcome working nomogram (Mount Sinai; ported from COMPASS_final.html); recovery-trajectory shape after Ficarra 2012 and Tewari 2012 systematic reviews. Not yet a formally published fitted model."
+  },
+
+  "plan_functional_deltas_pp": {
+    "source": "literature",
+    "citation": "Rosenberg 2020; Menon 2018; Ma 2016; Patel 2012. Inflammation penalties are expert priors.",
+    "hood_bilateral": { "contEarly": 12, "cont": 4, "pot": 2 },
+    "hood_unilateral": { "contEarly": 6, "cont": 2, "pot": 1 },
+    "bladder_neck_preservation": { "contEarly": 6, "cont": 3, "pot": 0 },
+    "hydrodissection": { "pot": 4 },
+    "sv_non_preservation_per_side": { "pot": -3 },
+    "inflammation_moderate": { "pot": -4, "cont": -2, "contEarly": -3 },
+    "inflammation_high": { "pot": -10, "cont": -5, "contEarly": -8 }
+  },
+
+  "healer_threshold": {
+    "source": "provisional",
+    "citation": "modeled potency ≥ 50% (PDE5-assisted) = functional recovery; to be calibrated against serial SHIM/EHS follow-up",
+    "potency_probability_pct": 50,
+    "buckets": { "super": "<=3 mo", "healer": "<=12 mo", "delayed": "18 mo", "non_recovery": "never" }
+  },
+
+  "nsg_outcome_data": {
+    "source": "institutional",
+    "citation": "Mount Sinai 5,003-side RP database — PSM rate and BCR rate (margin- vs margin+) by NS grade and zone"
+  },
+
+  "bcr_hazard": {
+    "source": "literature",
+    "citation": "Han 2003; Freedland 2005 recurrence-timing series",
+    "fraction_of_eventual_bcr_by_1y": 0.35,
+    "fraction_of_eventual_bcr_by_2_3y": 0.7
+  },
+
+  "psm_plan_modulation": {
+    "source": "provisional",
+    "citation": "directional expert-prior adjustments to the NS-grade PSM rate",
+    "hydrodissection": -0.03, "inflammation_moderate": 0.02, "inflammation_high": 0.05
+  },
+
+  "modifiable_bcr": {
+    "source": "literature",
+    "citation": "Cao & Ma 2011 meta-analysis (obesity → BCR); low-confidence",
+    "bmi_ge_30": 0.03, "bmi_ge_35": 0.06
+  }
+}

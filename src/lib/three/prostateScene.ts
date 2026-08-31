@@ -188,6 +188,12 @@ export function overlayColor(val: number, type: OverlayType): Color {
     const t = Math.min(1, (val - 0.35) / 0.35);
     return new Color(0.8, 0.4 - t * 0.3, 0.3 - t * 0.2);
   }
+  if (type === "plan") {
+    // val = (grade-1)/2 → 0 grade 1 (green), 0.5 grade 2 (amber), 1 grade 3 (red)
+    if (val < 0.25) return new Color(0.18, 0.78, 0.44);
+    if (val < 0.75) return new Color(0.9, 0.6, 0.1);
+    return new Color(0.9, 0.25, 0.15);
+  }
   return new Color(0.5, 0.5, 0.5);
 }
 
@@ -225,7 +231,9 @@ function lookupZoneValue(
           ? z.ece
           : overlay === "svi"
             ? z.svi
-            : z.psm;
+            : overlay === "plan"
+              ? (z.planGrade - 1) / 2
+              : z.psm;
     }
   }
   return 0.01;
@@ -506,7 +514,9 @@ function createZoneMesh(
         ? zone.ece
         : overlay === "svi"
           ? zone.svi
-          : zone.psm;
+          : overlay === "plan"
+            ? (zone.planGrade - 1) / 2
+            : zone.psm;
   const mesh = new Mesh(
     geo,
     new MeshBasicMaterial({
@@ -941,7 +951,7 @@ export function createProstateScene(
         for (const mesh of zoneMeshes) {
           const zn = mesh.userData.zone as ThreeZoneRuntime;
           const val =
-            ov === "cancer" ? zn.cancer : ov === "ece" ? zn.ece : ov === "svi" ? zn.svi : zn.psm;
+            ov === "cancer" ? zn.cancer : ov === "ece" ? zn.ece : ov === "svi" ? zn.svi : ov === "plan" ? (zn.planGrade - 1) / 2 : zn.psm;
           mesh.visible = opts.lesionsOnly ? (val ?? 0) >= 0.15 : true;
         }
         // Zone faces replaced by vertex colours; outlines shown when heatmap active.
@@ -958,7 +968,9 @@ export function createProstateScene(
                 ? zn.ece
                 : ov === "svi"
                   ? zn.svi
-                  : zn.psm;
+                  : ov === "plan"
+                    ? (zn.planGrade - 1) / 2
+                    : zn.psm;
           (mesh.material as MeshBasicMaterial).color.copy(
             overlayColor(val ?? 0.02, ov),
           );

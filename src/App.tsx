@@ -5,7 +5,7 @@ import { ControlsOverlay } from "@/components/ControlsOverlay";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import { OutcomesWorkspace } from "@/components/OutcomesWorkspace";
-import { InflammationWorkspace } from "@/components/InflammationWorkspace";
+import { SurgicalPlanWorkspace } from "@/components/SurgicalPlanWorkspace";
 import { PatientView, PatientViewHeader } from "@/components/PatientView";
 import { PresenterView } from "@/components/PresenterView";
 import { ThreeCanvas } from "@/components/ThreeCanvas";
@@ -236,14 +236,14 @@ export default function App() {
           <OutcomesWorkspace />
         </div>
 
-        {/* ── Experimental tab: standalone inflammation research instrument ── */}
+        {/* ── Surgical plan tab: operative plan + inflammation risk + impact ── */}
         <div
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
-            !patientView && !presenterView && desktopTab === "inflammation" ? "flex" : "hidden",
+            !patientView && !presenterView && desktopTab === "plan" ? "flex" : "hidden",
           )}
         >
-          <InflammationWorkspace />
+          <SurgicalPlanWorkspace />
         </div>
 
         {/* ── Patient view: full-width Inputs | Recovery, 3D model behind a button ── */}
