@@ -46,11 +46,10 @@ export interface InflammationRisk {
   intraopDriven: boolean;
 }
 
+/** A recommendation + a one-line rationale. Citations live in planningEvidence.ts. */
 export interface PlanRec<T> {
   value: T;
   rationale: string;
-  /** key into REFERENCES / evidence citation shown in the explain modal */
-  citation: string;
 }
 
 export interface SidePlan {
@@ -63,9 +62,8 @@ export interface SidePlan {
   recommendedGrade: number;
   /** true when the surgeon override differs from recommendedGrade */
   overridden: boolean;
-  /** why the model landed on modelGrade, + any inflammation escalation note */
+  /** why the model landed on this grade, + any inflammation escalation note */
   gradeRationale: string;
-  gradeCitation: string;
   plane: string;
   planeNote: string;
   zoneGrades: Record<string, number>;

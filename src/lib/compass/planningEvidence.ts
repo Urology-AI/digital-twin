@@ -143,8 +143,6 @@ export const NS_ALERT_THRESHOLDS = ev(
     "at base ECE rate (Hofman MS et al., proPSMA, Lancet 2020).",
 );
 
-export const NS_MODEL_CITATION = NS_BASE_MODEL.citation;
-
 /** Grade → fascial plane label + technique note. */
 export const PLANE_TECHNIQUE = ev(
   {

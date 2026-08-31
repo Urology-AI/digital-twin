@@ -6,9 +6,6 @@
  * Source: Mount Sinai 5,003-side radical-prostatectomy database (institutional
  * data) — see `NSG_OUTCOME_DATA` in planningEvidence.ts.
  */
-export const NSG_DATA_CITATION =
-  "Mount Sinai 5,003-side radical-prostatectomy database — positive-margin and " +
-  "biochemical-recurrence rates by nerve-sparing grade and zone.";
 
 /** NS Grade → PSM → BCR data from the 5,003-side database (rates in %). */
 export const NSG_DATA = {

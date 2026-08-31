@@ -13,7 +13,6 @@ import {
   HOOD_DECISION,
   HYDRODISSECTION_THRESHOLD,
   NS_GRADE_ESCALATION,
-  NS_MODEL_CITATION,
   NS_ZONE_THRESHOLDS,
   PLANE_TECHNIQUE,
   SV_PRESERVATION,
@@ -35,14 +34,12 @@ function resolveTri(
   override: boolean | null,
   rec: boolean,
   recRationale: string,
-  citation: string,
 ): PlanRec<boolean> {
   if (override === null || override === rec)
-    return { value: rec, rationale: recRationale, citation };
+    return { value: rec, rationale: recRationale };
   return {
     value: override,
     rationale: `Set to ${override ? "yes" : "no"} — model recommends ${rec ? "yes" : "no"}.`,
-    citation,
   };
 }
 
@@ -73,10 +70,8 @@ function buildSide(
   // above already shows the model grade, so this line explains why.
   const reason = nsDetail.reason || `model NS grade ${modelGrade}`;
   let gradeRationale = reason;
-  let gradeCitation = NS_MODEL_CITATION;
   if (inflEscalated) {
     gradeRationale = `${reason} · raised for severe inflammation`;
-    gradeCitation = NS_GRADE_ESCALATION.citation;
   } else if (infl.tier === "moderate") {
     gradeRationale = `${reason} · moderate inflammation flagged`;
   }
@@ -111,7 +106,6 @@ function buildSide(
     side === "left" ? S.plan_hydrodissection_l : S.plan_hydrodissection_r,
     hydroRec,
     hydroRationale,
-    HYDRODISSECTION_THRESHOLD.citation,
   );
 
   // ── SV preservation ───────────────────────────────────────────────────
@@ -126,19 +120,11 @@ function buildSide(
     side === "left" ? S.plan_sv_preservation_l : S.plan_sv_preservation_r,
     svRec,
     svRationale,
-    SV_PRESERVATION.citation,
   );
 
-  const cautions = [
-    ...nsDetail.alerts.map((a) => a.message),
-    ...(infl.tier !== "low"
-      ? [
-          `Periprostatic inflammation risk ${infl.tier}${
-            infl.intraopObserved ? " (intra-op observed)" : ""
-          } — planes may be obliterated.`,
-        ]
-      : []),
-  ];
+  // Per-side NS alerts only. The patient-level inflammation caution lives in
+  // the inflammation-risk card, not repeated on both side cards.
+  const cautions = nsDetail.alerts.map((a) => a.message);
 
   return {
     side,
@@ -147,7 +133,6 @@ function buildSide(
     recommendedGrade,
     overridden,
     gradeRationale,
-    gradeCitation,
     plane,
     planeNote: note,
     zoneGrades,
@@ -204,7 +189,6 @@ export function buildSurgicalPlan(
       S.plan_hood === "auto" || S.plan_hood === hoodRec
         ? hoodRecWhy
         : `Set to ${hoodValue} — model recommends ${hoodRec}.`,
-    citation: HOOD_DECISION.citation,
   };
 
   const bnEce = Math.max(
@@ -222,7 +206,7 @@ export function buildSurgicalPlan(
       : S.median_lobe_grade >= bnpCut.maxMedianLobe
         ? "Large median lobe — reconstruct rather than preserve."
         : "Very large gland — preservation may not be achievable.";
-  const bnp = resolveTri(S.plan_bnp, bnpRec, bnpRationale, BNP_DECISION.citation);
+  const bnp = resolveTri(S.plan_bnp, bnpRec, bnpRationale);
 
   return { left, right, hood, bladderNeckPreservation: bnp };
 }

@@ -165,8 +165,8 @@ function TriToggle({
             <span className="text-sm font-medium">
               {title}
               {value === null && (
-                <span className="ml-1.5 text-[10px] font-semibold uppercase text-muted-foreground">
-                  · auto: {resolved ? "yes" : "no"}
+                <span className="ml-1.5 text-[10px] font-medium text-muted-foreground">
+                  model: {resolved ? "yes" : "no"}
                 </span>
               )}
             </span>
@@ -299,7 +299,7 @@ function SideCard({
           </div>
           <Segmented
             value={String(plan.nsGrade)}
-            onChange={(v) => onOverride(Number(v))}
+            onChange={(v) => onOverride(Number(v) === recGrade ? null : Number(v))}
             options={[
               { value: "1", label: "1", hint: "Intrafascial" },
               { value: "2", label: "2", hint: "Interfascial" },
@@ -596,6 +596,17 @@ export function SurgicalPlanPanel() {
           <div className="h-2 overflow-hidden rounded-full bg-muted">
             <div className={cn("h-full rounded-full", tierTone.bar)} style={{ width: `${inflammation.score * 100}%` }} />
           </div>
+
+          {inflammation.tier === "high" && (
+            <p className={cn("text-xs font-medium", tierTone.text)}>
+              Planes likely obliterated — NS grade raised one step, hood not offered.
+            </p>
+          )}
+          {inflammation.tier === "moderate" && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Flagged — a wider plane may be safer; grade left to surgeon judgement.
+            </p>
+          )}
 
           {inflammation.reviewMri && (
             <div className="flex gap-2 rounded-lg bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-300">
