@@ -1,7 +1,8 @@
-import { Activity, ArrowRight, BookOpen, Layers, Stethoscope } from "lucide-react";
+import { Activity, ArrowRight, BookOpen, Layers, Lock, Stethoscope } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/store/uiStore";
+import { isDemoMode } from "@/lib/demoMode";
 
 const APP_URL = "https://urology-ai.github.io/digital-twin/";
 
@@ -50,6 +51,10 @@ const FEATURES = [
 export function WelcomeScreen() {
   const dismissWelcome = useUiStore((s) => s.dismissWelcome);
   const startTutorial = useUiStore((s) => s.startTutorial);
+  // Public preview ("/"): no free workspace — the interactive tool is
+  // clinician-only, behind Cloudflare Access at /clinical. "Take the Tour"
+  // opens a frozen, read-only preview.
+  const demo = isDemoMode();
 
   return (
     <div
@@ -202,7 +207,7 @@ export function WelcomeScreen() {
               type="button"
               size="lg"
               autoFocus
-              onClick={dismissWelcome}
+              onClick={demo ? () => { window.location.href = "/clinical"; } : dismissWelcome}
               className="gap-2 font-semibold shadow-md shadow-primary/20 transition-transform hover:scale-[1.02] hover:shadow-lg hover:shadow-primary/25 focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               style={{
                 height: "clamp(2.5rem, 5.5vh, 3rem)",
@@ -211,8 +216,9 @@ export function WelcomeScreen() {
                 fontSize: "clamp(0.875rem, 1.5vw, 0.9375rem)",
               }}
             >
-              Enter Workspace
-              <ArrowRight className="h-4 w-4" aria-hidden />
+              {demo ? <Lock className="h-4 w-4" aria-hidden /> : null}
+              {demo ? "Clinician sign in" : "Enter Workspace"}
+              {demo ? null : <ArrowRight className="h-4 w-4" aria-hidden />}
             </Button>
             <Button
               type="button"
@@ -235,7 +241,9 @@ export function WelcomeScreen() {
             className="welcome-fade-up mt-2 text-center text-muted-foreground/60"
             style={{ fontSize: "clamp(0.6875rem, 1.15vw, 0.75rem)", animationDelay: "380ms" }}
           >
-            New here? Take the tour first — it's a 2-minute walkthrough.
+            {demo
+              ? "The tour opens a preview with a sample case — nothing is saved. The full tool is for Mount Sinai clinicians."
+              : "New here? Take the tour first — it's a 2-minute walkthrough."}
           </p>
 
           {/* QR code — scan to open this app on a mobile device */}

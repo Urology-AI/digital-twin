@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ControlsOverlay } from "@/components/ControlsOverlay";
@@ -29,6 +29,7 @@ import {
 } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import patientsCatalog from "@/data/patients.json";
+import { DEMO_CASES } from "@/data/demoCases";
 import {
   hydrateFromLocalStorage,
   hydratePatientsFromCaseLog,
@@ -37,9 +38,28 @@ import {
   loadSharedCaseFromUrl,
   usePatientStore,
 } from "@/store/patientStore";
-import { useUiStore, readClinicalPath } from "@/store/uiStore";
-import { PublicLandingPage } from "@/components/PublicLandingPage";
+import { useUiStore } from "@/store/uiStore";
+import { isDemoMode } from "@/lib/demoMode";
+import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { cn } from "@/lib/utils";
+
+/**
+ * Public preview: the Input wizard (the base case definition) stays visible
+ * so the layout reads right, but can't be operated. `inert` removes the
+ * subtree from pointer, focus and a11y interaction without changing layout.
+ * Set imperatively because React 18 mishandles a JSX `inert` prop.
+ * Factors and Planning stay interactive — nothing there persists anyway.
+ */
+function useInert(on: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (on) el.setAttribute("inert", "");
+    else el.removeAttribute("inert");
+  }, [on]);
+  return ref;
+}
 
 function DimOverlay() {
   const patients = usePatientStore((s) => s.patients);
@@ -110,6 +130,13 @@ export default function App() {
       st.recompute();
       usePatientStore.setState({ loading: false });
     }
+    // Demo mode (public "/" — no Access): a frozen, read-only preview.
+    // Load one fixed demo case so the preview isn't blank; never touch
+    // saved cases, the patient library, or Turso share links.
+    if (isDemoMode()) {
+      if (DEMO_CASES[0]) usePatientStore.getState().loadDemoCase(DEMO_CASES[0]);
+      return;
+    }
     // Load saved library entries (full records) then fall back to case log snapshots.
     hydratePatientLibrary();
     hydratePatientsFromCaseLog();
@@ -121,26 +148,35 @@ export default function App() {
     void loadSharedCaseFromPath();
   }, [bootstrapFromJson]);
 
+  // A clinician already signed in via Cloudflare Access shouldn't sit on the
+  // public demo — send them into the gated app.
+  const accessIdentity = useAccessIdentity();
+  useEffect(() => {
+    if (isDemoMode() && accessIdentity) window.location.href = "/clinical";
+  }, [accessIdentity]);
+
   const onPredictions = desktopTab === "predictions";
   // Presenter view shares the predictions tab's split layout — panel on one
   // side, live 3D model on the other — so the 3D canvas needs to react to it too.
   const showSplitCanvas = onPredictions || presenterView;
   const patientView3DOpen = useUiStore((s) => s.patientView3DOpen);
   const setPatientView3DOpen = useUiStore((s) => s.setPatientView3DOpen);
-
-  // Root ("/") is the only path with no Access application on it, so it
-  // must stay a plain public landing page — the full clinical shell only
-  // renders under /clinical (Access-gated) or for a patient link.
-  if (!patientView && !readClinicalPath()) {
-    return <PublicLandingPage />;
-  }
+  const demo = isDemoMode();
+  const inputInertRef = useInert(demo);
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
       {patientView ? <PatientViewHeader /> : <AppHeader />}
 
-      <div className="flex shrink-0 items-center justify-center border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-600 dark:text-amber-400 sm:text-[11px]">
-        Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment.
+      <div className="flex shrink-0 items-center justify-center gap-1.5 border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-600 dark:text-amber-400 sm:text-[11px]">
+        {demo && (
+          <span className="font-semibold">
+            Preview — explore a sample case; nothing is saved. The full tool is for Mount Sinai clinicians.
+          </span>
+        )}
+        <span>
+          Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment.
+        </span>
       </div>
 
       {/*
@@ -203,11 +239,13 @@ export default function App() {
           )}
         </div>
 
-        {/* ── Input tab ────────────────────────────────────────────────── */}
+        {/* ── Input tab (frozen in the public preview) ─────────────────── */}
         <div
+          ref={inputInertRef}
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
             !patientView && !presenterView && desktopTab === "input" ? "flex flex-col" : "hidden",
+            demo && "[&_:is(input,select,textarea)]:opacity-70",
           )}
         >
           <ZoneInputWizard />
@@ -227,6 +265,9 @@ export default function App() {
         </div>
 
         {/* ── Outcomes tab: full-width split workspace ──────────────────── */}
+        {/* Factors tab stays interactive in the public preview — the
+            Modifiable Factors panel is the whole point of the demo, and it
+            touches no PHI and never persists. */}
         <div
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
@@ -293,7 +334,7 @@ export default function App() {
         </button>
       </footer>
 
-      <ChatWidget />
+      {!demo && <ChatWidget />}
 
       {infoOpen && (
         <InfoPanel onClose={() => setInfoOpen(false)} />

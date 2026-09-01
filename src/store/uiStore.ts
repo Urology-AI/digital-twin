@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { OverlayType } from "@/types/prediction";
 import { VIEWS } from "@/lib/three/prostateScene";
+import { isDemoMode } from "@/lib/demoMode";
 
 export type DesktopTab = "input" | "predictions" | "outcomes" | "plan";
 
@@ -26,20 +27,6 @@ function readWelcomeSeen(): boolean {
 function readPatientViewPath(): boolean {
   try {
     return window.location.pathname.startsWith("/patient/");
-  } catch {
-    return false;
-  }
-}
-
-/**
- * The clinical app only renders under /clinical/* — Cloudflare Access
- * gates exactly this path prefix (and nothing else), so root ("/") can be
- * an open public landing page and /patient/<id> stays open too, with no
- * path-precedence ambiguity between competing Access applications.
- */
-export function readClinicalPath(): boolean {
-  try {
-    return window.location.pathname.startsWith("/clinical");
   } catch {
     return false;
   }
@@ -189,7 +176,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setChatOpen: (v) => set({ chatOpen: v }),
   setWelcomeOpen: (v) => set({ welcomeOpen: v }),
   dismissWelcome: () => {
-    try { localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch { /* private mode */ }
+    try { if (!isDemoMode()) localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch { /* private mode */ }
     set({ welcomeOpen: false });
   },
   setExplainKey: (k) => set({ explainKey: k }),
@@ -210,7 +197,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setPatientView3DOpen: (v) => set({ patientView3DOpen: v }),
   setPresenterView: (v) => set({ presenterView: v }),
   startTutorial: () => {
-    try { localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch { /* private mode */ }
+    try { if (!isDemoMode()) localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch { /* private mode */ }
     set({ tutorialStep: 0, welcomeOpen: false, desktopTab: "input", wizardTab: null });
   },
   nextTutorialStep: () => {

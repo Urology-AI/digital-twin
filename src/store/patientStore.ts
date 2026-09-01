@@ -15,6 +15,7 @@ import type { LesionRow } from "@/types/lesion";
 import type { CompassPredictions, ThreeZoneRuntime } from "@/types/prediction";
 import { emptyLesion } from "@/types/lesion";
 import { DEMO_CASES } from "@/data/demoCases";
+import { isDemoMode } from "@/lib/demoMode";
 
 const STORAGE_KEY = "compass-digital-twin-state";
 // Bump this version whenever the blank-slate default changes so stale
@@ -178,6 +179,7 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       });
       get().recompute();
       get().pushHistory();
+      if (isDemoMode()) return;
       try {
         localStorage.setItem(
           STORAGE_KEY,
@@ -195,6 +197,7 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
     setActive: (id) => {
       set({ activeId: id });
       get().recompute();
+      if (isDemoMode()) return;
       try {
         const { patients } = get();
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ patients, activeId: id }));
@@ -493,6 +496,7 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
 
 /** Hydrate from localStorage after patients.json load */
 export function hydrateFromLocalStorage(): void {
+  if (isDemoMode()) return;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return;
@@ -523,6 +527,7 @@ export function hydrateFromLocalStorage(): void {
 let saveStatusResetTimer: ReturnType<typeof setTimeout> | undefined;
 
 export function autosavePatients(): void {
+  if (isDemoMode()) return;
   useUiStore.getState().setSaveStatus("saving");
   try {
     const { patients, activeId } = usePatientStore.getState();
@@ -541,6 +546,7 @@ usePatientStore.subscribe(autosavePatients);
 
 /** Save a PatientEntry to the persistent library (used by CaseLog saves). */
 export function savePatientToLibrary(entry: PatientEntry): void {
+  if (isDemoMode()) return;
   try {
     const existing = JSON.parse(
       localStorage.getItem(PATIENT_LIBRARY_KEY) || "[]",
@@ -598,6 +604,7 @@ export function loadPatientFromLibrary(id: string, displayName: string): boolean
  * Skips entries already present by id.
  */
 export function hydratePatientsFromCaseLog(): void {
+  if (isDemoMode()) return;
   try {
     const raw = localStorage.getItem(CASE_LOG_KEY);
     if (!raw) return;
@@ -660,6 +667,7 @@ export function hydratePatientsFromCaseLog(): void {
 
 /** Return all entries from the persistent patient library. */
 export function getPatientLibrary(): PatientEntry[] {
+  if (isDemoMode()) return [];
   try {
     return JSON.parse(localStorage.getItem(PATIENT_LIBRARY_KEY) || "[]") as PatientEntry[];
   } catch {
@@ -669,6 +677,7 @@ export function getPatientLibrary(): PatientEntry[] {
 
 /** Merge entries into the persistent patient library (replaces by id). */
 export function mergePatientLibrary(entries: PatientEntry[]): void {
+  if (isDemoMode()) return;
   try {
     const existing = getPatientLibrary();
     const byId = new Map(existing.map((e) => [e.id, e]));
@@ -681,6 +690,7 @@ export function mergePatientLibrary(entries: PatientEntry[]): void {
 
 /** Load library patients into the store (patients not already present by id). */
 export function hydratePatientLibrary(): void {
+  if (isDemoMode()) return;
   try {
     const raw = localStorage.getItem(PATIENT_LIBRARY_KEY);
     if (!raw) return;

@@ -19,7 +19,7 @@ function caseSubtitle(record: Parameters<typeof clinicalStateFromRecord>[0]) {
   return `GG${S.gg || "—"} · PSA ${S.psa}`;
 }
 
-export function CasePicker() {
+export function CasePicker({ sampleOnly = false }: { sampleOnly?: boolean }) {
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
   const predictions = usePatientStore((s) => s.predictions);
@@ -159,7 +159,7 @@ export function CasePicker() {
               );
             })}
 
-            {yourCases.length > 0 && (
+            {!sampleOnly && yourCases.length > 0 && (
               <>
                 <p className="px-2 pb-1 pt-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                   Your cases
@@ -187,6 +187,7 @@ export function CasePicker() {
             )}
           </div>
 
+          {!sampleOnly && (
           <div className="flex items-center gap-1 border-t border-border bg-muted/30 p-1.5">
             <button
               type="button"
@@ -211,6 +212,7 @@ export function CasePicker() {
               <Upload className="h-3.5 w-3.5" /> Import JSON
             </button>
           </div>
+          )}
         </div>,
         document.body,
       )}

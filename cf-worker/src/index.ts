@@ -36,23 +36,51 @@ interface Env {
 }
 
 /**
- * The frontend (src/lib/turso.ts) only ever emits a small, fixed set of
- * statement shapes. Everything else — DROP, DELETE, UPDATE, ATTACH, PRAGMA,
- * writes to any other table — is rejected here so a compromised browser
- * session (or XSS) can't turn this proxy into arbitrary DB access. Keep this
- * list in sync with src/lib/turso.ts if the schema logic there changes.
+ * Origin allowlist — the two front-ends that legitimately call this proxy.
+ * A browser on any other site gets its request rejected. (Non-browser
+ * clients send no Origin header and so aren't stopped here — the SQL
+ * allowlist below is the real guard; this is defence in depth.)
  */
+const ALLOWED_ORIGINS = new Set([
+  "https://digital-twin.urology.edu.eu.org",
+  "https://urology-ai.github.io",
+]);
+
+/**
+ * SQL allowlist. The proxy is public (no Access application on /api/*), so
+ * without this any caller could `SELECT * FROM patient_shares` and dump
+ * every shared patient record. Only the exact statements src/lib/turso.ts
+ * issues are permitted:
+ *  - patient_shares (holds identified records) — matched exactly, incl. arg count.
+ *  - case_log (de-identified research log) — matched by statement shape.
+ * Anything else is refused.
+ */
+function normalizeSql(sql: string): string {
+  return sql.trim().replace(/\s+/g, " ").replace(/;\s*$/, "");
+}
+
+const SHARE_GET = "SELECT record FROM patient_shares WHERE id = ?";
+const SHARE_PUT =
+  "INSERT OR REPLACE INTO patient_shares (id, record, created_at) VALUES (?, ?, ?)";
+const SHARE_CREATE =
+  "CREATE TABLE IF NOT EXISTS patient_shares ( id TEXT PRIMARY KEY, record TEXT NOT NULL, created_at TEXT NOT NULL )";
+
 const ALLOWED_SQL_PREFIXES = [
   "select ",
-  "create table if not exists ",
+  "create table if not exists case_log ",
   "alter table case_log add column ",
   "insert or replace into case_log ",
-  "insert or replace into patient_shares ",
 ];
 
-function isAllowedSql(sql: string): boolean {
-  const s = sql.trim().toLowerCase().replace(/\s+/g, " ");
-  return ALLOWED_SQL_PREFIXES.some((p) => s.startsWith(p));
+function isAllowedSql(sql: string, args: unknown[]): boolean {
+  const s = normalizeSql(sql);
+  if (s === SHARE_GET) return args.length === 1;
+  if (s === SHARE_PUT) return args.length === 3;
+  if (s === SHARE_CREATE) return true;
+  // No other access to the identified-records table.
+  if (/patient_shares/i.test(s)) return false;
+  const low = s.toLowerCase();
+  return ALLOWED_SQL_PREFIXES.some((p) => low.startsWith(p));
 }
 
 function jsonError(message: string, status: number): Response {
@@ -106,7 +134,7 @@ async function handleTursoExecute(request: Request, env: Env): Promise<Response>
 
   if (typeof sql !== "string" || !sql.trim()) return jsonError("Missing 'sql' string", 400);
   if (!Array.isArray(args)) return jsonError("'args' must be an array", 400);
-  if (!isAllowedSql(sql)) return jsonError("SQL statement not permitted", 403);
+  if (!isAllowedSql(sql, args)) return jsonError("SQL statement not permitted", 403);
 
   try {
     const result = await tursoClient(env).execute({ sql, args: args as Args });
@@ -154,7 +182,7 @@ async function handleTursoBatch(request: Request, env: Env): Promise<Response> {
     if (typeof s.sql !== "string" || !Array.isArray(s.args)) {
       return jsonError("Each statement needs 'sql' (string) and 'args' (array)", 400);
     }
-    if (!isAllowedSql(s.sql)) return jsonError("SQL statement not permitted", 403);
+    if (!isAllowedSql(s.sql, s.args)) return jsonError("SQL statement not permitted", 403);
   }
 
   try {
@@ -196,6 +224,12 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url);
     try {
+      if (pathname.startsWith("/api/turso/")) {
+        const origin = request.headers.get("Origin");
+        if (origin && !ALLOWED_ORIGINS.has(origin)) {
+          return jsonError("Origin not allowed", 403);
+        }
+      }
       if (pathname === "/api/turso/health") return await handleTursoHealth(env);
       if (pathname === "/api/turso/execute") return await handleTursoExecute(request, env);
       if (pathname === "/api/turso/batch") return await handleTursoBatch(request, env);

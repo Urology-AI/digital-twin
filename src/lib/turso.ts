@@ -1,5 +1,6 @@
 import type { CaseRecord } from "@/components/CaseLog";
 import type { PatientEntry } from "@/store/patientStore";
+import { isDemoMode } from "@/lib/demoMode";
 
 // Columns sourced from CaseRecord (flat prediction snapshot)
 const CASE_COLS: (keyof CaseRecord)[] = [
@@ -112,6 +113,7 @@ async function sha256hex(s: string): Promise<string> {
  * sync works because the code path exists. Used to gate the CaseLog sync UI.
  */
 export async function checkTursoHealth(): Promise<boolean> {
+  if (isDemoMode()) return false;
   try {
     const res = await fetch("/api/turso/health");
     return res.ok;
@@ -129,6 +131,8 @@ export async function checkTursoHealth(): Promise<boolean> {
  */
 function getClient() {
   async function post(path: string, body: unknown): Promise<Record<string, unknown>> {
+    // Belt-and-braces: the public demo build must never reach the proxy.
+    if (isDemoMode()) throw new Error("Turso disabled in demo mode");
     const res = await fetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

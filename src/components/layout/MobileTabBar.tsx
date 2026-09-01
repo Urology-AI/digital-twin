@@ -1,5 +1,6 @@
 import { Activity, ClipboardList, FlaskConical, Layers, MessageCircle } from "lucide-react";
 import { useUiStore, type DesktopTab } from "@/store/uiStore";
+import { isDemoMode } from "@/lib/demoMode";
 import { cn } from "@/lib/utils";
 
 const TABS: { id: DesktopTab; label: string; Icon: typeof Activity }[] = [
@@ -62,15 +63,17 @@ export function MobileTabBar() {
       </div>
       <div className="h-2 shrink-0" aria-hidden />
 
-      {/* Chat FAB — visible on mobile only */}
-      <button
-        type="button"
-        onClick={() => setChatOpen(true)}
-        className="absolute -top-14 right-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform"
-        aria-label="Open chat assistant"
-      >
-        <MessageCircle className="h-5 w-5" />
-      </button>
+      {/* Chat FAB — visible on mobile only; hidden in the public preview */}
+      {!isDemoMode() && (
+        <button
+          type="button"
+          onClick={() => setChatOpen(true)}
+          className="absolute -top-14 right-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg active:scale-95 transition-transform"
+          aria-label="Open chat assistant"
+        >
+          <MessageCircle className="h-5 w-5" />
+        </button>
+      )}
     </nav>
   );
 }
