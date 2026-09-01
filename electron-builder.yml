@@ -1,0 +1,45 @@
+appId: ai.urology.compass-digital-twin
+productName: COMPASS Digital Twin
+copyright: Mount Sinai — IRB STUDY-14-00050. Research use only.
+
+directories:
+  output: release
+  buildResources: electron
+
+files:
+  - electron/**/*
+  - dist/**/*
+  - package.json
+
+# The renderer is fully offline; nothing is fetched at runtime.
+asarUnpack:
+  - dist/**/*
+
+mac:
+  icon: electron/icon.icns
+  category: public.app-category.medical
+  target:
+    - dmg
+    - zip
+  artifactName: ${productName}-${version}-${arch}.${ext}
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: electron/entitlements.mac.plist
+  entitlementsInherit: electron/entitlements.mac.plist
+  # Signing identity is picked up from the keychain, or from CSC_LINK /
+  # CSC_KEY_PASSWORD env vars in CI.
+  #
+  # Notarization: set APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID
+  # before `npm run dist:mac` and notarize + staple runs automatically.
+  notarize: true
+
+dmg:
+  title: ${productName} ${version}
+
+# Auto-update feed + release hosting. `npm run dist:mac -- --publish always`
+# (or the CI workflow) uploads the dmg, zip and latest-mac.yml to a GitHub
+# Release; installed apps read that feed on launch.
+publish:
+  provider: github
+  owner: Urology-AI
+  repo: digital-twin

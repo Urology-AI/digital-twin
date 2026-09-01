@@ -1,6 +1,7 @@
 import type { CaseRecord } from "@/components/CaseLog";
 import type { PatientEntry } from "@/store/patientStore";
 import { isDemoMode } from "@/lib/demoMode";
+import { isOfflineBuild } from "@/lib/offlineBuild";
 
 // Columns sourced from CaseRecord (flat prediction snapshot)
 const CASE_COLS: (keyof CaseRecord)[] = [
@@ -113,7 +114,7 @@ async function sha256hex(s: string): Promise<string> {
  * sync works because the code path exists. Used to gate the CaseLog sync UI.
  */
 export async function checkTursoHealth(): Promise<boolean> {
-  if (isDemoMode()) return false;
+  if (isDemoMode() || isOfflineBuild()) return false;
   try {
     const res = await fetch("/api/turso/health");
     return res.ok;

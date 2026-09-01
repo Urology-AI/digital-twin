@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isOfflineBuild } from "@/lib/offlineBuild";
 
 /**
  * Who's currently signed in via Cloudflare Access, if anyone. Access handles
@@ -20,6 +21,7 @@ export function useAccessIdentity(): AccessIdentity | null {
   const [identity, setIdentity] = useState<AccessIdentity | null>(null);
 
   useEffect(() => {
+    if (isOfflineBuild()) return; // no sign-in in the offline app
     let cancelled = false;
     fetch("/cdn-cgi/access/get-identity", { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))

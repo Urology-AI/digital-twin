@@ -40,6 +40,7 @@ import {
 } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
 import { isDemoMode } from "@/lib/demoMode";
+import { isOfflineBuild } from "@/lib/offlineBuild";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { cn } from "@/lib/utils";
 
@@ -144,8 +145,11 @@ export default function App() {
     // there's no hash — fetch it from Turso by the /patient/<id> path (short
     // patient links). The path itself is deliberately left in place either
     // way — see readPatientViewPath in uiStore for why.
-    void loadSharedCaseFromUrl();
-    void loadSharedCaseFromPath();
+    // Cloud share links don't exist in the offline app.
+    if (!isOfflineBuild()) {
+      void loadSharedCaseFromUrl();
+      void loadSharedCaseFromPath();
+    }
   }, [bootstrapFromJson]);
 
   // A clinician already signed in via Cloudflare Access shouldn't sit on the
@@ -334,7 +338,7 @@ export default function App() {
         </button>
       </footer>
 
-      {!demo && <ChatWidget />}
+      {!demo && !isOfflineBuild() && <ChatWidget />}
 
       {infoOpen && (
         <InfoPanel onClose={() => setInfoOpen(false)} />
@@ -344,7 +348,7 @@ export default function App() {
         <CaseLog onClose={() => setCaseLogOpen(false)} />
       )}
 
-      {shareOpen && (
+      {shareOpen && !isOfflineBuild() && (
         <ShareLinkModal onClose={() => setShareOpen(false)} />
       )}
 

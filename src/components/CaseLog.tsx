@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydratePatientsFromCaseLog, hydratePatientLibrary, getPatientLibrary, mergePatientLibrary, syncPatientLibraryToStore, type PatientEntry } from "@/store/patientStore";
 import { cn } from "@/lib/utils";
 import { pushCases, pullCases, checkTursoHealth, hasCloudId } from "@/lib/turso";
+import { isOfflineBuild } from "@/lib/offlineBuild";
 
 const CASE_LOG_KEY = "compass_cases";
 // Tracks which patient entries (by PatientEntry.id) have been saved to the
@@ -152,6 +153,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
   const importRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    if (isOfflineBuild()) { setTursoAvailable(false); return; }
     let cancelled = false;
     checkTursoHealth().then((ok) => { if (!cancelled) setTursoAvailable(ok); });
     return () => { cancelled = true; };
@@ -439,8 +441,10 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       <div className="mx-auto max-w-4xl">
         <h2 className="mb-1 text-lg font-semibold text-primary">Prospective Case Log</h2>
         <p className="mb-4 text-xs text-muted-foreground">
-          Save COMPASS predictions per case. Enter pathology results when available. Data stored locally;
-          cloud sync de-identifies records (ID hashed, notes never uploaded).
+          Save COMPASS predictions per case. Enter pathology results when available. Data stored locally
+          {isOfflineBuild()
+            ? " on this Mac."
+            : "; cloud sync de-identifies records (ID hashed, notes never uploaded)."}
         </p>
 
         <div className="mb-4 flex flex-wrap gap-2">
@@ -489,7 +493,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
         {tursoAvailable === null && (
           <p className="mb-3 text-[11px] text-muted-foreground">Checking cloud sync…</p>
         )}
-        {tursoAvailable === false && (
+        {tursoAvailable === false && !isOfflineBuild() && (
           <p className="mb-3 rounded border border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-[10px] text-amber-500">
             Cloud sync unavailable — the Worker/Turso didn't respond to a health check.
           </p>

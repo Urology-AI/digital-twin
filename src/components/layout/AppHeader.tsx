@@ -25,6 +25,7 @@ import { AccessMenu } from "@/components/layout/AccessMenu";
 import { cn } from "@/lib/utils";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { isDemoMode } from "@/lib/demoMode";
+import { isOfflineBuild } from "@/lib/offlineBuild";
 
 const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[] = [
   { id: "input",        label: "Input",       Icon: ClipboardList },
@@ -57,6 +58,7 @@ export function AppHeader() {
 
   const active = patients.find((p) => p.id === activeId);
   const demo = isDemoMode();
+  const offline = isOfflineBuild();
 
   return (
     <header className="z-40 flex h-14 shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-card/95 px-3 backdrop-blur-md sm:px-4 supports-[backdrop-filter]:bg-card/85">
@@ -72,13 +74,22 @@ export function AppHeader() {
         </span>
       </button>
 
+      {offline && (
+        <span
+          title="Offline build — everything runs locally on this Mac. No login, no cloud, no data leaves the device."
+          className="hidden shrink-0 cursor-default rounded bg-emerald-500/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-emerald-400 sm:inline"
+        >
+          Offline · runs locally
+        </span>
+      )}
+
       {/* Divider */}
       <div className="hidden h-5 w-px shrink-0 bg-border/70 sm:block" />
 
       {/* Case selector — sample cases only in the public preview */}
       <div className="flex min-w-[130px] flex-1 items-center gap-2 sm:min-w-[190px] sm:max-w-[300px]">
         <CasePicker sampleOnly={demo} />
-        {!demo && active?.record._shareId && (
+        {!demo && !offline && active?.record._shareId && (
           <span
             title={`Share ID: ${active.record._shareId}`}
             className="hidden shrink-0 cursor-default rounded bg-sky-500/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-sky-400 sm:inline"
@@ -212,7 +223,7 @@ export function AppHeader() {
           </Button>
         )}
 
-        {!demo && (
+        {!demo && !offline && (
           <Button
             type="button"
             variant="ghost"
