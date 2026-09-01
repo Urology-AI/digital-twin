@@ -3,6 +3,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/store/uiStore";
 import { isDemoMode } from "@/lib/demoMode";
+import { isOfflineBuild } from "@/lib/offlineBuild";
 
 const APP_URL = "https://urology-ai.github.io/digital-twin/";
 
@@ -246,7 +247,8 @@ export function WelcomeScreen() {
               : "New here? Take the tour first — it's a 2-minute walkthrough."}
           </p>
 
-          {/* QR code — scan to open this app on a mobile device */}
+          {/* QR code — scan to open this app on a mobile device (web only) */}
+          {!isOfflineBuild() && (
           <div
             className="welcome-fade-up mt-[clamp(1.25rem,3vh,1.75rem)] flex flex-col items-center gap-2 rounded-lg border border-border/70 bg-card/80 p-3 shadow-sm backdrop-blur"
             style={{ animationDelay: "420ms" }}
@@ -270,6 +272,7 @@ export function WelcomeScreen() {
               Scan to open · urology-ai.github.io/digital-twin
             </a>
           </div>
+          )}
 
           <p
             className="welcome-fade-up mt-3 text-center text-muted-foreground/60"
