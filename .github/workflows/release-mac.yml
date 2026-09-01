@@ -1,8 +1,10 @@
 name: Release macOS app
 
-# Cut a release by tagging (npm version patch && git push --follow-tags),
-# or run manually from the Actions tab (workflow_dispatch) — set `preflight`
-# to only validate the signing/notarization secrets without building.
+# Triggered by a `vX.Y.Z` tag — pushed by hand, by `npm version patch`, or
+# automatically by auto-release.yml on every merge to main that touches app
+# code. The build version comes from the tag, not package.json.
+# Run manually (workflow_dispatch) with `preflight` to only check the
+# signing/notarization secrets without building.
 on:
   push:
     tags:
@@ -78,6 +80,18 @@ jobs:
       - run: npm run typecheck && npm test
         if: ${{ !inputs.preflight }}
 
+      - name: Resolve version
+        if: ${{ !inputs.preflight }}
+        id: ver
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            v="${GITHUB_REF_NAME#v}"
+          else
+            v="$(node -p 'require("./package.json").version')"
+          fi
+          echo "v=$v" >> "$GITHUB_OUTPUT"
+          echo "Building version $v"
+
       - name: Write the baked-in update token
         if: ${{ !inputs.preflight }}
         run: |
@@ -85,8 +99,9 @@ jobs:
 
       - name: Build, sign, notarize & publish
         if: ${{ !inputs.preflight }}
-        run: npm run dist:mac -- --publish always
+        run: npm run dist:mac -- --publish always -c.extraMetadata.version=${{ steps.ver.outputs.v }}
         env:
+          VITE_APP_VERSION: ${{ steps.ver.outputs.v }}
           # Write access to the private releases repo (NOT the built-in
           # GITHUB_TOKEN — that can't touch another repo).
           GH_TOKEN: ${{ secrets.RELEASES_WRITE_PAT }}

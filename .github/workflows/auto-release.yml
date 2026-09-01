@@ -1,0 +1,48 @@
+name: Auto-release on merge
+
+# Every merge to main that touches app code bumps the patch version, tags it,
+# and kicks off the signed macOS build (release-mac.yml). The web app already
+# deploys on merge, so this keeps the Mac app on the same commits with no
+# manual step. Put [skip release] in a commit message to opt a merge out.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "electron/**"
+      - "index.html"
+      - "vite.config.ts"
+      - "package.json"
+      - "package-lock.json"
+
+# Serialize so two quick merges can't race for the same tag number.
+concurrency: auto-release
+
+jobs:
+  tag:
+    if: ${{ !contains(github.event.head_commit.message, '[skip release]') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Tag next patch and trigger the release build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch --tags --quiet
+          latest=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          latest=${latest:-v1.0.0}
+          IFS='.' read -r MA MI PA <<< "${latest#v}"
+          next="v${MA}.${MI}.$((PA + 1))"
+          echo "Latest tag: $latest → new tag: $next"
+          git tag -a "$next" -m "Release $next"
+          git push origin "$next"
+          # A tag pushed with GITHUB_TOKEN does not itself trigger workflows,
+          # so dispatch release-mac.yml explicitly against the new tag.
+          gh workflow run release-mac.yml --ref "$next"
+          echo "::notice::Tagged $next and dispatched the release build."
