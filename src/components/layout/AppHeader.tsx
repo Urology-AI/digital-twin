@@ -9,7 +9,6 @@ import {
   MessageCircle,
   Monitor,
   Moon,
-  Plus,
   Printer,
   Redo2,
   Share2,
@@ -21,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore, type DesktopTab } from "@/store/uiStore";
 import { printReport } from "@/lib/compass/printReport";
+import { CasePicker } from "@/components/layout/CasePicker";
 import { cn } from "@/lib/utils";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 
@@ -50,9 +50,6 @@ export function AppHeader() {
   const setPresenterView = useUiStore((s) => s.setPresenterView);
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
-  const loading = usePatientStore((s) => s.loading);
-  const setActive = usePatientStore((s) => s.setActive);
-  const newCase = usePatientStore((s) => s.newCase);
   const undo = usePatientStore((s) => s.undo);
   const redo = usePatientStore((s) => s.redo);
 
@@ -75,34 +72,9 @@ export function AppHeader() {
       {/* Divider */}
       <div className="hidden h-5 w-px shrink-0 bg-border/70 sm:block" />
 
-      {/* Patient selector */}
-      <div className="flex min-w-[110px] flex-1 items-center gap-2 sm:min-w-[160px] sm:max-w-[260px]">
-        <label htmlFor="nav-patient" className="sr-only">Active patient</label>
-        <select
-          id="nav-patient"
-          data-tutorial="patient-select"
-          className={cn(
-            "h-8 min-w-0 flex-1 cursor-pointer truncate rounded-lg border border-input/80 bg-muted/50 px-2.5 text-xs font-medium text-foreground shadow-none transition-colors",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
-            "hover:bg-muted/80 sm:text-sm",
-            (loading || patients.length === 0) && "opacity-60",
-          )}
-          value={activeId ?? ""}
-          disabled={loading}
-          onChange={(e) => setActive(e.target.value)}
-        >
-          {loading ? (
-            <option value="">Loading cases…</option>
-          ) : patients.length === 0 ? (
-            <option value="">No patients loaded</option>
-          ) : (
-            patients.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))
-          )}
-        </select>
+      {/* Case selector */}
+      <div className="flex min-w-[130px] flex-1 items-center gap-2 sm:min-w-[190px] sm:max-w-[300px]">
+        <CasePicker />
         {active?.record._shareId && (
           <span
             title={`Share ID: ${active.record._shareId}`}
@@ -111,18 +83,6 @@ export function AppHeader() {
             Shared · {active.record._shareId.slice(0, 8)}
           </span>
         )}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 shrink-0 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-          aria-label="New case"
-          title="New case"
-          onClick={() => newCase()}
-        >
-          <Plus className="h-[15px] w-[15px]" />
-          <span className="hidden text-xs font-medium lg:inline">New case</span>
-        </Button>
       </div>
 
       {/* Desktop tab switcher */}
