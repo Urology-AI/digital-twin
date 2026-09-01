@@ -15,6 +15,7 @@ import {
   type PlanModifiers,
 } from "@/lib/compass/functionalOutcomes";
 import { cn } from "@/lib/utils";
+import { RefLinks } from "@/components/RefLinks";
 
 /** Small ±pp cell, green good / red bad. `invert` flips the colour sense. */
 function PpCell({ v, invert = false }: { v: number; invert?: boolean }) {
@@ -187,6 +188,14 @@ function InfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                 </tr>
               </tbody>
             </table>
+            <RefLinks
+              tags={[
+                "NS grade model",
+                "Fascial-plane nomenclature",
+                "Fascial-plane nomenclature & athermal technique",
+              ]}
+              className="mt-2"
+            />
           </section>
 
           <section>
@@ -219,6 +228,7 @@ function InfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                 ))}
               </tbody>
             </table>
+            <RefLinks tags={["Functional-outcome nomogram", "Plan functional deltas"]} className="mt-2" />
           </section>
 
           <section>

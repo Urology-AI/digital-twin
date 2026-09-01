@@ -7,6 +7,7 @@ import {
   lesionsFromRows,
 } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
+import { RefLinks } from "@/components/RefLinks";
 import {
   computeFunctionalOutcomes,
   type AlcoholLevel,
@@ -145,6 +146,7 @@ function TriToggle({
   detail,
   value,
   onChange,
+  sources,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -153,6 +155,8 @@ function TriToggle({
   detail: string;
   value: boolean | null;
   onChange: (v: boolean | null) => void;
+  /** planningReferences.ts `usedFor` tags for this feature */
+  sources?: string[];
 }) {
   const opts: { v: boolean | null; l: string }[] = [
     { v: null, l: "Auto" },
@@ -198,6 +202,7 @@ function TriToggle({
             </div>
           </div>
           <p className="mt-1 text-xs leading-snug text-muted-foreground">{detail}</p>
+          {sources && <RefLinks tags={sources} className="mt-1.5" />}
         </div>
       </div>
     </div>
@@ -316,6 +321,14 @@ function SideCard({
             ]}
           />
           <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{plan.gradeRationale}</p>
+          <RefLinks
+            tags={[
+              "NS grade model",
+              "Fascial-plane nomenclature",
+              "Fascial-plane nomenclature & athermal technique",
+            ]}
+            className="mt-1.5"
+          />
         </div>
 
         <div>
@@ -338,6 +351,16 @@ function SideCard({
               );
             })}
           </div>
+          <RefLinks
+            tags={[
+              "Per-zone NS-grade ECE thresholds",
+              "Zone dissection-alert thresholds",
+              "Zone dissection-alert thresholds (NVB course)",
+              "Zone dissection-alert thresholds (PSMA-at-base ECE rate)",
+              "Zonal ECE distribution",
+            ]}
+            className="mt-1.5"
+          />
         </div>
 
         <div className="space-y-2">
@@ -348,6 +371,7 @@ function SideCard({
             resolved={plan.hydrodissection.value}
             value={hydroOverride}
             onChange={onHydro}
+            sources={["Hydrodissection"]}
           />
           <TriToggle
             icon={<ShieldCheck className="h-4 w-4" />}
@@ -356,6 +380,7 @@ function SideCard({
             resolved={plan.svPreservation.value}
             value={svOverride}
             onChange={onSv}
+            sources={["Seminal-vesicle tip-sparing candidacy"]}
           />
         </div>
 
@@ -538,6 +563,18 @@ export function SurgicalPlanPanel() {
           />
         </div>
 
+        <RefLinks
+          tags={[
+            "Functional-outcome nomogram",
+            "Functional-outcome nomogram (recovery trajectory)",
+            "Plan functional deltas",
+            "Plan effect on positive-margin rate",
+            "BCR event-timing fractions",
+            "Obesity → BCR risk",
+          ]}
+          className="mt-2"
+        />
+
         {baseline.healerTier && withPlan.healerTier && (
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-border px-3 py-2 text-sm">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -600,6 +637,7 @@ export function SurgicalPlanPanel() {
               ]}
             />
             <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{plan.hood.rationale}</p>
+            <RefLinks tags={["Anterior hood candidacy"]} className="mt-1.5" />
           </div>
           <TriToggle
             icon={<ShieldCheck className="h-4 w-4" />}
@@ -608,6 +646,7 @@ export function SurgicalPlanPanel() {
             resolved={plan.bladderNeckPreservation.value}
             value={S.plan_bnp}
             onChange={(v) => updateClinicalForm({ plan_bnp: v })}
+            sources={["Bladder-neck preservation candidacy"]}
           />
         </CardContent>
       </Card>
@@ -652,6 +691,14 @@ export function SurgicalPlanPanel() {
               Estimate driven by the recorded intra-operative inflammation grade.
             </p>
           )}
+
+          <RefLinks
+            tags={[
+              "Inflammation-risk framing",
+              "Inflammation-risk weights (prior pelvic radiation)",
+              "Inflammation → grade escalation",
+            ]}
+          />
 
           {inflammation.contributors.length === 0 ? (
             <p className="text-xs text-muted-foreground">No risk factors recorded.</p>
