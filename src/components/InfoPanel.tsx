@@ -1,6 +1,45 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { EvidencePanel } from "@/components/EvidencePanel";
+import { isOfflineBuild } from "@/lib/offlineBuild";
+
+// Build version (git tag in CI, else package.json — see vite.config.ts), plus
+// a manual "check for updates" in the desktop app.
+function VersionFooter() {
+  const [status, setStatus] = useState<string | null>(null);
+  const desktop = typeof window !== "undefined" ? window.desktop : undefined;
+
+  useEffect(() => {
+    if (!desktop) return;
+    return desktop.onUpdateEvent((e) => {
+      setStatus(
+        e.type === "checking" ? "Checking…"
+        : e.type === "available" ? `Downloading ${e.version}…`
+        : e.type === "downloaded" ? `Update ${e.version} ready — restart to apply`
+        : e.type === "none" ? "Up to date"
+        : e.type === "error" ? "Update check failed" : null,
+      );
+    });
+  }, [desktop]);
+
+  return (
+    <div className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-4 text-[11px] text-muted-foreground">
+      <span>COMPASS Digital Twin · v{__APP_VERSION__}{isOfflineBuild() ? " · offline build" : ""}</span>
+      {desktop && (
+        <>
+          <button
+            type="button"
+            onClick={() => { setStatus("Checking…"); void desktop.checkForUpdates(); }}
+            className="rounded px-1.5 py-0.5 underline-offset-2 hover:bg-muted hover:underline"
+          >
+            Check for updates
+          </button>
+          {status && <span className="text-foreground/70">{status}</span>}
+        </>
+      )}
+    </div>
+  );
+}
 
 const H2 = ({ children }: { children: React.ReactNode }) => (
   <h2 className="text-base font-semibold uppercase tracking-wide text-primary mb-2">{children}</h2>
@@ -1673,6 +1712,8 @@ export function InfoPanel({ onClose }: InfoPanelProps) {
           {activeTab === "NS" && <NsTab />}
           {activeTab === "Sources" && <SourcesTab />}
         </div>
+
+        <VersionFooter />
       </div>
     </div>
   );
