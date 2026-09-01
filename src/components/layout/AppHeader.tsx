@@ -23,6 +23,7 @@ import { printReport } from "@/lib/compass/printReport";
 import { CasePicker } from "@/components/layout/CasePicker";
 import { cn } from "@/lib/utils";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
+import { isDemoMode } from "@/lib/demoMode";
 
 const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[] = [
   { id: "input",        label: "Input",       Icon: ClipboardList },
@@ -54,6 +55,7 @@ export function AppHeader() {
   const redo = usePatientStore((s) => s.redo);
 
   const active = patients.find((p) => p.id === activeId);
+  const demo = isDemoMode();
 
   return (
     <header className="z-40 flex h-14 shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-card/95 px-3 backdrop-blur-md sm:px-4 supports-[backdrop-filter]:bg-card/85">
@@ -157,18 +159,20 @@ export function AppHeader() {
           <span className="hidden text-xs font-medium lg:inline">{dark ? "Light" : "Dark"}</span>
         </Button>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 gap-1.5 px-2 text-emerald-500 hover:text-emerald-400"
-          aria-label="Prospective case log"
-          title="Prospective case log"
-          onClick={() => setCaseLogOpen(true)}
-        >
-          <BookOpen className="h-[15px] w-[15px]" />
-          <span className="hidden text-xs font-medium lg:inline">Case log</span>
-        </Button>
+        {!demo && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 px-2 text-emerald-500 hover:text-emerald-400"
+            aria-label="Prospective case log"
+            title="Prospective case log"
+            onClick={() => setCaseLogOpen(true)}
+          >
+            <BookOpen className="h-[15px] w-[15px]" />
+            <span className="hidden text-xs font-medium lg:inline">Case log</span>
+          </Button>
+        )}
 
         <Button
           type="button"
@@ -199,18 +203,20 @@ export function AppHeader() {
           <span className="hidden text-xs font-medium lg:inline">Overview</span>
         </Button>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-          aria-label="Share case"
-          title="Share case"
-          onClick={() => setShareOpen(true)}
-        >
-          <Share2 className="h-[15px] w-[15px]" />
-          <span className="hidden text-xs font-medium lg:inline">Share</span>
-        </Button>
+        {!demo && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+            aria-label="Share case"
+            title="Share case"
+            onClick={() => setShareOpen(true)}
+          >
+            <Share2 className="h-[15px] w-[15px]" />
+            <span className="hidden text-xs font-medium lg:inline">Share</span>
+          </Button>
+        )}
 
         <Button
           type="button"
@@ -249,7 +255,18 @@ export function AppHeader() {
           </div>
         )}
 
-        {/* Local save status */}
+        {/* Clinician sign-in — demo build only */}
+        {demo && (
+          <a
+            href="/clinical"
+            className="hidden shrink-0 items-center rounded-md px-2 py-1 text-[11px] font-semibold text-primary hover:underline sm:flex"
+          >
+            Clinician sign in
+          </a>
+        )}
+
+        {/* Local save status — hidden in the demo build (nothing is saved) */}
+        {!demo && (
         <div
           className="hidden sm:flex items-center gap-1.5 rounded-md px-2 py-1 text-muted-foreground"
           title={saveStatus === "saving" ? "Saving locally…" : "All changes saved locally"}
@@ -266,6 +283,7 @@ export function AppHeader() {
             {saveStatus === "saving" ? "Saving" : "Saved"}
           </span>
         </div>
+        )}
 
         {/* Chat assistant */}
         <button

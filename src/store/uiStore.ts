@@ -32,20 +32,6 @@ function readPatientViewPath(): boolean {
 }
 
 /**
- * The clinical app only renders under /clinical/* — Cloudflare Access
- * gates exactly this path prefix (and nothing else), so root ("/") can be
- * an open public landing page and /patient/<id> stays open too, with no
- * path-precedence ambiguity between competing Access applications.
- */
-export function readClinicalPath(): boolean {
-  try {
-    return window.location.pathname.startsWith("/clinical");
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Secondary signal for a clinician's own in-app "preview patient view"
  * toggle, which — unlike a patient link — doesn't change the URL. Without
  * this, a clinician's page refresh while previewing would silently drop

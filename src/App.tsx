@@ -37,8 +37,9 @@ import {
   loadSharedCaseFromUrl,
   usePatientStore,
 } from "@/store/patientStore";
-import { useUiStore, readClinicalPath } from "@/store/uiStore";
-import { PublicLandingPage } from "@/components/PublicLandingPage";
+import { useUiStore } from "@/store/uiStore";
+import { isDemoMode } from "@/lib/demoMode";
+import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { cn } from "@/lib/utils";
 
 function DimOverlay() {
@@ -110,6 +111,9 @@ export default function App() {
       st.recompute();
       usePatientStore.setState({ loading: false });
     }
+    // Demo mode (public "/" — no Access): models and manual entry only.
+    // Never touch saved cases, the patient library, or Turso share links.
+    if (isDemoMode()) return;
     // Load saved library entries (full records) then fall back to case log snapshots.
     hydratePatientLibrary();
     hydratePatientsFromCaseLog();
@@ -121,6 +125,13 @@ export default function App() {
     void loadSharedCaseFromPath();
   }, [bootstrapFromJson]);
 
+  // A clinician already signed in via Cloudflare Access shouldn't sit on the
+  // public demo — send them into the gated app.
+  const accessIdentity = useAccessIdentity();
+  useEffect(() => {
+    if (isDemoMode() && accessIdentity) window.location.href = "/clinical";
+  }, [accessIdentity]);
+
   const onPredictions = desktopTab === "predictions";
   // Presenter view shares the predictions tab's split layout — panel on one
   // side, live 3D model on the other — so the 3D canvas needs to react to it too.
@@ -128,19 +139,19 @@ export default function App() {
   const patientView3DOpen = useUiStore((s) => s.patientView3DOpen);
   const setPatientView3DOpen = useUiStore((s) => s.setPatientView3DOpen);
 
-  // Root ("/") is the only path with no Access application on it, so it
-  // must stay a plain public landing page — the full clinical shell only
-  // renders under /clinical (Access-gated) or for a patient link.
-  if (!patientView && !readClinicalPath()) {
-    return <PublicLandingPage />;
-  }
-
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
       {patientView ? <PatientViewHeader /> : <AppHeader />}
 
-      <div className="flex shrink-0 items-center justify-center border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-600 dark:text-amber-400 sm:text-[11px]">
-        Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment.
+      <div className="flex shrink-0 items-center justify-center gap-1.5 border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-600 dark:text-amber-400 sm:text-[11px]">
+        {isDemoMode() && (
+          <span className="font-semibold">
+            Demo — nothing is saved and no patient data is loaded.
+          </span>
+        )}
+        <span>
+          Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment.
+        </span>
       </div>
 
       {/*
