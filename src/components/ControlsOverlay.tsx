@@ -105,7 +105,7 @@ export function ControlsOverlay() {
               type="button"
               title={title}
               onClick={() => setView(id)}
-              className="rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground transition-all hover:bg-white/10 hover:text-foreground active:scale-95"
+              className="rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground transition-all hover:bg-foreground/10 hover:text-foreground active:scale-95"
             >
               {label}
             </button>
@@ -122,7 +122,7 @@ export function ControlsOverlay() {
               type="button"
               title={o.title}
               onClick={() => setOverlay(o.id)}
-              className={cn(pillBase, overlay === o.id ? o.activeColor : "border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10")}
+              className={cn(pillBase, overlay === o.id ? o.activeColor : "border-foreground/10 text-muted-foreground hover:text-foreground hover:bg-foreground/10")}
             >
               {o.label}
             </button>
@@ -133,7 +133,7 @@ export function ControlsOverlay() {
               type="button"
               title={title}
               onClick={toggle}
-              className={cn(pillBase, active ? "border-primary/60 bg-primary/15 text-primary" : "border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10")}
+              className={cn(pillBase, active ? "border-primary/60 bg-primary/15 text-primary" : "border-foreground/10 text-muted-foreground hover:text-foreground hover:bg-foreground/10")}
             >
               {label}
             </button>
@@ -142,7 +142,7 @@ export function ControlsOverlay() {
             type="button"
             onClick={() => printReport()}
             disabled={!entry || !predictions}
-            className={cn(pillBase, "border-white/10 text-muted-foreground hover:text-foreground hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed")}
+            className={cn(pillBase, "border-foreground/10 text-muted-foreground hover:text-foreground hover:bg-foreground/10 disabled:opacity-40 disabled:cursor-not-allowed")}
           >
             Print
           </button>
@@ -192,7 +192,7 @@ export function ControlsOverlay() {
       >
         <Button
           type="button" variant="secondary" size="icon"
-          className="glass h-10 w-10 rounded-xl border-white/10 shadow-lg"
+          className="glass h-10 w-10 rounded-xl border-foreground/10 shadow-lg"
           aria-label="Zoom in"
           onClick={() => emitZoomNudge(-0.45)}
         >
@@ -200,7 +200,7 @@ export function ControlsOverlay() {
         </Button>
         <Button
           type="button" variant="secondary" size="icon"
-          className="glass h-10 w-10 rounded-xl border-white/10 shadow-lg"
+          className="glass h-10 w-10 rounded-xl border-foreground/10 shadow-lg"
           aria-label="Zoom out"
           onClick={() => emitZoomNudge(0.45)}
         >
@@ -227,7 +227,7 @@ export function ControlsOverlay() {
           "glass flex h-14 w-5 flex-col items-center justify-center rounded-l-xl border-r-0 shadow-md transition-colors",
           drawerOpen
             ? "border-primary/60 bg-primary/10 text-primary"
-            : "border-white/10 text-muted-foreground",
+            : "border-foreground/10 text-muted-foreground",
         )}
         aria-label={drawerOpen ? "Close 3D controls" : "Open 3D controls"}
       >
@@ -241,18 +241,18 @@ export function ControlsOverlay() {
         className={cn(
           "pointer-events-auto absolute bottom-0 right-0 top-0 z-20 w-[196px] lg:hidden",
           "flex flex-col overflow-y-auto overscroll-contain",
-          "glass border-l border-white/[0.08]",
+          "glass border-l border-foreground/[0.08]",
           "transition-transform duration-200 ease-out",
           drawerOpen ? "translate-x-0" : "translate-x-full",
         )}
       >
         {/* Drawer header */}
-        <div className="flex shrink-0 items-center justify-between border-b border-white/[0.07] px-3 py-2.5">
+        <div className="flex shrink-0 items-center justify-between border-b border-foreground/[0.07] px-3 py-2.5">
           <span className="text-[11px] font-semibold text-foreground/70">3D Controls</span>
           <button
             type="button"
             onClick={() => setDrawerOpen(false)}
-            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-white/10 hover:text-foreground"
+            className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
             aria-label="Close"
           >
             <X className="h-3.5 w-3.5" />
@@ -270,7 +270,7 @@ export function ControlsOverlay() {
                   type="button"
                   title={title}
                   onClick={() => setView(id)}
-                  className="rounded-md border border-white/10 py-1.5 text-[11px] font-medium text-muted-foreground transition-all hover:bg-white/10 hover:text-foreground active:scale-95"
+                  className="rounded-md border border-foreground/10 py-1.5 text-[11px] font-medium text-muted-foreground transition-all hover:bg-foreground/10 hover:text-foreground active:scale-95"
                 >
                   {label}
                 </button>
@@ -290,7 +290,7 @@ export function ControlsOverlay() {
                   onClick={() => setOverlay(o.id)}
                   className={cn(
                     "rounded-md border py-1.5 text-[11px] font-medium transition-all active:scale-95",
-                    overlay === o.id ? o.activeColor : "border-white/10 text-muted-foreground hover:bg-white/10 hover:text-foreground",
+                    overlay === o.id ? o.activeColor : "border-foreground/10 text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
                   )}
                 >
                   {o.label}
@@ -313,11 +313,11 @@ export function ControlsOverlay() {
                     "flex items-center justify-between rounded-md border px-2.5 py-1.5 text-[11px] font-medium transition-all",
                     active
                       ? "border-primary/60 bg-primary/10 text-primary"
-                      : "border-white/10 text-muted-foreground hover:bg-white/10 hover:text-foreground",
+                      : "border-foreground/10 text-muted-foreground hover:bg-foreground/10 hover:text-foreground",
                   )}
                 >
                   <span>{label}</span>
-                  <span className={cn("h-2 w-2 rounded-full transition-colors", active ? "bg-primary" : "bg-white/20")} />
+                  <span className={cn("h-2 w-2 rounded-full transition-colors", active ? "bg-primary" : "bg-foreground/20")} />
                 </button>
               ))}
             </div>
@@ -331,7 +331,7 @@ export function ControlsOverlay() {
                 type="button"
                 onClick={() => printReport()}
                 disabled={!entry || !predictions}
-                className="flex-1 rounded-md border border-white/10 py-1.5 text-[11px] font-medium text-muted-foreground transition-all hover:bg-white/10 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex-1 rounded-md border border-foreground/10 py-1.5 text-[11px] font-medium text-muted-foreground transition-all hover:bg-foreground/10 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Print
               </button>
@@ -346,7 +346,7 @@ export function ControlsOverlay() {
           </div>
 
           {/* Legend */}
-          <div className="overflow-hidden rounded-lg border border-white/[0.07]">
+          <div className="overflow-hidden rounded-lg border border-foreground/[0.07]">
             <button
               type="button"
               className="flex w-full items-center justify-between px-3 py-2 text-[11px] font-semibold text-primary"

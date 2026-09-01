@@ -94,7 +94,7 @@ export function ZoneLabelsOverlay() {
                     </span>
                   </div>
                   {/* Mini progress bar */}
-                  <div className="h-1 w-full overflow-hidden rounded-full bg-white/8">
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-foreground/8">
                     <div
                       className={cn(
                         "h-full rounded-full",
@@ -111,7 +111,7 @@ export function ZoneLabelsOverlay() {
           )}
 
           {mlobe > 0 && (
-            <div className="mt-2.5 flex justify-between border-t border-white/10 pt-2 text-[10px]">
+            <div className="mt-2.5 flex justify-between border-t border-foreground/10 pt-2 text-[10px]">
               <span className="text-muted-foreground">Median lobe</span>
               <span className="font-bold text-amber-400">Grade {mlobe}</span>
             </div>
