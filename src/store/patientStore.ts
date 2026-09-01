@@ -14,6 +14,7 @@ import type { ClinicalState, Prostate3DInputV1, ZoneMap } from "@/types/patient"
 import type { LesionRow } from "@/types/lesion";
 import type { CompassPredictions, ThreeZoneRuntime } from "@/types/prediction";
 import { emptyLesion } from "@/types/lesion";
+import { DEMO_CASES } from "@/data/demoCases";
 
 const STORAGE_KEY = "compass-digital-twin-state";
 // Bump this version whenever the blank-slate default changes so stale
@@ -32,6 +33,8 @@ export interface PatientEntry {
   name: string;
   record: Prostate3DInputV1;
   lesionRows: LesionRow[];
+  /** set when this entry was loaded from a read-only demo template (src/data/demoCases.ts) */
+  demoId?: string;
 }
 
 function clone<T>(x: T): T {
@@ -77,6 +80,10 @@ interface PatientState {
   /** Wholesale-replaces one patient's record + lesions — used by patient view's "reset to original" after local-only edits (e.g. Modifiable Factors exploration). */
   restorePatientRecord: (id: string, record: Prostate3DInputV1, lesionRows: LesionRow[]) => void;
   newCase: () => void;
+  /** Load a read-only demo template, replacing any existing copy of it. */
+  loadDemoCase: (demo: import("@/data/demoCases").DemoCase) => void;
+  /** Restore the active case: demo entries revert to their template, others blank out. */
+  resetActiveCase: () => void;
   importJsonFile: (text: string, label?: string) => void;
   exportActiveJson: () => string;
   resetActiveToSeed: () => void;
@@ -395,6 +402,41 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       get().pushHistory();
     },
 
+    loadDemoCase: (demo) => {
+      // fresh id each load so downstream components re-hydrate from the pristine template
+      const id = `demo-${demo.id}-${Date.now()}`;
+      const others = get().patients.filter((p) => p.demoId !== demo.id);
+      const entry: PatientEntry = {
+        id,
+        demoId: demo.id,
+        name: demo.name,
+        record: clone(demo.record),
+        lesionRows: ensureLesionIds(clone(demo.lesionRows)),
+      };
+      set({ patients: [...others, entry], activeId: id });
+      get().recompute();
+      get().pushHistory();
+    },
+
+    resetActiveCase: () => {
+      const { activeId, patients } = get();
+      const active = patients.find((p) => p.id === activeId);
+      if (!active) return;
+      if (active.demoId) {
+        const demo = DEMO_CASES.find((d) => d.id === active.demoId);
+        if (demo) get().loadDemoCase(demo);
+        return;
+      }
+      const record = buildProstateRecord(defaultClinicalState(), []);
+      set({
+        patients: patients.map((p) =>
+          p.id === activeId ? { ...p, record, lesionRows: [] } : p,
+        ),
+      });
+      get().recompute();
+      get().pushHistory();
+    },
+
     importJsonFile: (text, label) => {
       const data = JSON.parse(text) as Prostate3DInputV1;
       if (data._schema !== "prostate-3d-input-v1") {
@@ -574,7 +616,7 @@ export function hydratePatientsFromCaseLog(): void {
     const newOnes: PatientEntry[] = cases
       .filter((c) => !existingIds.has(c.id))
       .map((c) => {
-        const name = (c.notes || "").trim() || `${c.date} — GG${c.gg} PSA ${c.psa}`;
+        const name = (c.notes || "").trim() || `GG${c.gg} · PSA ${c.psa}`;
         const zones = createDefaultZones();
         const record: Prostate3DInputV1 = {
           _schema: "prostate-3d-input-v1",

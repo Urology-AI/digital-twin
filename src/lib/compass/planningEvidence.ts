@@ -309,9 +309,22 @@ export const HEALER_THRESHOLD = ev(
   "provisional",
   "Healer-tier potency threshold",
   "Modeled potency probability (PDE5-assisted) ≥ 50% is treated as functional " +
-    "recovery; timeline buckets ≤3 mo super / ≤12 mo healer / 18 mo delayed, " +
-    "consistent with the Tewari-group nerve-sparing recovery-trajectory " +
-    "analyses. Threshold to be calibrated against serial SHIM / EHS follow-up.",
+    "recovery; timeline buckets full-recovery-by-6-wk super / ≤12 mo healer / " +
+    "18 mo delayed, consistent with the Tewari-group nerve-sparing recovery-" +
+    "trajectory analyses. Threshold to be calibrated against serial SHIM / EHS " +
+    "follow-up.",
+);
+
+export const FULL_RECOVERY_THRESHOLD = ev(
+  55,
+  "provisional",
+  "Super-healer full-recovery threshold",
+  "\"Super healer\" is reserved for full erectile-function recovery by 6 weeks " +
+    "post-op: modeled potency probability (PDE5-assisted) ≥ 55% at the 6-week " +
+    "point — above the 50% functional-recovery bar, so the patient is already " +
+    "past functional recovery this early rather than just crossing it. Reachable " +
+    "only by the best nerve-sparing / youngest / highest-baseline cases given " +
+    "the model's early-recovery ceiling. To be calibrated against serial SHIM / EHS.",
 );
 
 /* ================================================================== */

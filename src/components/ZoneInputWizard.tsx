@@ -380,6 +380,7 @@ export function ZoneInputWizard() {
   const entry = patients.find((p) => p.id === activeId);
 
   const wizardTab = useUiStore((s) => s.wizardTab);
+  const setDesktopTab = useUiStore((s) => s.setDesktopTab);
   const [_localTab, setLocalTab]        = useState<1 | 2>(1);
   const activeTab: 1 | 2               = wizardTab ?? _localTab;
   const setActiveTab = (t: 1 | 2) => setLocalTab(t);
@@ -605,6 +606,8 @@ export function ZoneInputWizard() {
   const psaNum  = parseFloat(psa);
   const volNum  = parseFloat(vol);
   const psad    = volNum > 0 && !isNaN(psaNum) ? (psaNum / volNum).toFixed(3) : "—";
+  // subtle "this field has a value" accent, so filled vs. placeholder is obvious on screen
+  const fld = (v: string) => (v.trim() ? "border-primary/40 bg-primary/[0.03]" : "");
   const psaWarn = !isNaN(psaNum) && psaNum > 0 && (psaNum > 100 || psaNum < 0.1);
   const volWarn = !isNaN(volNum) && volNum > 0 && (volNum < 10 || volNum > 250);
 
@@ -652,7 +655,10 @@ export function ZoneInputWizard() {
             )}>
               {activeTab > tab.n ? "✓" : tab.n}
             </span>
-            {tab.label}
+            <span className="flex flex-col items-start leading-none">
+              <span className="text-[9px] font-semibold uppercase tracking-wide opacity-60">Step {tab.n} of 2</span>
+              <span>{tab.label}</span>
+            </span>
             {tab.n === 2 && totalFilled > 0 && (
               <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-xs font-bold text-primary">{totalFilled}</span>
             )}
@@ -661,9 +667,9 @@ export function ZoneInputWizard() {
         <button
           type="button"
           onClick={() => setShowNoteImport(true)}
-          className="mr-3 flex shrink-0 items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:border-border/80 hover:bg-muted/50 hover:text-foreground"
+          className="mr-3 flex shrink-0 items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/15"
         >
-          ↑ Import note
+          ↑ Paste clinic note
         </button>
       </div>
 
@@ -676,6 +682,7 @@ export function ZoneInputWizard() {
 
       {/* ── Tab 1: Demographics ── */}
       {activeTab === 1 && (
+        <>
         <div className="flex-1 overflow-y-auto" data-tutorial="clinical-form">
           <div className="mx-auto max-w-2xl space-y-5 p-4 sm:space-y-7 sm:p-8">
             <div>
@@ -686,22 +693,28 @@ export function ZoneInputWizard() {
             <div className="grid grid-cols-3 gap-3 sm:gap-5">
               <div className="space-y-1.5 sm:space-y-2">
                 <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-age">Age <span className="font-normal text-muted-foreground">(years)</span><InfoHint text="Patient age at time of surgery. Used to calibrate several COMPASS risk models." /></label>
-                <Input id="wiz-age" type="number" min={18} max={120} inputMode="numeric" placeholder="65" value={age} onChange={(e) => handleAgeChange(e.target.value)} className="h-11 text-base" />
+                <Input id="wiz-age" type="number" min={18} max={120} inputMode="numeric" placeholder="65" value={age} onChange={(e) => handleAgeChange(e.target.value)} className={cn("h-11 text-base", fld(age))} />
               </div>
               <div className="space-y-1.5 sm:space-y-2">
                 <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-psa">PSA <span className="font-normal text-muted-foreground">(ng/mL)</span><InfoHint text="Prostate-specific antigen. Typical normal range: 0–4 ng/mL; higher values increase ECE/SVI/upgrade risk." /></label>
-                <Input id="wiz-psa" type="number" step="0.1" inputMode="decimal" placeholder="6.5" value={psa} onChange={(e) => handlePsaChange(e.target.value)} className="h-11 text-base" />
+                <Input id="wiz-psa" type="number" step="0.1" inputMode="decimal" placeholder="6.5" value={psa} onChange={(e) => handlePsaChange(e.target.value)} className={cn("h-11 text-base", fld(psa))} />
               </div>
               <div className="space-y-1.5 sm:space-y-2">
                 <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-vol">Volume <span className="font-normal text-muted-foreground">(cc)</span><InfoHint text="Prostate volume on imaging. Drives PSAD below — a key input for several models." /></label>
-                <Input id="wiz-vol" type="number" step="0.1" inputMode="decimal" placeholder="45" value={vol} onChange={(e) => handleVolChange(e.target.value)} className="h-11 text-base" />
+                <Input id="wiz-vol" type="number" step="0.1" inputMode="decimal" placeholder="45" value={vol} onChange={(e) => handleVolChange(e.target.value)} className={cn("h-11 text-base", fld(vol))} />
               </div>
             </div>
 
             <div className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/40 px-4 py-3 sm:gap-4 sm:px-5 sm:py-4">
               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground sm:text-sm">PSAD</span>
-              <span className="text-2xl font-black tabular-nums text-primary sm:text-3xl">{psad}</span>
-              <span className="text-sm text-muted-foreground">ng/mL/cc</span>
+              {psad === "—" ? (
+                <span className="text-sm text-muted-foreground/70">enter PSA and volume to compute</span>
+              ) : (
+                <>
+                  <span className="text-2xl font-black tabular-nums text-primary sm:text-3xl">{psad}</span>
+                  <span className="text-sm text-muted-foreground">ng/mL/cc</span>
+                </>
+              )}
             </div>
 
             {(psaWarn || volWarn) && (
@@ -719,15 +732,15 @@ export function ZoneInputWizard() {
                   Decipher <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–1)</span>
                   <InfoHint text="Decipher genomic classifier score. ≥0.6 is 'high' risk and raises upgrade/BCR predictions; leave blank if not tested." />
                 </label>
-                <Input id="wiz-dec" type="text" inputMode="decimal" placeholder="0.52" value={decipher} onChange={(e) => handleDecipherChange(e.target.value)} className="h-11 text-base" />
+                <Input id="wiz-dec" type="text" inputMode="decimal" placeholder="0.52" value={decipher} onChange={(e) => handleDecipherChange(e.target.value)} className={cn("h-11 text-base", fld(decipher))} />
               </div>
               <div className="space-y-1.5 sm:space-y-2">
                 <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-shim">SHIM <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–25)</span><InfoHint text="Sexual Health Inventory for Men — baseline erectile function. 22–25 no dysfunction, 17–21 mild, 12–16 mild-moderate, 8–11 moderate, 1–7 severe." /></label>
-                <Input id="wiz-shim" type="number" min={0} max={25} inputMode="numeric" placeholder="21" value={shim} onChange={(e) => handleShimChange(e.target.value)} className="h-11 text-base" />
+                <Input id="wiz-shim" type="number" min={0} max={25} inputMode="numeric" placeholder="21" value={shim} onChange={(e) => handleShimChange(e.target.value)} className={cn("h-11 text-base", fld(shim))} />
               </div>
               <div className="space-y-1.5 sm:space-y-2">
                 <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-ipss">IPSS <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–35)</span><InfoHint text="International Prostate Symptom Score — baseline urinary function. 0–7 mild, 8–19 moderate, 20–35 severe." /></label>
-                <Input id="wiz-ipss" type="number" min={0} max={35} inputMode="numeric" placeholder="8" value={ipss} onChange={(e) => handleIpssChange(e.target.value)} className="h-11 text-base" />
+                <Input id="wiz-ipss" type="number" min={0} max={35} inputMode="numeric" placeholder="8" value={ipss} onChange={(e) => handleIpssChange(e.target.value)} className={cn("h-11 text-base", fld(ipss))} />
               </div>
             </div>
 
@@ -881,24 +894,26 @@ export function ZoneInputWizard() {
               )}
             </div>
 
-            <div className="flex items-center justify-between pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setAge(""); setPsa(""); setVol(""); setDecipher(""); setShim(""); setIpss("");
-                  setHeightVal(""); setHeightFtVal(""); setHeightInVal(""); setWeightVal(""); setBmiDirectVal("");
-                  updateClinicalForm({ age: undefined, psa: 0, vol: 45, dec: null, shim: undefined, ipss: undefined, bmi: undefined });
-                }}
-                className="text-xs font-medium text-muted-foreground/60 hover:text-destructive transition-colors"
-              >
-                Clear all fields
-              </button>
-              <Button type="button" size="lg" onClick={() => setActiveTab(2)}>
-                Next: Zone Locations →
-              </Button>
-            </div>
           </div>
         </div>
+        {/* Sticky step nav */}
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-card/95 px-4 py-2.5 backdrop-blur sm:px-6 sm:py-3">
+          <button
+            type="button"
+            onClick={() => {
+              setAge(""); setPsa(""); setVol(""); setDecipher(""); setShim(""); setIpss("");
+              setHeightVal(""); setHeightFtVal(""); setHeightInVal(""); setWeightVal(""); setBmiDirectVal("");
+              updateClinicalForm({ age: undefined, psa: 0, vol: 45, dec: null, shim: undefined, ipss: undefined, bmi: undefined });
+            }}
+            className="text-xs font-medium text-muted-foreground/60 transition-colors hover:text-destructive"
+          >
+            Clear all fields
+          </button>
+          <Button type="button" size="lg" onClick={() => setActiveTab(2)}>
+            Next: Zone Locations →
+          </Button>
+        </div>
+        </>
       )}
 
       {/* ── Tab 2: Zone Locations ── */}
@@ -910,7 +925,7 @@ export function ZoneInputWizard() {
             {/* Legend + import button */}
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-5 gap-y-1.5 text-xs text-muted-foreground/80">
               <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
-                <span className="font-semibold text-muted-foreground">Click zone → enter findings · 3D updates live</span>
+                <span className="font-semibold text-muted-foreground">Click a zone to enter findings — predictions update live</span>
                 <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-blue-500 text-[8px] font-bold text-white">M</span> MRI</span>
                 <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-teal-500 text-[8px] font-bold text-white">U</span> MUS</span>
                 <span className="flex items-center gap-1.5"><span className="inline-flex h-4 w-4 items-center justify-center rounded bg-purple-500 text-[8px] font-bold text-white">P</span> PSMA</span>
@@ -1046,14 +1061,23 @@ export function ZoneInputWizard() {
           )}
         </div>
 
-        {/* Apply zone aggregates — flex-col footer (sized in the column flow) */}
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-3 border-t border-border bg-card/95 px-4 py-2.5 backdrop-blur sm:px-5 sm:py-3">
-          <p className="hidden text-xs text-muted-foreground/70 md:block">
-            Zone edits update predictions live. Apply commits aggregate flags & saves an undo point.
-          </p>
-          <Button type="button" size="default" onClick={applyZoneAggregates}>
-            Apply &amp; Save Checkpoint
-          </Button>
+        {/* Sticky step nav — flex-col footer (sized in the column flow) */}
+        <div className="flex shrink-0 flex-wrap items-center gap-3 border-t border-border bg-card/95 px-4 py-2.5 backdrop-blur sm:px-5 sm:py-3">
+          <button
+            type="button"
+            onClick={() => { setActiveTab(1); setSelectedZone(null); }}
+            className="text-xs font-medium text-muted-foreground/70 transition-colors hover:text-foreground"
+          >
+            ← Back: Demographics
+          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <Button type="button" size="default" onClick={applyZoneAggregates}>
+              Apply &amp; Save Checkpoint
+            </Button>
+            <Button type="button" size="default" variant="secondary" onClick={() => setDesktopTab("predictions")}>
+              See predictions →
+            </Button>
+          </div>
         </div>
         </div>
       )}

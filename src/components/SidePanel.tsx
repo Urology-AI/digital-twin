@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 const DESKTOP_TABS = [
   { id: "input",     label: "Data",     Icon: ClipboardList },
-  { id: "outcomes",  label: "Outcomes", Icon: Activity },
+  { id: "outcomes",  label: "Factors", Icon: Activity },
 ] as const;
 
 type LocalTab = typeof DESKTOP_TABS[number]["id"];

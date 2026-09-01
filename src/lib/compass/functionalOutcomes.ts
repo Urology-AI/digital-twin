@@ -12,6 +12,7 @@
  */
 import {
   FUNCTIONAL_OUTCOMES_MODEL,
+  FULL_RECOVERY_THRESHOLD,
   HEALER_THRESHOLD,
   MODIFIABLE_BCR,
   PLAN_DELTAS,
@@ -162,9 +163,10 @@ function healerTierFromTimeline(timeline: (number | null)[]): HealerTier | null 
   if (timeline.some((v) => v === null)) return null;
   const t = timeline as number[];
   const thr = HEALER_THRESHOLD.value;
+  const full = FULL_RECOVERY_THRESHOLD.value;
   // [6wk, 3mo, 6mo, 12mo, 18mo]
-  if (t[0]! >= thr || t[1]! >= thr) return "super";
-  if (t[2]! >= thr || t[3]! >= thr) return "healer";
+  if (t[0]! >= full) return "super"; // full recovery by 6 weeks
+  if (t[1]! >= thr || t[2]! >= thr || t[3]! >= thr) return "healer";
   if (t[4]! >= thr) return "delayed";
   return "non-recovery";
 }
@@ -174,8 +176,8 @@ function healerBandsFromTimeline(
 ): { super: number; healer: number; delayed: number } | null {
   if (timeline.some((v) => v === null)) return null;
   const t = timeline as number[];
-  const sup = clamp(t[1]! / 100, 0, 1);
-  const heal = clamp((t[3]! - t[1]!) / 100, 0, 1);
+  const sup = clamp(t[0]! / 100, 0, 1);
+  const heal = clamp((t[3]! - t[0]!) / 100, 0, 1);
   const del = clamp((t[4]! - t[3]!) / 100, 0, 1);
   return { super: sup, healer: heal, delayed: del };
 }

@@ -629,7 +629,7 @@ export function FunctionalOutcomesPanel() {
               </CardTitle>
               <span className="text-xs text-muted-foreground">
                 {result.healerTier === "super"
-                  ? "potency ≥ 50% by 3 months"
+                  ? "full potency recovery by 6 weeks"
                   : result.healerTier === "healer"
                     ? "potency ≥ 50% by 12 months"
                     : result.healerTier === "delayed"
