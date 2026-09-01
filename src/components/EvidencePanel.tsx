@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { BookOpen, ChevronDown, Database, TriangleAlert } from "lucide-react";
+import { BookOpen, ChevronDown, Database, ExternalLink, TriangleAlert } from "lucide-react";
 import { EVIDENCE_REGISTRY, SOURCE_LABEL, type EvidenceSource } from "@/lib/compass/planningEvidence";
-import { PLANNING_REFERENCES, REFERENCES_VERIFIED } from "@/lib/compass/planningReferences";
+import { PLANNING_REFERENCES, REFERENCES_VERIFIED, type PlanningReference } from "@/lib/compass/planningReferences";
+import { PaperModal } from "@/components/PaperModal";
 import { cn } from "@/lib/utils";
 
 const TONE: Record<EvidenceSource, { badge: string; Icon: typeof Database }> = {
@@ -104,6 +105,7 @@ export function EvidencePanel({ defaultOpen = false }: { defaultOpen?: boolean }
 
 function Bibliography() {
   const [open, setOpen] = useState(false);
+  const [selected, setSelected] = useState<PlanningReference | null>(null);
   const tewari = PLANNING_REFERENCES.filter((r) => r.group === "tewari");
   const external = PLANNING_REFERENCES.filter((r) => r.group === "external");
 
@@ -136,8 +138,11 @@ function Bibliography() {
               <ol className="space-y-1.5">
                 {(refs as typeof PLANNING_REFERENCES).map((r) => (
                   <li key={r.key} className="text-[11px] leading-snug">
-                    <span className="text-foreground">{r.authors}</span> {r.title}{" "}
-                    <span className="italic text-muted-foreground">{r.source}</span>
+                    <button type="button" onClick={() => setSelected(r)} className="text-left hover:underline">
+                      <span className="text-foreground">{r.authors}</span> {r.title}{" "}
+                      <span className="italic text-muted-foreground">{r.source}</span>
+                      <ExternalLink className="ml-0.5 inline h-2.5 w-2.5 text-muted-foreground" />
+                    </button>
                     <span className="block text-[10px] text-muted-foreground/60">
                       used for: {r.usedFor.join("; ")}
                     </span>
@@ -148,6 +153,7 @@ function Bibliography() {
           ))}
         </div>
       )}
+      {selected && <PaperModal reference={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }

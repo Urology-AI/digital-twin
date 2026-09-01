@@ -53,6 +53,16 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     verified: false,
   },
   {
+    key: "pedraza2026saline",
+    authors: "Pedraza AM, Fatterpekar M, Joshi H, Choudhary M, Kacagan C, Mandel A, et al., Tewari AK.",
+    title:
+      "Saline-assisted Fascial Exposure Microultrasound-guided Nerve Preservation During Robotic Prostatectomy: Interim Analysis of a Randomized Controlled Trial.",
+    source: "European Urology Oncology, 2026 (in press).",
+    group: "tewari",
+    usedFor: ["Hydrodissection"],
+    verified: false,
+  },
+  {
     key: "tewari2008competing",
     authors: "Tewari A, Rao S, Martinez-Salamanca JI, et al.",
     title:
@@ -175,6 +185,17 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     verified: false,
   },
   {
+    key: "zlotta2004",
+    authors:
+      "Zlotta AR, Roumeguère T, Ravery V, Hoffmann P, Montorsi F, Türkeri L, et al.; European Society for Urological Oncology.",
+    title:
+      "Is seminal vesicle ablation mandatory for all patients undergoing radical prostatectomy? A multivariate analysis on 1283 patients.",
+    source: "Eur Urol. 2004;46(1):42-49.",
+    group: "external",
+    usedFor: ["Seminal-vesicle tip-sparing candidacy"],
+    verified: true,
+  },
+  {
     key: "han2003",
     authors: "Han M, Partin AW, Zahurak M, et al.",
     title:
@@ -255,3 +276,22 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
 ];
 
 export const REFERENCES_VERIFIED = PLANNING_REFERENCES.every((r) => r.verified);
+
+/**
+ * Link for a reference. We deliberately do not hard-code DOIs/PMIDs (the
+ * citations above are compiled from working knowledge and unverified), so every
+ * link is an exact-title search — deterministic and lands on the paper without
+ * risking a wrong identifier. Europe PMC (not PubMed) because PubMed's result
+ * page requires first-party cookies and refuses to render inside our preview
+ * modal's iframe.
+ */
+export function refLink(r: PlanningReference): string {
+  const title = r.title.replace(/\.$/, "");
+  return `https://europepmc.org/search?query=${encodeURIComponent(title)}`;
+}
+
+/** References whose `usedFor` intersects any of the given feature tags. */
+export function referencesFor(...tags: string[]): PlanningReference[] {
+  const want = new Set(tags);
+  return PLANNING_REFERENCES.filter((r) => r.usedFor.some((u) => want.has(u)));
+}
