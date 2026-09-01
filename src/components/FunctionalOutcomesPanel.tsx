@@ -6,7 +6,6 @@ import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import {
   computeFunctionalOutcomes,
   modifiableFactorBreakdown,
-  FUNCTIONAL_MODEL_CITATION,
   type PfmtLevel,
   type Pde5Regimen,
   type AlcoholLevel,
@@ -16,76 +15,10 @@ import {
 } from "@/lib/compass/functionalOutcomes";
 import { cn } from "@/lib/utils";
 import { RefLinks } from "@/components/RefLinks";
-
-/** Small ±pp cell, green good / red bad. `invert` flips the colour sense. */
-function PpCell({ v, invert = false }: { v: number; invert?: boolean }) {
-  if (v === 0) return <span className="text-muted-foreground/40">·</span>;
-  const good = invert ? v < 0 : v > 0;
-  return (
-    <span className={good ? "text-emerald-500" : "text-red-500"}>
-      {v > 0 ? "+" : ""}
-      {v}
-    </span>
-  );
-}
-
-function ModifiableFactorBreakdown({
-  rows,
-}: {
-  rows: ReturnType<typeof modifiableFactorBreakdown>;
-}) {
-  if (rows.length === 0) return null;
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">Factor contributions</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Percentage-point effect of each active factor on the 12-month numbers. Modifiable factors
-          are the levers a patient can pull before surgery.
-        </p>
-        <p className="text-[10px] leading-snug text-muted-foreground/60">{FUNCTIONAL_MODEL_CITATION}</p>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 text-sm tabular-nums">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Factor
-          </div>
-          <div className="text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Potency
-          </div>
-          <div className="text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Contin.
-          </div>
-          <div className="text-right text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-            BCR risk
-          </div>
-          {rows.map((r) => (
-            <div key={r.label} className="contents">
-              <div className="truncate">
-                <span className={r.modifiable ? "text-foreground" : "text-muted-foreground"}>
-                  {r.label}
-                </span>{" "}
-                <span className="text-xs capitalize text-muted-foreground/60">{r.detail}</span>
-                {!r.modifiable && (
-                  <span className="ml-1 text-[9px] uppercase text-muted-foreground/50">fixed</span>
-                )}
-              </div>
-              <div className="text-right">
-                <PpCell v={r.pot} />
-              </div>
-              <div className="text-right">
-                <PpCell v={r.cont} />
-              </div>
-              <div className="text-right">
-                <PpCell v={r.bcrRisk} invert />
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
+import { useUiStore } from "@/store/uiStore";
+import { RecoveryLineChart } from "@/components/outcomes/RecoveryLineChart";
+import { HealerBands } from "@/components/outcomes/HealerBands";
+import { FactorContributionTable } from "@/components/outcomes/FactorContributionTable";
 
 /** Approximate 90% CI on logit scale (SE ≈ 0.58 logit units, z = 1.64) */
 function computeCI(pct: number): { lo: number; hi: number } {
@@ -316,115 +249,6 @@ function NsGradeSelector({ side, value, onChange }: {
   );
 }
 
-
-// ── Line chart ────────────────────────────────────────────────────────────────
-const TIME_LABELS = ["6 wk", "3 mo", "6 mo", "12 mo", "18 mo"];
-
-function RecoveryLineChart({ potency, continence, height = 140, large = false }: {
-  potency: (number | null)[];
-  continence: (number | null)[];
-  height?: number;
-  large?: boolean;
-}) {
-  const W = large ? 640 : 400, H = height;
-  const padL = large ? 42 : 34, padR = large ? 20 : 12, padT = large ? 28 : 22, padB = large ? 34 : 26;
-  const plotW = W - padL - padR;
-  const plotH = H - padT - padB;
-  const n = TIME_LABELS.length;
-  const dotR = large ? 5 : 3.5;
-  const lineW = large ? 3.5 : 2.5;
-  const labelSize = large ? 13 : 9;
-  const axisSize = large ? 12 : 9;
-  const labelGap = large ? 18 : 12;
-  // Minimum vertical separation (px) below which two same-index labels would
-  // visually collide; when lines converge, push labels further apart instead
-  // of letting them overlap.
-  const minSep = large ? 30 : 16;
-
-  const xOf = (i: number) => padL + (i / (n - 1)) * plotW;
-  const yOf = (v: number) => padT + (1 - v / 100) * plotH;
-
-  function buildPath(vals: (number | null)[]) {
-    let d = "", pen = false;
-    vals.forEach((v, i) => {
-      if (v === null) { pen = false; return; }
-      d += `${pen ? "L" : "M"}${xOf(i).toFixed(1)},${yOf(v).toFixed(1)} `;
-      pen = true;
-    });
-    return d;
-  }
-
-  const grids = [25, 50, 75, 100];
-  const potencyHasData = potency.some(v => v !== null);
-
-  // Decide, per time point, which series sits above the other so labels can
-  // be pushed outward (away from the other line) instead of overlapping when
-  // the two curves converge near the top of the chart.
-  function labelOffsets(i: number): { continence: number; potency: number } {
-    const c = continence[i], p = potency[i];
-    if (c == null || p == null || !potencyHasData) {
-      return { continence: labelGap, potency: -labelGap * 0.65 };
-    }
-    const dy = Math.abs(yOf(c) - yOf(p));
-    const extra = dy < minSep ? (minSep - dy) : 0;
-    if (yOf(c) <= yOf(p)) {
-      // continence dot sits above (or level with) potency dot → push its
-      // label further up, and potency's label further down, away from each other
-      return { continence: -(labelGap * 0.65 + extra), potency: labelGap + extra };
-    }
-    return { continence: labelGap + extra, potency: -(labelGap * 0.65 + extra) };
-  }
-
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full overflow-visible" style={{ height: H }}>
-      {/* Grid lines */}
-      {grids.map(g => (
-        <line key={g} x1={padL} y1={yOf(g)} x2={W - padR} y2={yOf(g)}
-          stroke="currentColor" strokeOpacity={0.08} strokeWidth={1} />
-      ))}
-      {/* Y-axis labels */}
-      {grids.map(g => (
-        <text key={g} x={padL - 6} y={yOf(g)} textAnchor="end" dominantBaseline="middle"
-          fill="currentColor" fillOpacity={0.35} fontSize={axisSize}>{g}%</text>
-      ))}
-      {/* X-axis baseline */}
-      <line x1={padL} y1={padT + plotH} x2={W - padR} y2={padT + plotH}
-        stroke="currentColor" strokeOpacity={0.15} strokeWidth={1} />
-      {/* X-axis labels */}
-      {TIME_LABELS.map((lbl, i) => (
-        <text key={i} x={xOf(i)} y={H - (large ? 8 : 4)} textAnchor="middle"
-          fill="currentColor" fillOpacity={0.45} fontSize={axisSize}>{lbl}</text>
-      ))}
-
-      {/* Continence line + dots */}
-      <path d={buildPath(continence)} fill="none" stroke="#8b5cf6" strokeWidth={lineW}
-        strokeLinecap="round" strokeLinejoin="round" />
-      {continence.map((v, i) => v !== null && (
-        <g key={i}>
-          <circle cx={xOf(i)} cy={yOf(v)} r={dotR} fill="#8b5cf6" />
-          <text x={xOf(i)} y={yOf(v) + labelOffsets(i).continence} textAnchor="middle"
-            fill="#8b5cf6" fontSize={labelSize} fontWeight="bold">{v}%</text>
-        </g>
-      ))}
-
-      {/* Potency line + dots (only if SHIM valid) */}
-      {potencyHasData && (
-        <>
-          <path d={buildPath(potency)} fill="none" stroke="#3b82f6" strokeWidth={lineW}
-            strokeLinecap="round" strokeLinejoin="round" />
-          {potency.map((v, i) => v !== null && (
-            <g key={i}>
-              <circle cx={xOf(i)} cy={yOf(v)} r={dotR} fill="#3b82f6" />
-              <text x={xOf(i)} y={yOf(v) + labelOffsets(i).potency} textAnchor="middle"
-                fill="#3b82f6" fontSize={labelSize} fontWeight="bold">{v}%</text>
-            </g>
-          ))}
-        </>
-      )}
-    </svg>
-  );
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function toSmokingStatus(v: string): SmokingStatus {
   return (["never","former","current"] as string[]).includes(v) ? v as SmokingStatus : "never";
@@ -457,6 +281,7 @@ export function FunctionalOutcomesPanel() {
   const [nsOverrideL, setNsOverrideL] = useState<1|2|3|null>(null);
   const [nsOverrideR, setNsOverrideR] = useState<1|2|3|null>(null);
   const [infoOpen, setInfoOpen] = useState(false);
+  const setDesktopTab = useUiStore((s) => s.setDesktopTab);
   const [chartExpanded, setChartExpanded] = useState(false);
 
   // Reset NS overrides when the active patient changes
@@ -537,6 +362,15 @@ export function FunctionalOutcomesPanel() {
           <p className="text-xs text-muted-foreground">
             From your operative plan — adjust here to explore an alternative (does not change the plan)
           </p>
+          <button
+            type="button"
+            onClick={() => setDesktopTab("plan")}
+            className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-primary hover:underline"
+          >
+            Adjust the operative plan
+            <span aria-hidden>→</span>
+            <span className="text-muted-foreground">Planning</span>
+          </button>
         </CardHeader>
         <CardContent className="pt-0">
           <div className="flex gap-4">
@@ -615,50 +449,7 @@ export function FunctionalOutcomesPanel() {
 
       {/* Erectile-recovery phenotype */}
       {result.healerTier && result.healerBands && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="mb-2 flex items-baseline gap-2">
-              <CardTitle className="text-base font-semibold">
-                {result.healerTier === "super"
-                  ? "Super healer"
-                  : result.healerTier === "healer"
-                    ? "Healer"
-                    : result.healerTier === "delayed"
-                      ? "Delayed healer"
-                      : "Unlikely to recover unaided"}
-              </CardTitle>
-              <span className="text-xs text-muted-foreground">
-                {result.healerTier === "super"
-                  ? "full potency recovery by 6 weeks"
-                  : result.healerTier === "healer"
-                    ? "potency ≥ 50% by 12 months"
-                    : result.healerTier === "delayed"
-                      ? "potency ≥ 50% around 18 months"
-                      : "does not reach 50% unaided"}
-              </span>
-            </div>
-            <div className="flex h-3 overflow-hidden rounded-full border border-border">
-              <div className="bg-emerald-500" style={{ width: `${result.healerBands.super * 100}%` }} />
-              <div className="bg-sky-500" style={{ width: `${result.healerBands.healer * 100}%` }} />
-              <div className="bg-amber-500" style={{ width: `${result.healerBands.delayed * 100}%` }} />
-              <div className="flex-1 bg-muted" />
-            </div>
-            <div className="mt-1.5 flex flex-wrap gap-3 text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" /> super{" "}
-                {Math.round(result.healerBands.super * 100)}%
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-sky-500" /> healer{" "}
-                {Math.round(result.healerBands.healer * 100)}%
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-amber-500" /> delayed{" "}
-                {Math.round(result.healerBands.delayed * 100)}%
-              </span>
-            </div>
-          </CardContent>
-        </Card>
+        <HealerBands tier={result.healerTier} bands={result.healerBands} />
       )}
 
       {/* Recovery timeline */}
@@ -702,7 +493,7 @@ export function FunctionalOutcomesPanel() {
         </CardContent>
       </Card>
 
-      <ModifiableFactorBreakdown rows={factorRows} />
+      <FactorContributionTable rows={factorRows} />
 
       <p className="text-[11px] text-muted-foreground">
         Model provenance and the full bibliography are in the methodology panel (ⓘ) →{" "}
