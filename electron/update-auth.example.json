@@ -1,0 +1,4 @@
+{
+  "_comment": "Copy to update-auth.json (gitignored). CI writes this from the RELEASES_READ_PAT secret before packaging. The token is a fine-grained GitHub PAT with READ-ONLY Contents access to Urology-AI/digital-twin-releases and nothing else. It ends up inside the app bundle, so scope it to exactly that one private repo, read-only.",
+  "token": ""
+}

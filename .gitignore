@@ -56,3 +56,6 @@ venv/
 .pytest_cache/
 
 release/
+
+# Offline app: baked-in update token (CI generates it)
+electron/update-auth.json

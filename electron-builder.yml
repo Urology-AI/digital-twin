@@ -36,10 +36,13 @@ mac:
 dmg:
   title: ${productName} ${version}
 
-# Auto-update feed + release hosting. `npm run dist:mac -- --publish always`
-# (or the CI workflow) uploads the dmg, zip and latest-mac.yml to a GitHub
-# Release; installed apps read that feed on launch.
+# Auto-update feed + release hosting. Releases go to a SEPARATE PRIVATE
+# repo so the .dmg is never publicly downloadable (this repo is public).
+# `npm run dist:mac -- --publish always` (or CI) uploads the dmg, zip and
+# latest-mac.yml there; installed apps read that feed with a baked-in
+# read-only token (see electron/main.cjs + electron/update-auth.example.json).
 publish:
   provider: github
   owner: Urology-AI
-  repo: digital-twin
+  repo: digital-twin-releases
+  private: true
