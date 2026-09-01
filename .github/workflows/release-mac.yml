@@ -1,40 +1,79 @@
 name: Release macOS app
 
-# Tag a commit `v1.0.1` (matching package.json version) and push it:
-#   npm version patch && git push --follow-tags
-# This builds, signs, notarizes and publishes the .dmg + auto-update feed
-# to a GitHub Release.
+# Cut a release by tagging (npm version patch && git push --follow-tags),
+# or run manually from the Actions tab (workflow_dispatch) — set `preflight`
+# to only validate the signing/notarization secrets without building.
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      preflight:
+        description: "Only check secrets, don't build"
+        type: boolean
+        default: false
 
 jobs:
   build:
     runs-on: macos-14
     permissions:
-      contents: write # create the GitHub Release
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
+      - name: Preflight — validate signing & notarization secrets
+        env:
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -e
+          fail=0
+          for v in MAC_CERT_P12 MAC_CERT_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            if [ -z "${!v}" ]; then echo "::error::$v is empty"; fail=1; else echo "$v: set"; fi
+          done
+          [ "$fail" = 0 ] || exit 1
+
+          echo "$MAC_CERT_P12" | base64 --decode > cert.p12
+          echo "cert.p12 size: $(wc -c < cert.p12) bytes"
+          # Validates both that the .p12 is well-formed and that MAC_CERT_PASSWORD is correct.
+          openssl pkcs12 -in cert.p12 -nodes -passin env:MAC_CERT_PASSWORD -clcerts 2>/dev/null \
+            | openssl x509 -noout -subject -enddate
+          echo "→ certificate + password OK"
+
+          # Confirms APPLE_ID / app-specific password / team id are accepted by Apple.
+          xcrun notarytool history --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID" \
+            | head -5
+          echo "→ notarization credentials OK"
+          rm cert.p12
+
+      - name: Stop here if preflight-only
+        if: ${{ inputs.preflight }}
+        run: echo "Preflight passed. Re-run without preflight (or push a tag) to build." && exit 0
+
       - uses: actions/setup-node@v4
+        if: ${{ !inputs.preflight }}
         with:
           node-version: 20
           cache: npm
 
       - run: npm ci
+        if: ${{ !inputs.preflight }}
 
       - run: npm run typecheck && npm test
+        if: ${{ !inputs.preflight }}
 
       - name: Build, sign, notarize & publish
+        if: ${{ !inputs.preflight }}
         run: npm run dist:mac -- --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Developer ID Application cert, exported as .p12 and base64-encoded:
-          #   base64 -i cert.p12 | pbcopy
           CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
-          # Notarization (App Store Connect):
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
