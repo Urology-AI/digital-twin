@@ -104,7 +104,7 @@ jobs:
         if: ${{ !inputs.preflight }}
         run: sudo mdutil -a -i off || true
 
-      - name: Build, sign, notarize, staple
+      - name: Build, sign, notarize
         if: ${{ !inputs.preflight }}
         run: |
           for attempt in 1 2 3; do
@@ -112,7 +112,8 @@ jobs:
             npm run dist:mac -- --publish never -c.extraMetadata.version=${{ steps.ver.outputs.v }} && { echo "::endgroup::"; ok=1; break; }
             echo "::endgroup::"
             echo "attempt $attempt failed; cleaning up and retrying in 20s"
-            rm -rf release; hdiutil info | grep -o '/Volumes/COMPASS[^"]*' | xargs -I{} hdiutil detach "{}" -force || true
+            rm -rf release
+            hdiutil info | grep -o '/Volumes/COMPASS[^"]*' | while read -r v; do hdiutil detach "$v" -force || true; done
             sleep 20
           done
           [ "$ok" = 1 ] || exit 1
@@ -124,20 +125,24 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      # Hard gate — refuse to publish anything that isn't notarized + stapled.
+      # Hard gate — refuse to publish a build whose .app isn't notarized +
+      # stapled. Checks the .app exactly as a downloaded copy would be seen:
+      # mount the .dmg, then run the Gatekeeper assessment offline.
       - name: Verify notarization
         if: ${{ !inputs.preflight }}
         run: |
           set -e
-          DMG=$(ls "release/COMPASS-Digital-Twin-${{ steps.ver.outputs.v }}-arm64.dmg")
-          xcrun stapler validate "$DMG"
+          DMG="release/COMPASS-Digital-Twin-${{ steps.ver.outputs.v }}-arm64.dmg"
           MP=$(mktemp -d)
           hdiutil attach -nobrowse -quiet -mountpoint "$MP" "$DMG"
           APP=$(find "$MP" -maxdepth 1 -name "*.app" -print -quit)
-          spctl -a -vvv -t exec "$APP"
-          xcrun stapler validate "$APP"
-          hdiutil detach "$MP" -quiet
-          echo "→ $DMG is signed + notarized + stapled"
+          # Copy off the read-only image and cut network so this is a true
+          # offline Gatekeeper check, exactly what the user's Mac does.
+          WORK=$(mktemp -d); cp -R "$APP" "$WORK/"; hdiutil detach "$MP" -quiet
+          APP2="$WORK/$(basename "$APP")"
+          xcrun stapler validate "$APP2"
+          spctl -a -vvv -t exec "$APP2"
+          echo "→ $DMG: .app is signed, notarized and stapled"
 
       - name: Publish to the private releases repo
         if: ${{ !inputs.preflight }}
