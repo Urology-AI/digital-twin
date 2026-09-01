@@ -21,6 +21,7 @@ import { usePatientStore } from "@/store/patientStore";
 import { useUiStore, type DesktopTab } from "@/store/uiStore";
 import { printReport } from "@/lib/compass/printReport";
 import { CasePicker } from "@/components/layout/CasePicker";
+import { AccessMenu } from "@/components/layout/AccessMenu";
 import { cn } from "@/lib/utils";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { isDemoMode } from "@/lib/demoMode";
@@ -252,18 +253,9 @@ export function AppHeader() {
           <span className="hidden text-xs font-medium lg:inline">About</span>
         </Button>
 
-        {/* Who's signed in via Cloudflare Access, if anyone (blank locally / on patient links) */}
-        {accessIdentity && (
-          <div
-            className="hidden items-center gap-1.5 rounded-md px-2 py-1 text-muted-foreground sm:flex"
-            title={`Signed in as ${accessIdentity.email}`}
-          >
-            <UserRound className="h-3.5 w-3.5" />
-            <span className="max-w-[140px] truncate text-[11px] font-medium">
-              {accessIdentity.name || accessIdentity.email}
-            </span>
-          </div>
-        )}
+        {/* Who's signed in via Cloudflare Access — click for "Sign out"
+            (blank locally / on patient links / in the public preview) */}
+        {accessIdentity && <AccessMenu identity={accessIdentity} />}
 
         {/* Clinician sign-in — demo build only */}
         {demo && (

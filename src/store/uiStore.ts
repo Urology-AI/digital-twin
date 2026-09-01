@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { OverlayType } from "@/types/prediction";
 import { VIEWS } from "@/lib/three/prostateScene";
+import { isDemoMode } from "@/lib/demoMode";
 
 export type DesktopTab = "input" | "predictions" | "outcomes" | "plan";
 
@@ -175,7 +176,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setChatOpen: (v) => set({ chatOpen: v }),
   setWelcomeOpen: (v) => set({ welcomeOpen: v }),
   dismissWelcome: () => {
-    try { localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch { /* private mode */ }
+    try { if (!isDemoMode()) localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch { /* private mode */ }
     set({ welcomeOpen: false });
   },
   setExplainKey: (k) => set({ explainKey: k }),
@@ -196,7 +197,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   setPatientView3DOpen: (v) => set({ patientView3DOpen: v }),
   setPresenterView: (v) => set({ presenterView: v }),
   startTutorial: () => {
-    try { localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch { /* private mode */ }
+    try { if (!isDemoMode()) localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch { /* private mode */ }
     set({ tutorialStep: 0, welcomeOpen: false, desktopTab: "input", wizardTab: null });
   },
   nextTutorialStep: () => {

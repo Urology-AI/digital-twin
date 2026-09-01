@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ControlsOverlay } from "@/components/ControlsOverlay";
@@ -44,14 +44,22 @@ import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { cn } from "@/lib/utils";
 
 /**
- * Public preview: clinical input panels stay visible (so the layout reads
- * right) but can't be operated. `inert` removes the whole subtree from
- * pointer, focus and a11y interaction without changing layout; tab nav and
- * 3D controls live outside these panels and stay live.
+ * Public preview: the Input wizard (the base case definition) stays visible
+ * so the layout reads right, but can't be operated. `inert` removes the
+ * subtree from pointer, focus and a11y interaction without changing layout.
+ * Set imperatively because React 18 mishandles a JSX `inert` prop.
+ * Factors and Planning stay interactive — nothing there persists anyway.
  */
-// React 18 doesn't render a boolean `inert`, so emit the bare attribute.
-const frozen = (on: boolean) =>
-  (on ? { inert: "" } : {}) as unknown as React.HTMLAttributes<HTMLDivElement>;
+function useInert(on: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (on) el.setAttribute("inert", "");
+    else el.removeAttribute("inert");
+  }, [on]);
+  return ref;
+}
 
 function DimOverlay() {
   const patients = usePatientStore((s) => s.patients);
@@ -154,6 +162,7 @@ export default function App() {
   const patientView3DOpen = useUiStore((s) => s.patientView3DOpen);
   const setPatientView3DOpen = useUiStore((s) => s.setPatientView3DOpen);
   const demo = isDemoMode();
+  const inputInertRef = useInert(demo);
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
@@ -162,7 +171,7 @@ export default function App() {
       <div className="flex shrink-0 items-center justify-center gap-1.5 border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-600 dark:text-amber-400 sm:text-[11px]">
         {demo && (
           <span className="font-semibold">
-            Read-only preview with a sample case — the interactive tool is for Mount Sinai clinicians.
+            Preview — explore a sample case; nothing is saved. The full tool is for Mount Sinai clinicians.
           </span>
         )}
         <span>
@@ -230,9 +239,9 @@ export default function App() {
           )}
         </div>
 
-        {/* ── Input tab ────────────────────────────────────────────────── */}
+        {/* ── Input tab (frozen in the public preview) ─────────────────── */}
         <div
-          {...frozen(demo)}
+          ref={inputInertRef}
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
             !patientView && !presenterView && desktopTab === "input" ? "flex flex-col" : "hidden",
@@ -270,11 +279,9 @@ export default function App() {
 
         {/* ── Surgical plan tab: operative plan + inflammation risk + impact ── */}
         <div
-          {...frozen(demo)}
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
             !patientView && !presenterView && desktopTab === "plan" ? "flex" : "hidden",
-            demo && "[&_:is(input,select,textarea)]:opacity-70",
           )}
         >
           <SurgicalPlanWorkspace />

@@ -242,7 +242,7 @@ export function WelcomeScreen() {
             style={{ fontSize: "clamp(0.6875rem, 1.15vw, 0.75rem)", animationDelay: "380ms" }}
           >
             {demo
-              ? "The tour is a read-only preview. The interactive tool is for Mount Sinai clinicians."
+              ? "The tour opens a preview with a sample case — nothing is saved. The full tool is for Mount Sinai clinicians."
               : "New here? Take the tour first — it's a 2-minute walkthrough."}
           </p>
 
