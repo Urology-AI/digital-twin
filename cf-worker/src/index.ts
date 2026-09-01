@@ -65,17 +65,22 @@ const SHARE_PUT =
 const SHARE_CREATE =
   "CREATE TABLE IF NOT EXISTS patient_shares ( id TEXT PRIMARY KEY, record TEXT NOT NULL, created_at TEXT NOT NULL )";
 
-function sqlAllowed(sql: string, args: unknown[]): boolean {
+const ALLOWED_SQL_PREFIXES = [
+  "select ",
+  "create table if not exists case_log ",
+  "alter table case_log add column ",
+  "insert or replace into case_log ",
+];
+
+function isAllowedSql(sql: string, args: unknown[]): boolean {
   const s = normalizeSql(sql);
   if (s === SHARE_GET) return args.length === 1;
   if (s === SHARE_PUT) return args.length === 3;
   if (s === SHARE_CREATE) return true;
-  if (s === "SELECT 1") return true;
-  if (s === "SELECT * FROM case_log ORDER BY date DESC") return true;
-  if (s.startsWith("CREATE TABLE IF NOT EXISTS case_log (")) return true;
-  if (s.startsWith("ALTER TABLE case_log ADD COLUMN ")) return true;
-  if (s.startsWith("INSERT OR REPLACE INTO case_log (")) return true;
-  return false;
+  // No other access to the identified-records table.
+  if (/patient_shares/i.test(s)) return false;
+  const low = s.toLowerCase();
+  return ALLOWED_SQL_PREFIXES.some((p) => low.startsWith(p));
 }
 
 function jsonError(message: string, status: number): Response {
@@ -129,7 +134,7 @@ async function handleTursoExecute(request: Request, env: Env): Promise<Response>
 
   if (typeof sql !== "string" || !sql.trim()) return jsonError("Missing 'sql' string", 400);
   if (!Array.isArray(args)) return jsonError("'args' must be an array", 400);
-  if (!sqlAllowed(sql, args)) return jsonError("Statement not allowed", 403);
+  if (!isAllowedSql(sql, args)) return jsonError("SQL statement not permitted", 403);
 
   try {
     const result = await tursoClient(env).execute({ sql, args: args as Args });
@@ -177,7 +182,7 @@ async function handleTursoBatch(request: Request, env: Env): Promise<Response> {
     if (typeof s.sql !== "string" || !Array.isArray(s.args)) {
       return jsonError("Each statement needs 'sql' (string) and 'args' (array)", 400);
     }
-    if (!sqlAllowed(s.sql, s.args)) return jsonError("Statement not allowed", 403);
+    if (!isAllowedSql(s.sql, s.args)) return jsonError("SQL statement not permitted", 403);
   }
 
   try {
@@ -190,16 +195,29 @@ async function handleTursoBatch(request: Request, env: Env): Promise<Response> {
   }
 }
 
+// Baseline security headers for the HTML documents this Worker serves.
+// Kept deliberately conservative (no CSP) so it can't break the SPA; a full
+// CSP belongs in a Cloudflare Transform Rule where it can be tuned safely.
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Cross-Origin-Opener-Policy": "same-origin",
+};
+
+function withSecurityHeaders(response: Response, status = response.status): Response {
+  const headers = new Headers(response.headers);
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) headers.set(k, v);
+  return new Response(response.body, { status, headers });
+}
+
 async function handleSpaFallback(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const indexUrl = new URL("/index.html", url.origin);
   const response = await fetch(new Request(indexUrl, request));
   // Report 200, not GitHub Pages' 404 for the (nonexistent) deep-link path
   // — the content itself is index.html, so the client-side router can run.
-  if (response.status === 404) {
-    return new Response(response.body, { status: 200, headers: response.headers });
-  }
-  return response;
+  return withSecurityHeaders(response, response.status === 404 ? 200 : response.status);
 }
 
 export default {
