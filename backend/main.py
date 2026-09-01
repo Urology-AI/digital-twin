@@ -37,10 +37,21 @@ print(f"[compass] LLM_ENDPOINT={_llm['endpoint'] or '<unset>'} LLM_MODEL={_llm['
 
 app = FastAPI(title="COMPASS API")
 
-# Comma-separated origin allowlist, e.g.
-#   ALLOWED_ORIGINS=https://digital-twin.urology.edu.eu.org
-# Falls back to "*" only when unset (dev). Set it in every real deployment.
-_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
+# Origins allowed to call this API from a browser. The two production
+# front-ends plus local dev. Add more (e.g. a LAN IP for device testing)
+# with ALLOWED_ORIGINS="https://a,https://b" — it replaces this default.
+_DEFAULT_ORIGINS = [
+    "https://urology-ai.github.io",             # GitHub Pages
+    "https://digital-twin.urology.edu.eu.org",  # Cloudflare custom domain
+    "http://localhost:5173",                    # Vite dev
+    "http://127.0.0.1:5173",
+]
+_env_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
+_origins = (
+    [o.strip() for o in _env_origins.split(",") if o.strip()]
+    if _env_origins
+    else _DEFAULT_ORIGINS
+)
 
 app.add_middleware(
     CORSMiddleware,
