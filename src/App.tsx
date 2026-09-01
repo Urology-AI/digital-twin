@@ -55,7 +55,7 @@ function DimOverlay() {
   const d = entry.record.prostate.dimensions_cm;
   const psadValid = isFinite(S.psad) && S.psad > 0;
   return (
-    <div className="pointer-events-none absolute left-2 z-10 rounded-lg border border-border/60 bg-black/75 px-2.5 py-1.5 text-[10px] text-muted-foreground backdrop-blur sm:px-3 sm:py-2 sm:text-[11px] max-lg:top-2 lg:bottom-3 lg:left-3">
+    <div className="glass pointer-events-none absolute left-2 z-10 rounded-lg px-2.5 py-1.5 text-[10px] text-muted-foreground sm:px-3 sm:py-2 sm:text-[11px] max-lg:top-2 lg:bottom-3 lg:left-3">
       <span className="font-semibold text-primary">{vol} cc</span>
       {d && (
         <>
