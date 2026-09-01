@@ -36,7 +36,11 @@ export function useThreeProstate(
     const h = createProstateScene(el, zones, overlay, dims, medianLobeGrade, () => setGlbLoading(false));
     handlesRef.current = h;
     h.model.scale.setScalar(0.85 * volumeScale);
-    h.setBackground(useUiStore.getState().dark ? 0x1e1e24 : 0xf5f5f7);
+    {
+      const startDark = useUiStore.getState().dark;
+      h.setBackground(startDark ? 0x1e1e24 : 0xf5f5f7);
+      h.setThemeLighting(startDark);
+    }
     el.style.touchAction = "none";
 
     const applyOrbitDelta = (dx: number, dy: number) => {
@@ -226,6 +230,7 @@ export function useThreeProstate(
     const h = handlesRef.current;
     if (!h) return;
     h.setBackground(dark ? 0x1e1e24 : 0xf5f5f7);
+    h.setThemeLighting(dark);
   }, [dark]);
 
   return glbLoading;

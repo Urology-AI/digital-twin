@@ -645,6 +645,8 @@ export interface ProstateSceneHandles {
   dispose: () => void;
   setSize: (w: number, h: number) => void;
   setBackground: (hex: number) => void;
+  /** Adjust exposure + ambient so the tissue reads consistently in either theme. */
+  setThemeLighting: (dark: boolean) => void;
   updateZones: (
     zones: ThreeZoneRuntime[],
     overlay: OverlayType,
@@ -692,7 +694,8 @@ export function createProstateScene(
   renderer.toneMappingExposure = 1.2;
   container.appendChild(renderer.domElement);
 
-  scene.add(new AmbientLight(0xfff8f0, 0.5));
+  const ambient = new AmbientLight(0xfff8f0, 0.5);
+  scene.add(ambient);
   const ml = new DirectionalLight(0xffffff, 1.0);
   ml.position.set(3, 5, 4);
   scene.add(ml);
@@ -933,6 +936,15 @@ export function createProstateScene(
     },
     setBackground: (hex: number) => {
       scene.background = new Color(hex);
+    },
+    setThemeLighting: (dark: boolean) => {
+      // On a light canvas the tissue reads darker/muddier than on black, so
+      // lift exposure and light intensity in light mode to keep the hue
+      // consistent with the dark-mode appearance.
+      renderer.toneMappingExposure = dark ? 1.2 : 1.55;
+      ambient.intensity = dark ? 0.5 : 0.85;
+      ml.intensity = dark ? 1.0 : 1.25;
+      fl.intensity = dark ? 0.5 : 0.7;
     },
     updateZones: (z, ov, opts) => {
       if (glbLoaded) {
