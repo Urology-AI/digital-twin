@@ -35,6 +35,26 @@ interface Env {
   TURSO_AUTH_TOKEN: string;
 }
 
+/**
+ * The frontend (src/lib/turso.ts) only ever emits a small, fixed set of
+ * statement shapes. Everything else — DROP, DELETE, UPDATE, ATTACH, PRAGMA,
+ * writes to any other table — is rejected here so a compromised browser
+ * session (or XSS) can't turn this proxy into arbitrary DB access. Keep this
+ * list in sync with src/lib/turso.ts if the schema logic there changes.
+ */
+const ALLOWED_SQL_PREFIXES = [
+  "select ",
+  "create table if not exists ",
+  "alter table case_log add column ",
+  "insert or replace into case_log ",
+  "insert or replace into patient_shares ",
+];
+
+function isAllowedSql(sql: string): boolean {
+  const s = sql.trim().toLowerCase().replace(/\s+/g, " ");
+  return ALLOWED_SQL_PREFIXES.some((p) => s.startsWith(p));
+}
+
 function jsonError(message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
@@ -86,6 +106,7 @@ async function handleTursoExecute(request: Request, env: Env): Promise<Response>
 
   if (typeof sql !== "string" || !sql.trim()) return jsonError("Missing 'sql' string", 400);
   if (!Array.isArray(args)) return jsonError("'args' must be an array", 400);
+  if (!isAllowedSql(sql)) return jsonError("SQL statement not permitted", 403);
 
   try {
     const result = await tursoClient(env).execute({ sql, args: args as Args });
@@ -133,6 +154,7 @@ async function handleTursoBatch(request: Request, env: Env): Promise<Response> {
     if (typeof s.sql !== "string" || !Array.isArray(s.args)) {
       return jsonError("Each statement needs 'sql' (string) and 'args' (array)", 400);
     }
+    if (!isAllowedSql(s.sql)) return jsonError("SQL statement not permitted", 403);
   }
 
   try {
@@ -145,16 +167,29 @@ async function handleTursoBatch(request: Request, env: Env): Promise<Response> {
   }
 }
 
+// Baseline security headers for the HTML documents this Worker serves.
+// Kept deliberately conservative (no CSP) so it can't break the SPA; a full
+// CSP belongs in a Cloudflare Transform Rule where it can be tuned safely.
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Cross-Origin-Opener-Policy": "same-origin",
+};
+
+function withSecurityHeaders(response: Response, status = response.status): Response {
+  const headers = new Headers(response.headers);
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) headers.set(k, v);
+  return new Response(response.body, { status, headers });
+}
+
 async function handleSpaFallback(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const indexUrl = new URL("/index.html", url.origin);
   const response = await fetch(new Request(indexUrl, request));
   // Report 200, not GitHub Pages' 404 for the (nonexistent) deep-link path
   // — the content itself is index.html, so the client-side router can run.
-  if (response.status === 404) {
-    return new Response(response.body, { status: 200, headers: response.headers });
-  }
-  return response;
+  return withSecurityHeaders(response, response.status === 404 ? 200 : response.status);
 }
 
 export default {

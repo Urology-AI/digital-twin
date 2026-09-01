@@ -37,11 +37,16 @@ print(f"[compass] LLM_ENDPOINT={_llm['endpoint'] or '<unset>'} LLM_MODEL={_llm['
 
 app = FastAPI(title="COMPASS API")
 
+# Comma-separated origin allowlist, e.g.
+#   ALLOWED_ORIGINS=https://digital-twin.urology.edu.eu.org
+# Falls back to "*" only when unset (dev). Set it in every real deployment.
+_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_origins,
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
