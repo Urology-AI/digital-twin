@@ -28,15 +28,39 @@ loads it automatically. `.env` is gitignored; never commit it.
 
 ## Releases & auto-update
 
-`.github/workflows/release-mac.yml` builds, signs, notarizes and publishes to
-a GitHub Release when you push a `vX.Y.Z` tag. Installed apps check that
-release feed on launch (when online) and self-update via `electron-updater`.
+This repo is **public**, so releases go to a separate **private** repo,
+`Urology-AI/digital-twin-releases`, and are never publicly downloadable.
+`.github/workflows/release-mac.yml` builds, signs, notarizes and publishes
+there on a `vX.Y.Z` tag. Installed apps read that private feed with a
+read-only token baked into the bundle and self-update via `electron-updater`.
 
-Add these repo secrets: `MAC_CERT_P12` (base64 of the .p12),
-`MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`.
+### One-time setup
 
-To cut a release:
+Two fine-grained GitHub PATs (github.com → Settings → Developer settings →
+Fine-grained tokens), each scoped to **only** `Urology-AI/digital-twin-releases`:
+
+| PAT | Repository access | Used by |
+| --- | --- | --- |
+| `RELEASES_WRITE_PAT` | Contents: **Read and write** | CI, to publish the release |
+| `RELEASES_READ_PAT`  | Contents: **Read-only**     | baked into the app, to fetch updates |
+
+Repo secrets to add (Settings → Secrets and variables → Actions):
+`MAC_CERT_P12` (base64 of the .p12), `MAC_CERT_PASSWORD`, `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`, `RELEASES_WRITE_PAT`,
+`RELEASES_READ_PAT`.
+
+Run the workflow once with **preflight** checked to verify every secret.
+
+### Cut a release
 
 ```bash
 npm version patch && git push --follow-tags
+```
+
+### Local publish (instead of CI)
+
+```bash
+cp electron/update-auth.example.json electron/update-auth.json   # add the read PAT
+export GH_TOKEN=<the RELEASES_WRITE_PAT>
+npm run dist:mac -- --publish always
 ```

@@ -45,8 +45,14 @@ if (!app.requestSingleInstanceLock()) {
     createWindow();
 
     // Fully usable offline; this only does anything when the machine happens
-    // to be online. Pulls a newer signed build from the GitHub Releases feed
+    // to be online. Pulls a newer signed build from the PRIVATE releases repo
     // in the background and installs it on quit. Silent on failure.
+    // The read-only token is written into the bundle at build time (CI, from
+    // the RELEASES_READ_PAT secret) — see electron/update-auth.example.json.
+    try {
+      const auth = require("./update-auth.json");
+      if (auth && auth.token) autoUpdater.addAuthHeader(`token ${auth.token}`);
+    } catch { /* no token bundled — updates just won't run */ }
     autoUpdater.autoDownload = true;
     autoUpdater.checkForUpdatesAndNotify().catch(() => {});
   });

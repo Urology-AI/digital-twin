@@ -29,10 +29,12 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          RELEASES_WRITE_PAT: ${{ secrets.RELEASES_WRITE_PAT }}
+          RELEASES_READ_PAT: ${{ secrets.RELEASES_READ_PAT }}
         run: |
           set -e
           fail=0
-          for v in MAC_CERT_P12 MAC_CERT_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+          for v in MAC_CERT_P12 MAC_CERT_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID RELEASES_WRITE_PAT RELEASES_READ_PAT; do
             if [ -z "${!v}" ]; then echo "::error::$v is empty"; fail=1; else echo "$v: set"; fi
           done
           [ "$fail" = 0 ] || exit 1
@@ -51,6 +53,15 @@ jobs:
           echo "→ notarization credentials OK"
           rm cert.p12
 
+          # Confirms both release-repo tokens can reach the private repo.
+          for pat in RELEASES_WRITE_PAT RELEASES_READ_PAT; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' \
+              -H "Authorization: Bearer ${!pat}" \
+              https://api.github.com/repos/Urology-AI/digital-twin-releases)
+            [ "$code" = 200 ] && echo "→ $pat reaches digital-twin-releases OK" \
+              || { echo "::error::$pat cannot read digital-twin-releases (HTTP $code)"; exit 1; }
+          done
+
       - name: Stop here if preflight-only
         if: ${{ inputs.preflight }}
         run: echo "Preflight passed. Re-run without preflight (or push a tag) to build." && exit 0
@@ -67,11 +78,18 @@ jobs:
       - run: npm run typecheck && npm test
         if: ${{ !inputs.preflight }}
 
+      - name: Write the baked-in update token
+        if: ${{ !inputs.preflight }}
+        run: |
+          printf '{"token":"%s"}' "${{ secrets.RELEASES_READ_PAT }}" > electron/update-auth.json
+
       - name: Build, sign, notarize & publish
         if: ${{ !inputs.preflight }}
         run: npm run dist:mac -- --publish always
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Write access to the private releases repo (NOT the built-in
+          # GITHUB_TOKEN — that can't touch another repo).
+          GH_TOKEN: ${{ secrets.RELEASES_WRITE_PAT }}
           CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
