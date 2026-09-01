@@ -1,6 +1,7 @@
 import { useMemo } from "react";
-import { Activity, Droplets, RotateCcw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Activity, ChevronRight, Droplets, RotateCcw, ShieldCheck, TriangleAlert } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { HealerBands } from "@/components/outcomes/HealerBands";
 import { usePatientStore } from "@/store/patientStore";
 import {
   deriveClinicalFromLesions,
@@ -63,8 +64,6 @@ const HEALER_LABEL: Record<string, string> = {
   delayed: "Delayed healer",
   "non-recovery": "Unaided recovery unlikely",
 };
-/** worse → better order, for colouring the shift */
-const HEALER_ORDER = ["super", "healer", "delayed", "non-recovery"];
 
 const NS_META: Record<number, { name: string; tone: string }> = {
   1: { name: "Intrafascial", tone: "emerald" },
@@ -102,39 +101,34 @@ function ImpactTile({
   sub,
   baseline,
   withPlan,
-  accent,
   invert = false,
 }: {
   label: string;
   sub: string;
   baseline: number;
   withPlan: number;
-  accent: string;
   invert?: boolean;
 }) {
   return (
-    <Card className="relative overflow-hidden">
-      <div className={cn("absolute inset-x-0 top-0 h-[3px]", accent)} />
-      <CardContent className="p-3.5">
-        <div className="flex items-start justify-between">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {label}
-          </div>
-          <DeltaBadge from={baseline} to={withPlan} invert={invert} />
+    <div className="rounded-lg border border-border p-3.5">
+      <div className="flex items-start justify-between">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {label}
         </div>
-        <div className="mt-1 flex items-baseline gap-1.5">
-          <span className="text-3xl font-bold tabular-nums">{pct(withPlan)}</span>
-          <span className="text-xs text-muted-foreground tabular-nums">from {pct(baseline)}</span>
-        </div>
-        <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
-          <div
-            className={cn("h-full rounded-full", invert ? "bg-red-400" : "bg-primary")}
-            style={{ width: `${Math.min(100, withPlan * 100)}%` }}
-          />
-        </div>
-        <div className="mt-1.5 text-[10px] text-muted-foreground">{sub}</div>
-      </CardContent>
-    </Card>
+        <DeltaBadge from={baseline} to={withPlan} invert={invert} />
+      </div>
+      <div className="mt-1 flex items-baseline gap-1.5">
+        <span className="text-2xl font-semibold tabular-nums text-foreground">{pct(withPlan)}</span>
+        <span className="text-xs text-muted-foreground tabular-nums">from {pct(baseline)}</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
+        <div
+          className={cn("h-full rounded-full", invert ? "bg-red-400/80" : "bg-foreground/25")}
+          style={{ width: `${Math.min(100, withPlan * 100)}%` }}
+        />
+      </div>
+      <div className="mt-1.5 text-[10px] text-muted-foreground">{sub}</div>
+    </div>
   );
 }
 
@@ -341,9 +335,9 @@ function SideCard({
                   key={z}
                   className={cn(
                     "rounded-md px-2 py-1 text-[11px] font-medium",
-                    g === 1 && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-                    g === 2 && "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-                    g === 3 && "bg-red-500/10 text-red-600 dark:text-red-400",
+                    g === 1 && "bg-muted text-muted-foreground",
+                    g === 2 && "bg-amber-500/12 text-amber-600 dark:text-amber-400",
+                    g === 3 && "bg-red-500/12 text-red-600 dark:text-red-400",
                   )}
                 >
                   {z.replace("_", " ")} <span className="font-bold">{g}</span>
@@ -412,6 +406,7 @@ export function SurgicalPlanPanel() {
   const activeId = usePatientStore((s) => s.activeId);
   const updateClinicalForm = usePatientStore((s) => s.updateClinicalForm);
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
+  const setDesktopTab = useUiStore((s) => s.setDesktopTab);
 
   const entry = patients.find((p) => p.id === activeId) ?? null;
   const S = useMemo(
@@ -513,90 +508,96 @@ export function SurgicalPlanPanel() {
       </div>
 
       {/* ── Impact ─────────────────────────────────────────────── */}
-      <section>
-        <SectionTitle icon={<Activity className="h-4 w-4" />}>
-          Impact vs. nerve-sparing grade alone
-        </SectionTitle>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <ImpactTile
-            label="Continence"
-            sub="at 12 months · 0–1 pad"
-            baseline={baseline.continence12 / 100}
-            withPlan={withPlan.continence12 / 100}
-            accent="bg-gradient-to-r from-violet-500 to-primary"
-          />
-          {baseline.potency12 != null && withPlan.potency12 != null ? (
-            <ImpactTile
-              label="Potency"
-              sub="at 12 months · SHIM ≥ 12"
-              baseline={baseline.potency12 / 100}
-              withPlan={withPlan.potency12 / 100}
-              accent="bg-gradient-to-r from-blue-500 to-primary"
+      <Card>
+        <CardContent className="space-y-4 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <SectionTitle icon={<Activity className="h-4 w-4" />}>
+              Impact vs. nerve-sparing grade alone
+            </SectionTitle>
+            <RefLinks
+              tags={[
+                "Functional-outcome nomogram",
+                "Functional-outcome nomogram (recovery trajectory)",
+                "Plan functional deltas",
+                "Plan effect on positive-margin rate",
+                "BCR event-timing fractions",
+                "Obesity → BCR risk",
+              ]}
             />
-          ) : (
-            <Card className="relative overflow-hidden">
-              <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-blue-500 to-primary" />
-              <CardContent className="p-3.5">
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <ImpactTile
+              label="Continence"
+              sub="at 12 months · 0–1 pad"
+              baseline={baseline.continence12 / 100}
+              withPlan={withPlan.continence12 / 100}
+            />
+            {baseline.potency12 != null && withPlan.potency12 != null ? (
+              <ImpactTile
+                label="Potency"
+                sub="at 12 months · SHIM ≥ 12"
+                baseline={baseline.potency12 / 100}
+                withPlan={withPlan.potency12 / 100}
+              />
+            ) : (
+              <div className="rounded-lg border border-border p-3.5">
                 <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Potency
                 </div>
-                <div className="mt-1 text-2xl font-bold text-muted-foreground/50">N/A</div>
+                <div className="mt-1 text-2xl font-semibold text-muted-foreground/50">N/A</div>
                 <div className="mt-1 text-[10px] text-muted-foreground">SHIM &lt; 12 at baseline</div>
-              </CardContent>
-            </Card>
-          )}
-          <ImpactTile
-            label="BCR 1 year"
-            sub="cumulative incidence"
-            baseline={bcr.baseline.y1}
-            withPlan={bcr.withPlan.y1}
-            accent="bg-gradient-to-r from-red-500 to-orange-500"
-            invert
-          />
-          <ImpactTile
-            label="BCR 2–3 years"
-            sub="cumulative incidence"
-            baseline={bcr.baseline.y23}
-            withPlan={bcr.withPlan.y23}
-            accent="bg-gradient-to-r from-red-500 to-orange-500"
-            invert
-          />
-        </div>
-
-        <RefLinks
-          tags={[
-            "Functional-outcome nomogram",
-            "Functional-outcome nomogram (recovery trajectory)",
-            "Plan functional deltas",
-            "Plan effect on positive-margin rate",
-            "BCR event-timing fractions",
-            "Obesity → BCR risk",
-          ]}
-          className="mt-2"
-        />
-
-        {baseline.healerTier && withPlan.healerTier && (
-          <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-border px-3 py-2 text-sm">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Erectile-recovery phenotype
-            </span>
-            <span className="text-muted-foreground">{HEALER_LABEL[baseline.healerTier]}</span>
-            <span className="text-muted-foreground/50">→</span>
-            <span
-              className={cn(
-                "font-semibold",
-                baseline.healerTier === withPlan.healerTier
-                  ? "text-muted-foreground"
-                  : HEALER_ORDER.indexOf(withPlan.healerTier) > HEALER_ORDER.indexOf(baseline.healerTier)
-                    ? "text-red-500"
-                    : "text-emerald-500",
-              )}
-            >
-              {HEALER_LABEL[withPlan.healerTier]}
-            </span>
+              </div>
+            )}
+            <ImpactTile
+              label="BCR 1 year"
+              sub="cumulative incidence"
+              baseline={bcr.baseline.y1}
+              withPlan={bcr.withPlan.y1}
+              invert
+            />
+            <ImpactTile
+              label="BCR 2–3 years"
+              sub="cumulative incidence"
+              baseline={bcr.baseline.y23}
+              withPlan={bcr.withPlan.y23}
+              invert
+            />
           </div>
-        )}
-      </section>
+
+          {withPlan.healerTier && withPlan.healerBands && (
+            <div className="rounded-lg border border-border p-3">
+              <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Erectile-recovery phenotype
+                </span>
+                {baseline.healerTier && (
+                  <>
+                    <span className="text-xs text-muted-foreground">
+                      {HEALER_LABEL[baseline.healerTier]}
+                    </span>
+                    <span className="text-muted-foreground/50">→</span>
+                  </>
+                )}
+                <span className="text-xs font-semibold text-foreground">
+                  {HEALER_LABEL[withPlan.healerTier]}
+                </span>
+              </div>
+              <HealerBands compact tier={withPlan.healerTier} bands={withPlan.healerBands} />
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => setDesktopTab("outcomes")}
+            className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+          >
+            Recovery trajectory &amp; modifiable patient factors
+            <ChevronRight className="h-3.5 w-3.5" />
+            <span className="text-muted-foreground">Factors</span>
+          </button>
+        </CardContent>
+      </Card>
 
       {/* ── Per-side plan ──────────────────────────────────────── */}
       <div className="grid gap-4 lg:grid-cols-2">
