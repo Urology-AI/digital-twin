@@ -74,10 +74,10 @@ export function AppHeader() {
       {/* Divider */}
       <div className="hidden h-5 w-px shrink-0 bg-border/70 sm:block" />
 
-      {/* Case selector */}
+      {/* Case selector — sample cases only in the public preview */}
       <div className="flex min-w-[130px] flex-1 items-center gap-2 sm:min-w-[190px] sm:max-w-[300px]">
-        <CasePicker />
-        {active?.record._shareId && (
+        <CasePicker sampleOnly={demo} />
+        {!demo && active?.record._shareId && (
           <span
             title={`Share ID: ${active.record._shareId}`}
             className="hidden shrink-0 cursor-default rounded bg-sky-500/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-sky-400 sm:inline"
@@ -112,35 +112,39 @@ export function AppHeader() {
 
       {/* Right actions */}
       <div className="ml-auto lg:ml-0 flex shrink-0 items-center gap-0.5">
-        {/* Undo/Redo */}
-        <div className="flex items-center">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-            aria-label="Undo"
-            title="Undo last change"
-            onClick={() => undo()}
-          >
-            <Undo2 className="h-[15px] w-[15px]" />
-            <span className="hidden text-xs font-medium lg:inline">Undo</span>
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-            aria-label="Redo"
-            title="Redo last undone change"
-            onClick={() => redo()}
-          >
-            <Redo2 className="h-[15px] w-[15px]" />
-            <span className="hidden text-xs font-medium lg:inline">Redo</span>
-          </Button>
-        </div>
+        {/* Undo/Redo — editing is disabled in the public preview */}
+        {!demo && (
+          <>
+            <div className="flex items-center">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                aria-label="Undo"
+                title="Undo last change"
+                onClick={() => undo()}
+              >
+                <Undo2 className="h-[15px] w-[15px]" />
+                <span className="hidden text-xs font-medium lg:inline">Undo</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                aria-label="Redo"
+                title="Redo last undone change"
+                onClick={() => redo()}
+              >
+                <Redo2 className="h-[15px] w-[15px]" />
+                <span className="hidden text-xs font-medium lg:inline">Redo</span>
+              </Button>
+            </div>
 
-        <div className="mx-1 h-4 w-px shrink-0 bg-border/60" />
+            <div className="mx-1 h-4 w-px shrink-0 bg-border/60" />
+          </>
+        )}
 
         <Button
           type="button"
@@ -174,34 +178,38 @@ export function AppHeader() {
           </Button>
         )}
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-8 gap-1.5 px-2 text-blue-400 hover:text-blue-300"
-          aria-label="Switch to patient summary"
-          title="Patient summary"
-          onClick={() => setPatientView(true)}
-        >
-          <UserRound className="h-[15px] w-[15px]" />
-          <span className="hidden text-xs font-medium lg:inline">Patient summary</span>
-        </Button>
+        {!demo && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 px-2 text-blue-400 hover:text-blue-300"
+            aria-label="Switch to patient summary"
+            title="Patient summary"
+            onClick={() => setPatientView(true)}
+          >
+            <UserRound className="h-[15px] w-[15px]" />
+            <span className="hidden text-xs font-medium lg:inline">Patient summary</span>
+          </Button>
+        )}
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "h-8 gap-1.5 px-2",
-            presenterView ? "text-violet-300 bg-violet-500/15" : "text-violet-400 hover:text-violet-300",
-          )}
-          aria-label={presenterView ? "Exit overview mode" : "Open overview mode"}
-          title="Overview mode"
-          onClick={() => setPresenterView(!presenterView)}
-        >
-          <Monitor className="h-[15px] w-[15px]" />
-          <span className="hidden text-xs font-medium lg:inline">Overview</span>
-        </Button>
+        {!demo && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-8 gap-1.5 px-2",
+              presenterView ? "text-violet-300 bg-violet-500/15" : "text-violet-400 hover:text-violet-300",
+            )}
+            aria-label={presenterView ? "Exit overview mode" : "Open overview mode"}
+            title="Overview mode"
+            onClick={() => setPresenterView(!presenterView)}
+          >
+            <Monitor className="h-[15px] w-[15px]" />
+            <span className="hidden text-xs font-medium lg:inline">Overview</span>
+          </Button>
+        )}
 
         {!demo && (
           <Button
@@ -218,17 +226,19 @@ export function AppHeader() {
           </Button>
         )}
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="hidden sm:inline-flex h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-          aria-label="Print report"
-          onClick={() => printReport()}
-        >
-          <Printer className="h-[15px] w-[15px]" />
-          <span className="hidden text-xs font-medium lg:inline">Print</span>
-        </Button>
+        {!demo && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="hidden sm:inline-flex h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+            aria-label="Print report"
+            onClick={() => printReport()}
+          >
+            <Printer className="h-[15px] w-[15px]" />
+            <span className="hidden text-xs font-medium lg:inline">Print</span>
+          </Button>
+        )}
 
         <Button
           type="button"
@@ -285,19 +295,21 @@ export function AppHeader() {
         </div>
         )}
 
-        {/* Chat assistant */}
-        <button
-          type="button"
-          className={cn(
-            "flex items-center rounded-md px-1.5 py-1 transition-colors hover:bg-muted/60 hover:text-foreground",
-            chatOpen ? "text-primary" : "text-muted-foreground",
-          )}
-          aria-label="Open chat assistant"
-          onClick={() => setChatOpen(!chatOpen)}
-          title="Ask the assistant"
-        >
-          <MessageCircle className="h-[15px] w-[15px]" />
-        </button>
+        {/* Chat assistant — clinician tool, hidden in the public preview */}
+        {!demo && (
+          <button
+            type="button"
+            className={cn(
+              "flex items-center rounded-md px-1.5 py-1 transition-colors hover:bg-muted/60 hover:text-foreground",
+              chatOpen ? "text-primary" : "text-muted-foreground",
+            )}
+            aria-label="Open chat assistant"
+            onClick={() => setChatOpen(!chatOpen)}
+            title="Ask the assistant"
+          >
+            <MessageCircle className="h-[15px] w-[15px]" />
+          </button>
+        )}
       </div>
 
       {active && (

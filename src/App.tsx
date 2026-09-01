@@ -29,6 +29,7 @@ import {
 } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import patientsCatalog from "@/data/patients.json";
+import { DEMO_CASES } from "@/data/demoCases";
 import {
   hydrateFromLocalStorage,
   hydratePatientsFromCaseLog,
@@ -41,6 +42,14 @@ import { useUiStore } from "@/store/uiStore";
 import { isDemoMode } from "@/lib/demoMode";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { cn } from "@/lib/utils";
+
+/**
+ * Public preview: clinical input panels stay visible (so the layout reads
+ * right) but can't be operated. `inert` removes the whole subtree from
+ * pointer, focus and a11y interaction without changing layout; tab nav and
+ * 3D controls live outside these panels and stay live.
+ */
+const frozen = (on: boolean): { inert?: boolean } => (on ? { inert: true } : {});
 
 function DimOverlay() {
   const patients = usePatientStore((s) => s.patients);
@@ -111,9 +120,13 @@ export default function App() {
       st.recompute();
       usePatientStore.setState({ loading: false });
     }
-    // Demo mode (public "/" — no Access): models and manual entry only.
-    // Never touch saved cases, the patient library, or Turso share links.
-    if (isDemoMode()) return;
+    // Demo mode (public "/" — no Access): a frozen, read-only preview.
+    // Load one fixed demo case so the preview isn't blank; never touch
+    // saved cases, the patient library, or Turso share links.
+    if (isDemoMode()) {
+      if (DEMO_CASES[0]) usePatientStore.getState().loadDemoCase(DEMO_CASES[0]);
+      return;
+    }
     // Load saved library entries (full records) then fall back to case log snapshots.
     hydratePatientLibrary();
     hydratePatientsFromCaseLog();
@@ -138,15 +151,16 @@ export default function App() {
   const showSplitCanvas = onPredictions || presenterView;
   const patientView3DOpen = useUiStore((s) => s.patientView3DOpen);
   const setPatientView3DOpen = useUiStore((s) => s.setPatientView3DOpen);
+  const demo = isDemoMode();
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
       {patientView ? <PatientViewHeader /> : <AppHeader />}
 
       <div className="flex shrink-0 items-center justify-center gap-1.5 border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-600 dark:text-amber-400 sm:text-[11px]">
-        {isDemoMode() && (
+        {demo && (
           <span className="font-semibold">
-            Demo — nothing is saved and no patient data is loaded.
+            Read-only preview with a sample case — the interactive tool is for Mount Sinai clinicians.
           </span>
         )}
         <span>
@@ -216,9 +230,11 @@ export default function App() {
 
         {/* ── Input tab ────────────────────────────────────────────────── */}
         <div
+          {...frozen(demo)}
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
             !patientView && !presenterView && desktopTab === "input" ? "flex flex-col" : "hidden",
+            demo && "[&_:is(input,select,textarea)]:opacity-70",
           )}
         >
           <ZoneInputWizard />
@@ -238,6 +254,9 @@ export default function App() {
         </div>
 
         {/* ── Outcomes tab: full-width split workspace ──────────────────── */}
+        {/* Factors tab stays interactive in the public preview — the
+            Modifiable Factors panel is the whole point of the demo, and it
+            touches no PHI and never persists. */}
         <div
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
@@ -249,9 +268,11 @@ export default function App() {
 
         {/* ── Surgical plan tab: operative plan + inflammation risk + impact ── */}
         <div
+          {...frozen(demo)}
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
             !patientView && !presenterView && desktopTab === "plan" ? "flex" : "hidden",
+            demo && "[&_:is(input,select,textarea)]:opacity-70",
           )}
         >
           <SurgicalPlanWorkspace />
@@ -304,7 +325,7 @@ export default function App() {
         </button>
       </footer>
 
-      <ChatWidget />
+      {!demo && <ChatWidget />}
 
       {infoOpen && (
         <InfoPanel onClose={() => setInfoOpen(false)} />
