@@ -11,6 +11,12 @@ files:
   - dist/**/*
   - package.json
 
+# notarize.cjs: submit the .app to Apple + staple. staple-dmg.cjs: staple the
+# .dmg too. Replaces the built-in `notarize: true`, which submits but doesn't
+# reliably staple (Gatekeeper then rejects the build offline).
+afterSign: electron/notarize.cjs
+afterAllArtifactBuild: electron/staple-dmg.cjs
+
 # The renderer is fully offline; nothing is fetched at runtime.
 asarUnpack:
   - dist/**/*
@@ -27,11 +33,10 @@ mac:
   entitlements: electron/entitlements.mac.plist
   entitlementsInherit: electron/entitlements.mac.plist
   # Signing identity is picked up from the keychain, or from CSC_LINK /
-  # CSC_KEY_PASSWORD env vars in CI.
-  #
-  # Notarization: set APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID
-  # before `npm run dist:mac` and notarize + staple runs automatically.
-  notarize: true
+  # CSC_KEY_PASSWORD env vars in CI. Notarization is handled by the
+  # afterSign / afterAllArtifactBuild hooks above (needs APPLE_ID,
+  # APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID in the environment).
+  notarize: false
 
 dmg:
   title: ${productName} ${version}
