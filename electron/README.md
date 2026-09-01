@@ -26,6 +26,13 @@ certificate (in your login keychain, or exported as a `.p12`).
 Copy `.env.example` to `.env` at the repo root and fill it in — `electron-builder`
 loads it automatically. `.env` is gitignored; never commit it.
 
+Notarization is electron-builder's built-in step (`mac.notarize` in
+`electron-builder.yml`): it submits the `.app` to Apple and staples the
+ticket. The `.dmg` is not separately notarized — Gatekeeper accepts a `.dmg`
+whose `.app` is stapled. CI's "Verify notarization" step mounts the built
+`.dmg` and runs an offline Gatekeeper assessment before publishing; a build
+that fails it is never released.
+
 ## Releases & auto-update
 
 This repo is **public**, so releases go to a separate **private** repo,
