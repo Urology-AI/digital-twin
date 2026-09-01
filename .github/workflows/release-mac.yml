@@ -97,16 +97,62 @@ jobs:
         run: |
           printf '{"token":"%s"}' "${{ secrets.RELEASES_READ_PAT }}" > electron/update-auth.json
 
-      - name: Build, sign, notarize & publish
+      # `hdiutil create` is flaky on GitHub's macOS runners while Spotlight is
+      # indexing the freshly-checked-out tree; disabling it makes the DMG build
+      # reliable.
+      - name: Disable Spotlight (hdiutil reliability)
         if: ${{ !inputs.preflight }}
-        run: npm run dist:mac -- --publish always -c.extraMetadata.version=${{ steps.ver.outputs.v }}
+        run: sudo mdutil -a -i off || true
+
+      - name: Build, sign, notarize, staple
+        if: ${{ !inputs.preflight }}
+        run: |
+          for attempt in 1 2 3; do
+            echo "::group::electron-builder attempt $attempt"
+            npm run dist:mac -- --publish never -c.extraMetadata.version=${{ steps.ver.outputs.v }} && { echo "::endgroup::"; ok=1; break; }
+            echo "::endgroup::"
+            echo "attempt $attempt failed; cleaning up and retrying in 20s"
+            rm -rf release; hdiutil info | grep -o '/Volumes/COMPASS[^"]*' | xargs -I{} hdiutil detach "{}" -force || true
+            sleep 20
+          done
+          [ "$ok" = 1 ] || exit 1
         env:
           VITE_APP_VERSION: ${{ steps.ver.outputs.v }}
-          # Write access to the private releases repo (NOT the built-in
-          # GITHUB_TOKEN — that can't touch another repo).
-          GH_TOKEN: ${{ secrets.RELEASES_WRITE_PAT }}
           CSC_LINK: ${{ secrets.MAC_CERT_P12 }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      # Hard gate — refuse to publish anything that isn't notarized + stapled.
+      - name: Verify notarization
+        if: ${{ !inputs.preflight }}
+        run: |
+          set -e
+          DMG=$(ls "release/COMPASS-Digital-Twin-${{ steps.ver.outputs.v }}-arm64.dmg")
+          xcrun stapler validate "$DMG"
+          MP=$(mktemp -d)
+          hdiutil attach -nobrowse -quiet -mountpoint "$MP" "$DMG"
+          APP=$(find "$MP" -maxdepth 1 -name "*.app" -print -quit)
+          spctl -a -vvv -t exec "$APP"
+          xcrun stapler validate "$APP"
+          hdiutil detach "$MP" -quiet
+          echo "→ $DMG is signed + notarized + stapled"
+
+      - name: Publish to the private releases repo
+        if: ${{ !inputs.preflight }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_WRITE_PAT }}
+        run: |
+          set -e
+          VER="${{ steps.ver.outputs.v }}"
+          gh release delete "v$VER" --repo Urology-AI/digital-twin-releases --yes --cleanup-tag 2>/dev/null || true
+          gh release create "v$VER" \
+            --repo Urology-AI/digital-twin-releases \
+            --title "$VER" --notes "Automated release. Signed, notarized, stapled." \
+            release/COMPASS-Digital-Twin-*.dmg \
+            release/COMPASS-Digital-Twin-*.dmg.blockmap \
+            release/COMPASS-Digital-Twin-*.zip \
+            release/COMPASS-Digital-Twin-*.zip.blockmap \
+            release/latest-mac.yml
+          echo "::notice::Published v$VER"
