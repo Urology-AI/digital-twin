@@ -40,6 +40,7 @@ import {
 } from "@/store/patientStore";
 import { useUiStore } from "@/store/uiStore";
 import { isDemoMode } from "@/lib/demoMode";
+import { isOfflineBuild } from "@/lib/offlineBuild";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { cn } from "@/lib/utils";
 
@@ -144,6 +145,19 @@ export default function App() {
     // there's no hash — fetch it from Turso by the /patient/<id> path (short
     // patient links). The path itself is deliberately left in place either
     // way — see readPatientViewPath in uiStore for why.
+    // Offline app: no cloud share links. On first run, preload editable
+    // copies of the demo cases so the app opens on a populated example
+    // (all four are also in the case picker); after that, respect whatever
+    // cases the user has kept.
+    if (isOfflineBuild()) {
+      try {
+        if (localStorage.getItem("compass-offline-seeded") !== "1") {
+          usePatientStore.getState().seedDemoLibrary();
+          localStorage.setItem("compass-offline-seeded", "1");
+        }
+      } catch { /* private mode */ }
+      return;
+    }
     void loadSharedCaseFromUrl();
     void loadSharedCaseFromPath();
   }, [bootstrapFromJson]);
@@ -334,7 +348,7 @@ export default function App() {
         </button>
       </footer>
 
-      {!demo && <ChatWidget />}
+      {!demo && !isOfflineBuild() && <ChatWidget />}
 
       {infoOpen && (
         <InfoPanel onClose={() => setInfoOpen(false)} />
@@ -344,7 +358,7 @@ export default function App() {
         <CaseLog onClose={() => setCaseLogOpen(false)} />
       )}
 
-      {shareOpen && (
+      {shareOpen && !isOfflineBuild() && (
         <ShareLinkModal onClose={() => setShareOpen(false)} />
       )}
 
@@ -357,7 +371,7 @@ export default function App() {
           both are suppressed there rather than left to dead-end. */}
       {welcomeOpen && !patientView && !presenterView && <WelcomeScreen />}
       {creditsOpen && <CreditsModal onClose={() => setCreditsOpen(false)} />}
-      {!patientView && !presenterView && <TutorialOverlay />}
+      {!patientView && !presenterView && !isOfflineBuild() && <TutorialOverlay />}
       <PrintReportModal />
 
       {explainKey && (
