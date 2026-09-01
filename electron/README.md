@@ -21,15 +21,10 @@ recipients unless it is signed and notarized.
 ## Signing & notarization
 
 Requires an Apple Developer account ($99/yr) and a **Developer ID Application**
-certificate. Set these before `npm run dist:mac`:
+certificate (in your login keychain, or exported as a `.p12`).
 
-```bash
-export CSC_LINK=/path/to/DeveloperID.p12      # or base64 string in CI
-export CSC_KEY_PASSWORD=…
-export APPLE_ID=you@example.com
-export APPLE_APP_SPECIFIC_PASSWORD=…          # appleid.apple.com → App-Specific Passwords
-export APPLE_TEAM_ID=XXXXXXXXXX
-```
+Copy `.env.example` to `.env` at the repo root and fill it in — `electron-builder`
+loads it automatically. `.env` is gitignored; never commit it.
 
 ## Releases & auto-update
 
