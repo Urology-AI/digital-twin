@@ -981,7 +981,7 @@ function UpgradeTab() {
             ].map(([f, b, mag]) => (
               <tr key={f} className="border-b border-border/40">
                 <Td className="text-foreground">{f}</Td>
-                <Td className={`tabular-nums font-mono ${b.startsWith("−") ? "text-amber-400" : ""}`}>{b}</Td>
+                <Td className={`tabular-nums font-mono ${b?.startsWith("−") ? "text-amber-400" : ""}`}>{b}</Td>
                 <Td className="text-muted-foreground">{mag}</Td>
               </tr>
             ))}
@@ -1073,7 +1073,7 @@ function PsmTab() {
             ].map(([f, b]) => (
               <tr key={f} className="border-b border-border/40">
                 <Td className="text-foreground">{f}</Td>
-                <Td className={`tabular-nums font-mono ${b.startsWith("−") ? "text-amber-400" : ""}`}>{b}</Td>
+                <Td className={`tabular-nums font-mono ${b?.startsWith("−") ? "text-amber-400" : ""}`}>{b}</Td>
               </tr>
             ))}
           </tbody>
@@ -1368,7 +1368,7 @@ function ScoreTab() {
                 <Td className="text-foreground">{out}</Td>
                 <Td className="tabular-nums">{compass}</Td>
                 <Td className="tabular-nums">{capra}</Td>
-                <Td className={`tabular-nums font-semibold ${delta.startsWith("+") ? "text-emerald-500" : "text-amber-400"}`}>{delta}</Td>
+                <Td className={`tabular-nums font-semibold ${delta?.startsWith("+") ? "text-emerald-500" : "text-amber-400"}`}>{delta}</Td>
                 <Td className="tabular-nums">{p}</Td>
               </tr>
             ))}

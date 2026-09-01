@@ -32,17 +32,6 @@ function linearPredict(
 }
 
 /**
- * MUS ECE logit delta for patient-level SVI.
- * mus_ece is absent from the trained SVI patient model feature set.
- * Coefficient ESTIMATED from the side-specific SVI model analogy;
- * NOT formally calibrated from training data.
- */
-function musEceSviDelta(S: ClinicalState): number {
-  if (S.mus_ece === 1) return 0.25;
-  return 0;
-}
-
-/**
  * Patient-level SVI — locked 2026-05-03, 22-feature binary-GG model.
  * Features: log_psad, gg2, gg3, gg4_5, mc, pirads, mri_epe, mri_svi,
  *           mus_ece, psma_epe, dec_imp, dec_avail, pos_cores

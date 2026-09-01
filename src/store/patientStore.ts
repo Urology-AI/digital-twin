@@ -574,7 +574,7 @@ export function hydratePatientsFromCaseLog(): void {
     const newOnes: PatientEntry[] = cases
       .filter((c) => !existingIds.has(c.id))
       .map((c) => {
-        const name = (c.notes || "").trim() || `${c.date} — GG${c.gg} PSA ${c.psa}`;
+        const name = (c.notes || "").trim() || `GG${c.gg} · PSA ${c.psa}`;
         const zones = createDefaultZones();
         const record: Prostate3DInputV1 = {
           _schema: "prostate-3d-input-v1",
