@@ -27,7 +27,9 @@ mac:
   target:
     - dmg
     - zip
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  # Explicit (no spaces) so the on-disk name, the uploaded asset name and the
+  # names inside latest-mac.yml all match — CI uploads these files directly.
+  artifactName: COMPASS-Digital-Twin-${version}-${arch}.${ext}
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: electron/entitlements.mac.plist
