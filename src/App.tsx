@@ -49,7 +49,9 @@ import { cn } from "@/lib/utils";
  * pointer, focus and a11y interaction without changing layout; tab nav and
  * 3D controls live outside these panels and stay live.
  */
-const frozen = (on: boolean): { inert?: boolean } => (on ? { inert: true } : {});
+// React 18 doesn't render a boolean `inert`, so emit the bare attribute.
+const frozen = (on: boolean) =>
+  (on ? { inert: "" } : {}) as unknown as React.HTMLAttributes<HTMLDivElement>;
 
 function DimOverlay() {
   const patients = usePatientStore((s) => s.patients);
