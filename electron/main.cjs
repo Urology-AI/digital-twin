@@ -1,67 +1,58 @@
 // Electron shell for the COMPASS Digital Twin — a fully offline macOS app.
 //
 // The web app is a static SPA (all prediction models run in-browser). We serve
-// the built `dist/` over a loopback HTTP server rather than file:// so that
-// `base: "/"` asset URLs and pathname-based routing work unchanged. The window
-// loads `/clinical` deliberately: any other path puts the app in demo mode
-// (no persistence, no saved data — see src/lib/demoMode.ts).
+// the built `dist/` from a custom `app://compass/` scheme rather than file://
+// so that `base: "/"` asset URLs and pathname routing work unchanged AND the
+// origin is stable across launches (a random localhost port would change the
+// origin every time and wipe localStorage). The window loads `/clinical`
+// deliberately: any other path puts the app in demo mode (see
+// src/lib/demoMode.ts).
 
-const { app, BrowserWindow, shell } = require("electron");
+const { app, BrowserWindow, shell, protocol, net } = require("electron");
 const { autoUpdater } = require("electron-updater");
-const http = require("node:http");
-const fs = require("node:fs");
 const path = require("node:path");
+const { pathToFileURL } = require("node:url");
 
 const DIST = path.join(__dirname, "..", "dist");
+const ORIGIN = "app://compass";
 
-const MIME = {
-  ".html": "text/html",
-  ".js": "text/javascript",
-  ".css": "text/css",
-  ".json": "application/json",
-  ".svg": "image/svg+xml",
-  ".png": "image/png",
-  ".jpg": "image/jpeg",
-  ".glb": "model/gltf-binary",
-  ".mp4": "video/mp4",
-  ".woff2": "font/woff2",
-  ".woff": "font/woff",
-  ".wasm": "application/wasm",
-};
+protocol.registerSchemesAsPrivileged([
+  { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
+]);
 
-function startServer() {
-  return new Promise((resolve) => {
-    const server = http.createServer((req, res) => {
-      const urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
-      let filePath = path.join(DIST, urlPath);
+// Only one running copy — otherwise a second launch could fight over the
+// scheme handler / auto-update.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    const [win] = BrowserWindow.getAllWindows();
+    if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+  });
 
-      // Prevent path traversal outside dist/.
-      if (!filePath.startsWith(DIST)) {
-        res.writeHead(403);
-        res.end("Forbidden");
-        return;
+  app.whenReady().then(() => {
+    protocol.handle("app", (req) => {
+      const { pathname } = new URL(req.url);
+      let rel = decodeURIComponent(pathname).replace(/^\/+/, "");
+      let target = path.join(DIST, rel);
+      // Block traversal and fall back to the SPA entry for client-side routes.
+      if (!target.startsWith(DIST) || !path.extname(target)) {
+        target = path.join(DIST, "index.html");
       }
-
-      if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-        res.writeHead(200, { "Content-Type": MIME[path.extname(filePath)] || "application/octet-stream" });
-        fs.createReadStream(filePath).pipe(res);
-        return;
-      }
-
-      // SPA fallback — serve index.html for client-side routes.
-      res.writeHead(200, { "Content-Type": "text/html" });
-      fs.createReadStream(path.join(DIST, "index.html")).pipe(res);
+      return net.fetch(pathToFileURL(target).toString());
     });
 
-    server.listen(0, "127.0.0.1", () => {
-      resolve(server.address().port);
-    });
+    createWindow();
+
+    // Fully usable offline; this only does anything when the machine happens
+    // to be online. Pulls a newer signed build from the GitHub Releases feed
+    // in the background and installs it on quit. Silent on failure.
+    autoUpdater.autoDownload = true;
+    autoUpdater.checkForUpdatesAndNotify().catch(() => {});
   });
 }
 
-async function createWindow() {
-  const port = await startServer();
-
+function createWindow() {
   const win = new BrowserWindow({
     width: 1440,
     height: 960,
@@ -76,25 +67,14 @@ async function createWindow() {
     },
   });
 
-  win.loadURL(`http://127.0.0.1:${port}/clinical`);
+  win.loadURL(`${ORIGIN}/clinical`);
 
-  // Open external links (if any) in the system browser, never in-app.
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith("http://127.0.0.1:")) return { action: "allow" };
+    if (url.startsWith(ORIGIN)) return { action: "allow" };
     shell.openExternal(url);
     return { action: "deny" };
   });
 }
-
-app.whenReady().then(() => {
-  createWindow();
-  // The app is fully usable offline; this only does anything when the machine
-  // happens to be online. Checks the GitHub Releases feed, downloads a newer
-  // signed build in the background and installs it on next quit. Silent on
-  // failure (offline, no release, etc.).
-  autoUpdater.autoDownload = true;
-  autoUpdater.checkForUpdatesAndNotify().catch(() => {});
-});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();

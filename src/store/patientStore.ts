@@ -83,6 +83,8 @@ interface PatientState {
   newCase: () => void;
   /** Load a read-only demo template, replacing any existing copy of it. */
   loadDemoCase: (demo: import("@/data/demoCases").DemoCase) => void;
+  /** Offline app first-run: add editable copies of every demo case as saved patients. */
+  seedDemoLibrary: () => void;
   /** Restore the active case: demo entries revert to their template, others blank out. */
   resetActiveCase: () => void;
   importJsonFile: (text: string, label?: string) => void;
@@ -419,6 +421,24 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       set({ patients: [...others, entry], activeId: id });
       get().recompute();
       get().pushHistory();
+    },
+
+    seedDemoLibrary: () => {
+      const present = new Set(
+        get().patients.map((p) => p.demoId).filter(Boolean) as string[],
+      );
+      const added = DEMO_CASES.filter((d) => !present.has(d.id)).map((d, i) => ({
+        id: `demo-${d.id}-${Date.now() + i}`,
+        demoId: d.id,
+        name: d.name,
+        record: clone(d.record),
+        lesionRows: ensureLesionIds(clone(d.lesionRows)),
+      }));
+      if (added.length === 0) return;
+      const others = get().patients.filter((p) => !p.demoId && p.name !== "New Case");
+      set({ patients: [...others, ...added], activeId: added[0]!.id });
+      get().recompute();
+      usePatientStore.setState({ loading: false });
     },
 
     resetActiveCase: () => {

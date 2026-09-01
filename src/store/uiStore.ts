@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { OverlayType } from "@/types/prediction";
 import { VIEWS } from "@/lib/three/prostateScene";
 import { isDemoMode } from "@/lib/demoMode";
+import { isOfflineBuild } from "@/lib/offlineBuild";
 
 export type DesktopTab = "input" | "predictions" | "outcomes" | "plan";
 
@@ -147,7 +148,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   referenceOpen: false,
   creditsOpen: false,
   chatOpen: false,
-  welcomeOpen: !readWelcomeSeen(),
+  // The offline app skips the welcome/tour and opens straight into the workspace.
+  welcomeOpen: !isOfflineBuild() && !readWelcomeSeen(),
   explainKey: null,
   tutorialStep: null,
   wizardTab: null,
