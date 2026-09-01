@@ -142,7 +142,10 @@ jobs:
           APP2="$WORK/$(basename "$APP")"
           xcrun stapler validate "$APP2"
           spctl -a -vvv -t exec "$APP2"
-          echo "→ $DMG: .app is signed, notarized and stapled"
+          # Offline proof: this requirement can only be satisfied by an
+          # embedded (stapled) ticket, no network fallback.
+          codesign --test-requirement="=notarized" --verify --verbose=2 "$APP2"
+          echo "→ $DMG: .app is signed, notarized and stapled (offline-verified)"
 
       - name: Publish to the private releases repo
         if: ${{ !inputs.preflight }}
