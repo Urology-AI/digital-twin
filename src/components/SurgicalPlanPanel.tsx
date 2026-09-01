@@ -102,12 +102,15 @@ function ImpactTile({
   baseline,
   withPlan,
   invert = false,
+  accent,
 }: {
   label: string;
   sub: string;
   baseline: number;
   withPlan: number;
   invert?: boolean;
+  /** Tailwind bg-* class for the progress fill (positive outcomes). Ignored when `invert`. */
+  accent?: string;
 }) {
   return (
     <div className="rounded-lg border border-border p-3.5">
@@ -123,7 +126,7 @@ function ImpactTile({
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
         <div
-          className={cn("h-full rounded-full", invert ? "bg-red-400/80" : "bg-foreground/25")}
+          className={cn("h-full rounded-full", invert ? "bg-red-400/80" : accent ?? "bg-foreground/25")}
           style={{ width: `${Math.min(100, withPlan * 100)}%` }}
         />
       </div>
@@ -532,6 +535,7 @@ export function SurgicalPlanPanel() {
               sub="at 12 months · 0–1 pad"
               baseline={baseline.continence12 / 100}
               withPlan={withPlan.continence12 / 100}
+              accent="bg-violet-500/80"
             />
             {baseline.potency12 != null && withPlan.potency12 != null ? (
               <ImpactTile
@@ -539,6 +543,7 @@ export function SurgicalPlanPanel() {
                 sub="at 12 months · SHIM ≥ 12"
                 baseline={baseline.potency12 / 100}
                 withPlan={withPlan.potency12 / 100}
+                accent="bg-blue-500/80"
               />
             ) : (
               <div className="rounded-lg border border-border p-3.5">
