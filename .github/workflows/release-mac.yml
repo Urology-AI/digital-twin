@@ -220,14 +220,18 @@ jobs:
           assert_notarized "$ZAPP"
           echo "::endgroup::"
 
-          # Informational only — see the note above on stapler, and the .dmg
-          # is unsigned so spctl has no primary signature to report on.
-          echo "::group::.dmg — informational"
+          # The disk image is signed (dmg.sign in electron-builder.yml) and
+          # notarized, so Gatekeeper can assess it on mount. Shipping an
+          # unsigned image is what left v1.0.17 showing "no usable signature"
+          # here and the malware dialog on a user's Mac — gate on it.
+          echo "::group::.dmg — the disk image itself"
+          codesign --verify --verbose=2 "$DMG"
+          spctl -a -vvv -t open --context context:primary-signature "$DMG"
+          # Informational: see the note above on stapler.
           xcrun stapler validate "$DMG" || true
-          spctl -a -vvv -t open --context context:primary-signature "$DMG" || true
           echo "::endgroup::"
 
-          echo "→ v$VER: the .app in both the .dmg and the .zip is signed and notarized (offline-verified on a cold runner)"
+          echo "→ v$VER: the .dmg and the .app inside it and in the .zip are signed and notarized (offline-verified on a cold runner)"
 
   publish:
     needs: [build, verify]

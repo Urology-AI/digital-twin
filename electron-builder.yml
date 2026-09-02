@@ -45,6 +45,13 @@ mac:
 
 dmg:
   title: ${productName} ${version}
+  # Sign the disk image itself. Notarizing an unsigned .dmg is accepted by
+  # Apple, but Gatekeeper has nothing to assess when the image is mounted
+  # ("source=no usable signature"), which is what trips the "Apple could not
+  # verify ... is free of malware" dialog on a downloaded (quarantined) image.
+  # Signing happens during the dmg build, before notarize-artifacts.cjs
+  # submits and staples it.
+  sign: true
 
 # Auto-update feed + release hosting. Releases go to a SEPARATE PRIVATE
 # repo so the .dmg is never publicly downloadable (this repo is public).
