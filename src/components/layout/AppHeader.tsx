@@ -53,7 +53,7 @@ function ManagedBadge({ chip }: { chip: string }) {
           : "bg-muted text-muted-foreground",
       )}
     >
-      {sinai ? "Sinai device" : enrollment.managed ? "Managed" : "Unmanaged"}
+      {enrollment.managed ? "Managed" : "Unmanaged"}
     </span>
   );
 }
