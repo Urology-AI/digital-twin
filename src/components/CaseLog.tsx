@@ -7,6 +7,7 @@ import { pushCases, pullCases, checkTursoHealth, hasCloudId } from "@/lib/turso"
 import { isOfflineBuild } from "@/lib/offlineBuild";
 
 const CASE_LOG_KEY = "compass_cases";
+const CASE_BUNDLE_SCHEMA = "compass-case-bundle-v1";
 // Tracks which patient entries (by PatientEntry.id) have been saved to the
 // case log, so imported/unsaved patients can be flagged separately.
 const SAVED_PATIENT_IDS_KEY = "compass_saved_patient_ids";
@@ -224,15 +225,21 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
           // Import as CaseLog entries
           const imported = parseCsv(text);
           if (!imported.length) { alert("No valid rows found in CSV."); return; }
-          const existing = getCases();
-          const existingIds = new Set(existing.map((c) => c.id));
-          const newOnes = imported.filter((c) => !existingIds.has(c.id));
-          const merged = [...newOnes, ...existing];
-          saveCases(merged);
-          setCases(merged);
+          mergeImportedCases(imported);
         } else {
-          // Import as full patient record (JSON)
-          importJsonFile(text, file.name.replace(/\.json$/i, ""));
+          const data = JSON.parse(text) as { _schema?: string; cases?: CaseRecord[]; library?: PatientEntry[] };
+          if (data._schema === CASE_BUNDLE_SCHEMA) {
+            // Full bundle: case-log rows + complete patient records (lesions/zones/geometry)
+            mergeImportedCases(data.cases ?? []);
+            if (data.library?.length) {
+              mergePatientLibrary(data.library);
+              syncPatientLibraryToStore();
+            }
+            hydratePatientsFromCaseLog();
+          } else {
+            // Single full patient record (prostate-3d-input-v1)
+            importJsonFile(text, file.name.replace(/\.json$/i, ""));
+          }
         }
       } catch {
         alert("Could not import file. Check that it is a valid COMPASS JSON or exported CSV.");
@@ -368,6 +375,31 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
     setCases([]);
   };
 
+  const mergeImportedCases = (imported: CaseRecord[]) => {
+    const existing = getCases();
+    const existingIds = new Set(existing.map((c) => c.id));
+    const newOnes = imported.filter((c) => !existingIds.has(c.id));
+    const merged = [...newOnes, ...existing];
+    saveCases(merged);
+    setCases(merged);
+  };
+
+  const exportJSON = () => {
+    const bundle = {
+      _schema: CASE_BUNDLE_SCHEMA,
+      exportedAt: new Date().toISOString(),
+      cases: getCases(),
+      library: getPatientLibrary(),
+    };
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `compass-cases-${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportCSV = () => {
     const rows = getCases();
     if (rows.length === 0) return;
@@ -453,10 +485,13 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
           </Button>
           <input ref={importRef} type="file" accept=".json,.csv" className="sr-only" onChange={handleImport} aria-hidden />
           <Button size="sm" variant="outline" onClick={() => importRef.current?.click()}>
-            Import Case
+            Import CSV / JSON
           </Button>
           <Button size="sm" variant="outline" onClick={exportCSV}>
             Export CSV
+          </Button>
+          <Button size="sm" variant="outline" onClick={exportJSON}>
+            Export JSON
           </Button>
           {tursoAvailable && (
             <>
