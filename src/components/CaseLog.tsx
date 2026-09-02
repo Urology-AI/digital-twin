@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, CloudUpload, CloudDownload, Cloud, CloudOff } from "lucide-react";
+import { X, CloudUpload, CloudDownload, Cloud, CloudOff, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydratePatientsFromCaseLog, hydratePatientLibrary, getPatientLibrary, mergePatientLibrary, syncPatientLibraryToStore, type PatientEntry } from "@/store/patientStore";
 import { cn } from "@/lib/utils";
@@ -477,11 +477,24 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
 
       <div className="mx-auto max-w-4xl">
         <h2 className="mb-1 text-lg font-semibold text-primary">Prospective Case Log</h2>
-        <p className="mb-4 text-xs text-muted-foreground">
+        <p className="mb-2 text-xs text-muted-foreground">
           Save COMPASS predictions per case. Enter pathology results when available. Data stored locally
           {isOfflineBuild()
             ? " on this Mac."
             : "; cloud sync de-identifies records (ID hashed, notes never uploaded)."}
+        </p>
+        {/*
+          The notes field becomes the case's display name, so it is the one place
+          a name or MRN could realistically be typed. The app has no PHI fields by
+          design (see Prostate3DInputV1 — no name, MRN, DOB or dates); say so
+          rather than relying on people knowing it.
+        */}
+        <p className="mb-4 flex items-start gap-1.5 rounded border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-600 dark:text-amber-400">
+          <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+          <span>
+            <strong className="font-semibold">Do not enter PHI.</strong> Identify cases by study ID
+            only — no names, MRNs, dates of birth or other identifiers, in notes or anywhere else.
+          </span>
         </p>
 
         <div className="mb-4 flex flex-wrap gap-2">
@@ -767,7 +780,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
                 <input
                   defaultValue={c.notes}
                   onBlur={(e) => updateNotes(i, e.target.value)}
-                  placeholder="Notes..."
+                  placeholder="Notes (study ID — no PHI)..."
                   className="w-full rounded border border-border/60 bg-background px-2 py-1 text-[10px] text-foreground"
                 />
               </div>

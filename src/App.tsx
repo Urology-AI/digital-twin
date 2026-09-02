@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ControlsOverlay } from "@/components/ControlsOverlay";
 import { AppHeader } from "@/components/layout/AppHeader";
 import { BuildStatus } from "@/components/layout/BuildStatus";
+import { StatusChips } from "@/components/layout/StatusChips";
 import { OverviewPanel } from "@/components/OverviewPanel";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import { OutcomesWorkspace } from "@/components/OutcomesWorkspace";
@@ -321,8 +322,11 @@ export default function App() {
 
       {/* Desktop-only footer */}
       <footer className="hidden lg:flex h-7 shrink-0 items-center gap-3 border-t border-border/50 bg-card/60 px-4">
-        {/* Build + update control, left — the header chip carries auth state. */}
+        {/* Build + update control and every status chip — session state on the
+            web, build/device state in the offline app. None of it changes while
+            you work, so it lives here rather than in the header bar. */}
         <BuildStatus />
+        <StatusChips />
         <span className="ml-auto text-[10px] text-muted-foreground/50">
           COMPASS · Tewari Lab · Mount Sinai · Research Use Only
         </span>
@@ -331,7 +335,7 @@ export default function App() {
           onClick={() => setReferenceOpen(true)}
           className="rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 hover:bg-muted/70 hover:text-foreground transition-colors"
         >
-          Reference
+          Anatomy view
         </button>
         <button
           type="button"

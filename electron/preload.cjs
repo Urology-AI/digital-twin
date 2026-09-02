@@ -5,6 +5,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("desktop", {
   version: () => ipcRenderer.invoke("app:version"),
+  // Advisory: is this machine enrolled in Sinai device management (see managed.cjs).
+  deviceEnrollment: () => ipcRenderer.invoke("device:enrollment"),
   checkForUpdates: () => ipcRenderer.invoke("updates:check"),
   installUpdate: () => ipcRenderer.invoke("updates:install"),
   onUpdateEvent: (cb) => {

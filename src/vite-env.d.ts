@@ -13,6 +13,13 @@ interface Window {
   desktop?: {
     version: () => Promise<string>;
     checkForUpdates: () => Promise<void>;
+    /** Advisory device-management check. Absent in builds packaged before it. */
+    deviceEnrollment?: () => Promise<{
+      managed: boolean;
+      org: string | null;
+      detail: string;
+      platform: string;
+    }>;
     /** Absent in builds packaged before the in-app restart button. */
     installUpdate?: () => Promise<void>;
     onUpdateEvent: (cb: (e: { type: string; version?: string; message?: string }) => void) => () => void;

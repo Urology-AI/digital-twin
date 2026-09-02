@@ -43,6 +43,29 @@ mac:
   # not the built-in step.
   notarize: false
 
+win:
+  icon: electron/icon.png
+  target:
+    - nsis
+  # Same explicit naming as mac: the on-disk name, the uploaded asset and the
+  # names inside latest.yml all have to match (CI uploads these directly).
+  artifactName: COMPASS-Digital-Twin-${version}-x64.${ext}
+  # Code signing: set WIN_CSC_LINK (base64 .pfx) + WIN_CSC_KEY_PASSWORD in CI,
+  # or CSC_LINK/CSC_KEY_PASSWORD locally. Without a certificate the installer
+  # still builds, but SmartScreen warns every downloader.
+  signtoolOptions:
+    signingHashAlgorithms:
+      - sha256
+    rfc3161TimeStampServer: http://timestamp.digicert.com
+
+nsis:
+  # Per-user install: no admin rights, which is what a managed Sinai desktop
+  # will actually allow.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: false
+  createDesktopShortcut: true
+
 dmg:
   title: ${productName} ${version}
   # Sign the disk image itself. Notarizing an unsigned .dmg is accepted by

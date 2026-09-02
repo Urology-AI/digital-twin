@@ -18,6 +18,32 @@ npm run dist:mac        # produce release/*.dmg + *.zip + latest-mac.yml
 An unsigned `.dmg` is fine for your own testing. macOS Gatekeeper will warn
 recipients unless it is signed and notarized.
 
+## Windows
+
+```bash
+npm run dist:win        # produce release/*.exe + latest.yml
+```
+
+NSIS, per-user install (no admin rights), x64. Signing needs an OV or EV
+code-signing certificate: set `WIN_CSC_LINK` (base64 of the `.pfx`) and
+`WIN_CSC_KEY_PASSWORD` as repo secrets — the `build-win` job in
+`release-mac.yml` picks them up. Without them the installer still builds and
+runs, but SmartScreen warns every downloader. There is no Windows equivalent
+of Apple notarization, so there is no offline verify job.
+
+## Device-management check
+
+`electron/managed.cjs` asks the OS whether the machine is enrolled in device
+management (`profiles status -type enrollment` on macOS, `dsregcmd /status` on
+Windows) and the header shows "Sinai device" / "Managed" / "Unmanaged".
+
+It is **advisory only** — the machine reports on itself, so a determined user
+can defeat it. It tells an honest user they are on a personal laptop; it does
+not gate anything. Enforcement would need a server-side posture check
+(Cloudflare Access + WARP) or an MDM-issued client certificate, neither of
+which an offline app can do. Fill in the real tenant/organisation strings at
+`SINAI_MARKERS` in `managed.cjs`.
+
 ## Signing & notarization
 
 Requires an Apple Developer account ($99/yr) and a **Developer ID Application**

@@ -2,12 +2,10 @@ import React from "react";
 import {
   Activity,
   ClipboardList,
+  FilePlus2,
   FlaskConical,
   Info,
   Layers,
-  ListChecks,
-  Lock,
-  LockOpen,
   MessageCircle,
   Moon,
   Redo2,
@@ -32,63 +30,6 @@ const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[]
   { id: "plan",         label: "Planning",    Icon: FlaskConical },
 ];
 
-/**
- * One word next to the wordmark for which build you are in: Clinical with a
- * signed-in Access session, Local in the offline desktop app, Demo on the
- * public preview, and Restricted on the web with no session. The build
- * version and the update control live in the footer (see BuildStatus).
- */
-function StatusBadge({ signedIn, demo }: { signedIn: boolean; demo: boolean }) {
-  const chip =
-    "hidden shrink-0 cursor-default items-center gap-1 rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-wider sm:inline-flex";
-
-  if (isOfflineBuild()) {
-    return (
-      <span
-        title="Offline build — everything runs on this Mac. No login, no cloud, no data leaves the device."
-        className={cn(chip, "bg-amber-500/15 text-amber-600 dark:text-amber-400")}
-      >
-        Local
-      </span>
-    );
-  }
-
-  if (signedIn) {
-    return (
-      <span
-        title="Signed in through Cloudflare Access"
-        className={cn(chip, "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400")}
-      >
-        <Lock className="h-3 w-3" />
-        Clinical
-      </span>
-    );
-  }
-
-  if (demo) {
-    return (
-      <span
-        title="Public preview — sample cases only, nothing is saved"
-        className={cn(chip, "bg-muted text-muted-foreground")}
-      >
-        Demo
-      </span>
-    );
-  }
-
-  // No Access session: the open lock is about who you are, not how the page was
-  // served — the connection itself is still TLS.
-  return (
-    <span
-      title="Restricted — no Cloudflare Access session, so no patient data loads"
-      className={cn(chip, "bg-red-500/15 text-red-600 dark:text-red-400")}
-    >
-      <LockOpen className="h-3 w-3" />
-      Restricted
-    </span>
-  );
-}
-
 export function AppHeader() {
   const accessIdentity = useAccessIdentity();
   const chatOpen = useUiStore((s) => s.chatOpen);
@@ -99,12 +40,11 @@ export function AppHeader() {
   const setDark = useUiStore((s) => s.setDark);
   const desktopTab = useUiStore((s) => s.desktopTab);
   const setDesktopTab = useUiStore((s) => s.setDesktopTab);
-  const overview = useUiStore((s) => s.overview);
-  const setOverview = useUiStore((s) => s.setOverview);
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
   const setWelcomeOpen = useUiStore((s) => s.setWelcomeOpen);
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
+  const newCase = usePatientStore((s) => s.newCase);
   const undo = usePatientStore((s) => s.undo);
   const redo = usePatientStore((s) => s.redo);
 
@@ -126,14 +66,29 @@ export function AppHeader() {
         </span>
       </button>
 
-      <StatusBadge signedIn={!!accessIdentity} demo={demo} />
-
       {/* Divider */}
       <div className="hidden h-5 w-px shrink-0 bg-border/70 sm:block" />
 
       {/* Case selector — sample cases only in the public preview */}
-      <div className="flex min-w-[130px] flex-1 items-center gap-2 sm:min-w-[190px] sm:max-w-[300px]">
+      <div className="flex min-w-[150px] flex-1 items-center gap-2 sm:min-w-[240px] sm:max-w-[480px]">
         <CasePicker sampleOnly={demo} />
+        {/* Starting a case was buried in the picker's dropdown — it is the most
+            common action in the bar, so it gets its own control. */}
+        {!demo && (
+          <button
+            type="button"
+            onClick={() => newCase()}
+            title="Start a new blank case"
+            className={cn(
+              "flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-input/80 bg-muted/50 px-3",
+              "text-sm font-medium text-foreground transition-colors hover:bg-muted/80",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/60",
+            )}
+          >
+            <FilePlus2 className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">New</span>
+          </button>
+        )}
         {!demo && !offline && active?.record._shareId && (
           <span
             title={`Share ID: ${active.record._shareId}`}
@@ -169,24 +124,7 @@ export function AppHeader() {
 
       {/* Right actions */}
       <div className="ml-auto lg:ml-0 flex shrink-0 items-center gap-0.5">
-        {/* Overview: every tab collapses to its key points until switched off */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-pressed={overview}
-          className={cn(
-            "h-8 gap-1.5 px-2",
-            overview ? "bg-primary/10 text-primary hover:bg-primary/15" : "text-muted-foreground hover:text-foreground",
-          )}
-          title={overview ? "Show the full detail on every tab" : "Collapse every tab to its key points"}
-          onClick={() => setOverview(!overview)}
-        >
-          <ListChecks className="h-[15px] w-[15px]" />
-          <span className="hidden text-xs font-medium lg:inline">Overview</span>
-        </Button>
-
-        <div className="mx-1 h-4 w-px shrink-0 bg-border/60" />
+        {/* Overview lives in the tools menu — it was duplicated here. */}
 
         {/* Undo/Redo — editing is disabled in the public preview */}
         {!demo && (
