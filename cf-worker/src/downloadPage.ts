@@ -147,11 +147,6 @@ export function downloadPageHtml(
     <li><strong>Mac</strong> — open the <code>.dmg</code> and drag COMPASS Digital Twin into Applications.</li>
     <li><strong>Windows</strong> — run the <code>.exe</code>; it installs for the current user, no admin rights needed.</li>
   </ul>
-  <p>
-    There is no sign-in: the app works with no network. On first launch it checks whether the
-    machine is Mount Sinai&ndash;managed and says so in the header.
-  </p>
-
   <p class="warn">
     <strong>Before you install.</strong> For named Mount Sinai study staff only — do not
     forward the app or this link outside the team. Do not enter PHI: COMPASS holds no patient
