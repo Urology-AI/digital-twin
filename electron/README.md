@@ -74,7 +74,14 @@ npm version patch && git push --follow-tags
 ### Local publish (instead of CI)
 
 ```bash
-cp electron/update-auth.example.json electron/update-auth.json   # add the read PAT
 export GH_TOKEN=<the RELEASES_WRITE_PAT>
 npm run dist:mac -- --publish always
+```
+
+The built app needs no token of its own: it reads updates through the
+Cloudflare Worker (`/api/updates/*`), which holds the read-only
+`RELEASES_READ_PAT` as a Worker secret. Set it once with:
+
+```bash
+cd cf-worker && npx wrangler secret put RELEASES_READ_PAT
 ```
