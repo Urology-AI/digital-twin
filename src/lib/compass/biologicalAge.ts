@@ -3,17 +3,31 @@
  *
  * This is a counselling display, not a model input: `runCompass` and the
  * functional-outcomes nomogram keep using chronological age. Year-equivalents
- * and the clamp come from `BIOLOGICAL_AGE` in planningEvidence.ts and are
- * provisional (see that citation).
+ * and the clamp come from the `BIOLOGICAL_AGE_*` entries in planningEvidence.ts,
+ * each carrying its own source.
  */
-import { BIOLOGICAL_AGE } from "@/lib/compass/planningEvidence";
+import {
+  BIOLOGICAL_AGE_ALCOHOL,
+  BIOLOGICAL_AGE_BMI,
+  BIOLOGICAL_AGE_COMORBID,
+  BIOLOGICAL_AGE_EXERCISE,
+  BIOLOGICAL_AGE_FRAMING,
+  BIOLOGICAL_AGE_SMOKING,
+} from "@/lib/compass/planningEvidence";
 import type {
   AlcoholLevel,
   ExerciseLevel,
   SmokingStatus,
 } from "@/lib/compass/functionalOutcomes";
 
-const W = BIOLOGICAL_AGE.value;
+const W = {
+  bmi: BIOLOGICAL_AGE_BMI.value,
+  smoking: BIOLOGICAL_AGE_SMOKING.value,
+  exercise: BIOLOGICAL_AGE_EXERCISE.value,
+  alcohol: BIOLOGICAL_AGE_ALCOHOL.value,
+  ...BIOLOGICAL_AGE_COMORBID.value,
+  clamp: BIOLOGICAL_AGE_FRAMING.value.clamp,
+};
 
 export interface BiologicalAgeInputs {
   age: number;

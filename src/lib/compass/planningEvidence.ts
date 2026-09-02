@@ -374,29 +374,82 @@ export const MODIFIABLE_BCR = ev(
     "shown as a caveated estimate only.",
 );
 
-export const BIOLOGICAL_AGE = ev(
-  {
-    bmi: { underweight: 1, normal: 0, overweight: 1.5, obese: 4 },
-    smoking: { never: 0, former: 2, current: 6 },
-    exercise: { sedentary: 3, light: 1, moderate: 0, active: -3 },
-    alcohol: { none: -0.5, moderate: 0, heavy: 3 },
-    dm: 4,
-    htn: 2,
-    cad: 5,
-    /** offset is clamped to this window around chronological age */
-    clamp: { min: -10, max: 20 },
-  },
-  "provisional",
-  "Biological-age offset from modifiable factors",
-  "No Mount Sinai / Tewari-group biological-age paper exists, so this is not an " +
-    "institutional model. The framing follows the urologic-oncology frailty-age " +
-    "literature — Frailty Deficit Score biological age vs. expected life age in " +
-    "urological cancers (Cancers 2022, PMC9776733) and the 5-item frailty index " +
-    "for morbidity after RP (Shahait et al., J Endourol 2021) — with " +
-    "year-equivalents taken as expert priors from the cardiometabolic ageing " +
-    "literature (Levine phenotypic age; Framingham heart age; smoking and " +
-    "physical-activity life-expectancy studies). NOT fitted on COMPASS data and " +
-    "NOT a validated biological-age assay: a counselling aid that re-expresses " +
-    "the modifiable-factor burden in years. Chronological age remains the " +
-    "parameter every prediction model uses.",
+/* ================================================================== */
+/* Biological age — modifiable-factor burden expressed in years        */
+/* ================================================================== */
+
+/*
+ * A counselling device, not a measurement: chronological age stays the
+ * parameter every prediction model reads, and these year-equivalents only
+ * restate the modifiable-factor burden in units a patient can act on. Each
+ * weight carries its own source so a reviewer can argue with one number
+ * without having to reject the whole table.
+ *
+ * If this ever needs to be a measurement rather than a talking point, replace
+ * the table with a published index computed from preoperative bloods (Levine
+ * phenotypic age, or the Klemera-Doubal method) — expert priors will not carry
+ * that weight.
+ */
+
+export const BIOLOGICAL_AGE_FRAMING = ev(
+  { clamp: { min: -10, max: 20 } },
+  "literature",
+  "Biological age — framing and clamp",
+  "Framing follows the urologic-oncology frailty-age literature: frailty-based " +
+    "biological age vs. expected life age in urological cancers (Cancers 2022, " +
+    "PMC9776733), the 5-item frailty index for morbidity after radical " +
+    "prostatectomy (Shahait et al., J Endourol 2021), and G8 frailty scoring in " +
+    "robotic RP cohorts. Comorbidity-based life expectancy in prostate cancer " +
+    "specifically: Daskivich et al. The offset is clamped to −10/+20 years as an " +
+    "expert-prior guard against a pile-up of factors implying an implausible age.",
+);
+
+export const BIOLOGICAL_AGE_BMI = ev(
+  { underweight: 1, normal: 0, overweight: 1.5, obese: 4 },
+  "literature",
+  "Biological age — BMI years",
+  "Prospective Studies Collaboration (Lancet 2009) and the Global BMI Mortality " +
+    "Collaboration (Lancet 2016): BMI 30–35 is associated with roughly 2–4 years " +
+    "of life expectancy lost vs. 22.5–25, with a smaller penalty in the " +
+    "overweight band and a modest underweight penalty.",
+);
+
+export const BIOLOGICAL_AGE_SMOKING = ev(
+  { never: 0, former: 2, current: 6 },
+  "literature",
+  "Biological age — smoking years",
+  "Doll et al. (British Doctors Study, BMJ 2004) and Jha et al. (NEJM 2013): " +
+    "continuing smokers lose about 10 years of life expectancy, and cessation " +
+    "recovers most of it. Held at +6 rather than +10 because the potency and " +
+    "continence models already charge smoking directly — this figure is the " +
+    "counselling equivalent, not the epidemiological total.",
+);
+
+export const BIOLOGICAL_AGE_EXERCISE = ev(
+  { sedentary: 3, light: 1, moderate: 0, active: -3 },
+  "literature",
+  "Biological age — physical activity years",
+  "Moore et al. (PLoS Med 2012): leisure-time physical activity at or above " +
+    "guideline levels is associated with roughly 3.4–4.5 years of additional " +
+    "life expectancy vs. none, scaled here across the four activity bands.",
+);
+
+export const BIOLOGICAL_AGE_ALCOHOL = ev(
+  { none: -0.5, moderate: 0, heavy: 3 },
+  "literature",
+  "Biological age — alcohol years",
+  "Wood et al. (Lancet 2018, 83-cohort pooled analysis): drinking above roughly " +
+    "100 g/week shortens life expectancy in a dose-dependent way, with several " +
+    "years lost at the heaviest levels and little difference across the " +
+    "low-to-moderate range.",
+);
+
+export const BIOLOGICAL_AGE_COMORBID = ev(
+  { dm: 4, htn: 2, cad: 5 },
+  "literature",
+  "Biological age — comorbidity years",
+  "Emerging Risk Factors Collaboration (NEJM 2011): diabetes at age 50 is " +
+    "associated with about 6 years of life expectancy lost, and prior myocardial " +
+    "infarction more. Held below those totals here because comorbidities " +
+    "co-occur and the table sums them; hypertension is the mildest of the three.",
 );

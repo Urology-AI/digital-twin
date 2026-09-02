@@ -12,7 +12,6 @@ import type {
 } from "@/lib/compass/functionalOutcomes";
 import { computeBiologicalAge } from "@/lib/compass/biologicalAge";
 import { ageAdjustment } from "@/lib/compass/functionalOutcomes";
-import { BIOLOGICAL_AGE } from "@/lib/compass/planningEvidence";
 import { cn } from "@/lib/utils";
 
 function SegPicker<T extends string>({
@@ -190,7 +189,8 @@ function BiologicalAgeReadout({
         </p>
       </div>
       <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
-        {BIOLOGICAL_AGE.label} — provisional, counselling aid only.
+        Biological-age offset from modifiable factors — a counselling aid, sourced
+        per factor in Evidence &amp; sources.
       </p>
     </div>
   );
