@@ -95,10 +95,23 @@ function setupAutoUpdate() {
   // The read-only feed token is baked in at build time. Without it every
   // request to the private releases repo 404s and surfaces as an opaque
   // failure — say so plainly instead.
+  //
+  // The token has to go through setFeedURL, not addAuthHeader: electron-updater
+  // only picks its private-repo provider (authenticated api.github.com) when a
+  // token is present in the feed options or GH_TOKEN is set. app-update.yml
+  // carries `private: true` but no token, so the updater silently fell back to
+  // the PUBLIC provider and fetched github.com/<owner>/<repo>/releases.atom —
+  // a web endpoint that ignores the auth header and 404s on a private repo.
   try {
     const auth = require("./update-auth.json");
-    if (auth && auth.token) autoUpdater.addAuthHeader(`token ${auth.token}`);
-    else throw new Error("empty token");
+    if (!auth || !auth.token) throw new Error("empty token");
+    autoUpdater.setFeedURL({
+      provider: "github",
+      owner: "Urology-AI",
+      repo: "digital-twin-releases",
+      private: true,
+      token: auth.token,
+    });
   } catch {
     send("error", { message: "no update token in this build — reinstall from a CI release" });
     return;
