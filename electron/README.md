@@ -85,3 +85,20 @@ Cloudflare Worker (`/api/updates/*`), which holds the read-only
 ```bash
 cd cf-worker && npx wrangler secret put RELEASES_READ_PAT
 ```
+
+## Update size
+
+Updates are differential. electron-updater caches the previous `update.zip`
+and, using the `.zip.blockmap` published alongside it, downloads only the
+changed blocks — a typical update is a few MB rather than the ~110 MB the full
+`.zip` weighs. This needs a feed that serves the blockmap and honours `Range`
+requests; the Worker (`/api/updates/*`) does both. The first update after a
+fresh install is always a full download, since there is no previous zip to diff
+against.
+
+Note that a full signed release is still what ships **every** change, including
+changes confined to `src/`. That is deliberate: it keeps Apple's notarization
+in the path for every line of code users run. Shipping the web bundle
+out-of-band would move executable content outside the code signature, into a
+user-writable directory where nothing re-verifies it — not an acceptable trade
+for a tool handling PHI.

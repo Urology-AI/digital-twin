@@ -72,6 +72,14 @@ function setupAutoUpdate() {
   // launching the .app from a terminal. "Update check failed" in the UI now
   // also carries the underlying message (see the 'error' handler below).
   autoUpdater.autoDownload = true;
+  // Differential download is on by default and DOES work on macOS in
+  // electron-updater 6 (MacUpdater caches the previous update.zip and fetches
+  // only the changed blocks). It needs three things, all of which hold here:
+  // the .zip.blockmap published alongside the .zip, a feed that serves it, and
+  // a feed that honours Range requests — the Worker does both. So a typical
+  // update pulls a few MB rather than the ~110 MB the .zip weighs. The first
+  // update after an install is always full: there is no previous zip to diff
+  // against yet.
   autoUpdater.on("checking-for-update", () => send("checking"));
   autoUpdater.on("update-available", (i) => send("available", { version: i.version }));
   autoUpdater.on("update-not-available", () => send("none"));
