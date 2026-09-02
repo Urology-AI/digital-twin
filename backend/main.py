@@ -37,11 +37,28 @@ print(f"[compass] LLM_ENDPOINT={_llm['endpoint'] or '<unset>'} LLM_MODEL={_llm['
 
 app = FastAPI(title="COMPASS API")
 
+# This dev/self-host backend exposes UNAUTHENTICATED /api/chat and /api/analyze,
+# which forward to a configured LLM. With allow_origins=["*"] any website a
+# clinician had open could drive that endpoint from their browser — and POST a
+# `clinical` blob to it. Restrict to the front-ends that actually call it;
+# override with COMPASS_ALLOWED_ORIGINS (comma-separated) when self-hosting.
+_DEFAULT_ORIGINS = [
+    "https://digital-twin.urology.edu.eu.org",
+    "https://urology-ai.github.io",
+    "http://localhost:5173",
+    "http://localhost:4173",
+]
+ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.getenv("COMPASS_ALLOWED_ORIGINS", ",".join(_DEFAULT_ORIGINS)).split(",")
+    if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 

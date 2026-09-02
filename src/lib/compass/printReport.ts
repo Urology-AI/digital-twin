@@ -35,6 +35,23 @@ function lesionRowToSectors(row: import("@/types/lesion").LesionRow): string[] {
   return [...sectorsForSide("L"), ...sectorsForSide("R")];
 }
 
+/**
+ * The report is assembled as an HTML string and handed to an <iframe srcDoc>,
+ * so React does no escaping for us here. Record fields reach this file from
+ * imported JSON and from /patient/<id> shares, i.e. they are not necessarily
+ * the well-formed numbers the schema promises — escape before interpolating.
+ * (The iframe is also sandboxed without allow-scripts, in PrintReportModal;
+ * these are two independent layers and both should stay.)
+ */
+function esc(v: unknown): string {
+  return String(v ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function cancerColor(val: number): string {
   // Mirrors overlayColor(val, "cancer") from prostateScene.ts
   let r: number, g: number, b: number;
@@ -406,8 +423,8 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
   let patHtml = `<table>
     <thead><tr><th>PSA</th><th>Volume</th><th>PSAD</th><th>Grade Group</th><th>Cores</th><th>PI-RADS</th><th>Laterality</th></tr></thead>
     <tbody><tr>
-      <td>${S.psa} ng/mL</td><td>${S.vol} cc</td><td>${S.psad.toFixed(3)}</td>
-      <td>GG ${S.gg}</td><td>${S.cores}</td><td>${S.pirads}</td><td>${S.laterality}</td>
+      <td>${esc(S.psa)} ng/mL</td><td>${esc(S.vol)} cc</td><td>${S.psad.toFixed(3)}</td>
+      <td>GG ${esc(S.gg)}</td><td>${esc(S.cores)}</td><td>${esc(S.pirads)}</td><td>${esc(S.laterality)}</td>
     </tr></tbody>
   </table>`;
 
@@ -418,7 +435,7 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
       <tbody><tr>
         <td>${S.mri_size > 0 ? (S.mri_size * 10).toFixed(0) + " mm" : "—"}</td>
         <td>${abLabels[String(S.mri_abutment)] ?? "—"}</td>
-        <td>${S.mri_adc > 0 ? S.mri_adc : "—"}</td>
+        <td>${S.mri_adc > 0 ? esc(S.mri_adc) : "—"}</td>
         <td>${S.mri_epe ? "Yes" : "No"}</td>
         <td>${S.mri_svi ? "Yes" : "No"}</td>
       </tr></tbody>
@@ -478,7 +495,7 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
   (L.alerts ?? []).forEach((a) => allAlerts.push("L — " + a.message));
   (R.alerts ?? []).forEach((a) => allAlerts.push("R — " + a.message));
   const alertHtml = allAlerts.length > 0
-    ? `<div style="margin:6px 0 10px">${allAlerts.map((a) => `<div style="color:#922B21;font-size:10px;padding:2px 0;display:flex;align-items:center;gap:6px"><span style="font-size:12px">⚠</span> ${a}</div>`).join("")}</div>`
+    ? `<div style="margin:6px 0 10px">${allAlerts.map((a) => `<div style="color:#922B21;font-size:10px;padding:2px 0;display:flex;align-items:center;gap:6px"><span style="font-size:12px">⚠</span> ${esc(a)}</div>`).join("")}</div>`
     : "";
 
   // ── PLND decision ─────────────────────────────────────────────────────────
@@ -548,7 +565,7 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
 
   // ── Compose HTML ──────────────────────────────────────────────────────────
   const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-  const patientId = entry.record.patient?.age ? `Age ${entry.record.patient.age}` : "";
+  const patientId = entry.record.patient?.age ? `Age ${esc(entry.record.patient.age)}` : "";
 
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>COMPASS Surgical Planning Report</title>

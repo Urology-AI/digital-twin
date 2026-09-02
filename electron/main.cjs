@@ -42,7 +42,9 @@ if (!app.requestSingleInstanceLock()) {
       const rel = decodeURIComponent(pathname).replace(/^\/+/, "");
       let target = path.join(DIST, rel);
       // Block traversal and fall back to the SPA entry for client-side routes.
-      if (!target.startsWith(DIST) || !path.extname(target)) {
+      // The separator matters: a bare startsWith(DIST) would also accept a
+      // sibling directory whose name merely begins with "app-dist".
+      if (!target.startsWith(DIST + path.sep) || !path.extname(target)) {
         target = path.join(DIST, "index.html");
       }
       return net.fetch(pathToFileURL(target).toString());
@@ -126,6 +128,21 @@ ipcMain.handle("updates:check", async () => {
   try { await autoUpdater.checkForUpdates(); } catch (e) { send("error", { message: String(e && e.message ? e.message : e) }); }
 });
 
+// A URL is "internal" only if its origin is exactly ours — a string prefix
+// test would accept "app://compass.evil.example".
+function isInternal(url) {
+  try { return new URL(url).origin === ORIGIN; } catch { return false; }
+}
+
+// Only ever hand http/https to the OS. shell.openExternal on an arbitrary
+// scheme can launch other applications (file:, smb:, custom handlers).
+function openExternally(url) {
+  try {
+    const { protocol } = new URL(url);
+    if (protocol === "http:" || protocol === "https:") shell.openExternal(url);
+  } catch { /* not a URL — ignore */ }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -138,6 +155,11 @@ function createWindow() {
       preload: path.join(__dirname, "preload.cjs"),
       contextIsolation: true,
       nodeIntegration: false,
+      // Default since Electron 20, but stated explicitly: this is a security
+      // property of the app, not something to inherit silently from a default
+      // that a future upgrade or an added webPreference could flip.
+      sandbox: true,
+      webSecurity: true,
     },
   });
 
@@ -145,10 +167,24 @@ function createWindow() {
   mainWindow.on("closed", () => { mainWindow = null; });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith(ORIGIN)) return { action: "allow" };
-    shell.openExternal(url);
+    if (isInternal(url)) return { action: "allow" };
+    openExternally(url);
     return { action: "deny" };
   });
+
+  // setWindowOpenHandler only covers NEW windows. Without this, a top-level
+  // navigation of the main window itself would land a foreign page on the
+  // app:// origin, with the preload bridge attached and read access to the
+  // localStorage holding every saved case. Keep both guards.
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (isInternal(url)) return;
+    event.preventDefault();
+    openExternally(url);
+  });
+
+  // Nothing in this app uses <webview>; refuse to attach one at all rather
+  // than rely on its own webPreferences being safe.
+  mainWindow.webContents.on("will-attach-webview", (event) => event.preventDefault());
 }
 
 app.on("window-all-closed", () => {

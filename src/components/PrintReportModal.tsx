@@ -106,6 +106,13 @@ export function PrintReportModal() {
           <iframe
             ref={iframeRef}
             srcDoc={html}
+            // srcDoc content inherits THIS origin, so anything executable that
+            // reached the report string would run with access to the saved
+            // cases in localStorage. No allow-scripts: the report is static
+            // markup and never needs to run any. allow-same-origin keeps
+            // handlePrint()'s contentWindow.print() reachable, allow-modals
+            // lets the print dialog open from inside the frame.
+            sandbox="allow-same-origin allow-modals"
             className="min-h-0 flex-1 border-0 bg-white"
             title="COMPASS Print Report"
           />

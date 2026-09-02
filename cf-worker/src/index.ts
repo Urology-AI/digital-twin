@@ -56,6 +56,11 @@ const GEMINI_MODEL = "gemini-2.5-flash";
 const GEMINI_URL = (model: string, key: string) =>
   `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
 const MAX_CHAT_BODY_BYTES = 600_000; // room for a base64 screenshot
+// `model` is caller-supplied and is interpolated into the Gemini URL PATH.
+// Unvalidated, a value like "../../v1beta/tunedModels/x" walks to a different
+// Google API path with our key attached. Host is pinned, so this is not full
+// SSRF, but the key must only ever be spent on the path we intend.
+const MODEL_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
 
 /**
  * Origin allowlist — the two front-ends that legitimately call this proxy.
@@ -297,6 +302,9 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
   if (origin && !ALLOWED_ORIGINS.has(origin)) return reply({ error: "Origin not allowed" }, 403);
   if (!env.GEMINI_API_KEY) return reply({ error: "Chat not configured on server" }, 503);
 
+  // Content-Length is a hint the client can simply omit (chunked encoding), so
+  // it is only a cheap early-out. The authoritative check is on the bytes we
+  // actually read, below.
   if (Number(request.headers.get("Content-Length") || 0) > MAX_CHAT_BODY_BYTES) {
     return reply({ error: "Request too large" }, 413);
   }
@@ -307,8 +315,17 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
   }
 
   let parsed: { messages?: OaMessage[]; temperature?: number; max_tokens?: number; model?: string };
+  let raw: string;
   try {
-    parsed = await request.json();
+    raw = await request.text();
+  } catch {
+    return reply({ error: "Could not read body" }, 400);
+  }
+  if (new TextEncoder().encode(raw).length > MAX_CHAT_BODY_BYTES) {
+    return reply({ error: "Request too large" }, 413);
+  }
+  try {
+    parsed = JSON.parse(raw);
   } catch {
     return reply({ error: "Invalid JSON" }, 400);
   }
@@ -317,6 +334,7 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
   }
 
   const model = typeof parsed.model === "string" && parsed.model.trim() ? parsed.model.trim() : GEMINI_MODEL;
+  if (!MODEL_NAME.test(model)) return reply({ error: "Invalid 'model'" }, 400);
   const geminiBody = oaToGemini(
     parsed.messages,
     typeof parsed.temperature === "number" ? parsed.temperature : 0.3,
