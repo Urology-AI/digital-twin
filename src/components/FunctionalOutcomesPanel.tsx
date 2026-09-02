@@ -19,6 +19,7 @@ import { useUiStore } from "@/store/uiStore";
 import { RecoveryLineChart } from "@/components/outcomes/RecoveryLineChart";
 import { HealerBands } from "@/components/outcomes/HealerBands";
 import { FactorContributionTable } from "@/components/outcomes/FactorContributionTable";
+import { BiologicalAgeCard } from "@/components/outcomes/BiologicalAgeCard";
 
 /** Approximate 90% CI on logit scale (SE ≈ 0.58 logit units, z = 1.64) */
 function computeCI(pct: number): { lo: number; hi: number } {
@@ -492,6 +493,14 @@ export function FunctionalOutcomesPanel() {
           />
         </CardContent>
       </Card>
+
+      <BiologicalAgeCard
+        bio={{
+          age: fnInputs.age, bmi: fnInputs.bmi, smoking: fnInputs.smoking,
+          exercise: fnInputs.exercise, alcohol: fnInputs.alcohol,
+          dm: fnInputs.dm, htn: fnInputs.htn, cad: fnInputs.cad,
+        }}
+      />
 
       <FactorContributionTable rows={factorRows} />
 

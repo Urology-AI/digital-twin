@@ -3,6 +3,8 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ControlsOverlay } from "@/components/ControlsOverlay";
 import { AppHeader } from "@/components/layout/AppHeader";
+import { BuildStatus } from "@/components/layout/BuildStatus";
+import { OverviewPanel } from "@/components/OverviewPanel";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import { OutcomesWorkspace } from "@/components/OutcomesWorkspace";
 import { SurgicalPlanWorkspace } from "@/components/SurgicalPlanWorkspace";
@@ -38,7 +40,7 @@ import {
   loadSharedCaseFromUrl,
   usePatientStore,
 } from "@/store/patientStore";
-import { useUiStore } from "@/store/uiStore";
+import { useUiStore, type DesktopTab } from "@/store/uiStore";
 import { isDemoMode } from "@/lib/demoMode";
 import { isOfflineBuild } from "@/lib/offlineBuild";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
@@ -75,6 +77,15 @@ function DimOverlay() {
   );
 }
 
+/** Scroll shell for the overview inside the full-height tab containers. */
+function OverviewScreen({ tab }: { tab: DesktopTab }) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain app-scroll px-5 py-5">
+      <OverviewPanel tab={tab} />
+    </div>
+  );
+}
+
 export default function App() {
   const bootstrapFromJson = usePatientStore((s) => s.bootstrapFromJson);
   const infoOpen = useUiStore((s) => s.infoOpen);
@@ -92,6 +103,7 @@ export default function App() {
   const setCreditsOpen = useUiStore((s) => s.setCreditsOpen);
   const dark = useUiStore((s) => s.dark);
   const desktopTab = useUiStore((s) => s.desktopTab);
+  const overview = useUiStore((s) => s.overview);
   const patientView = useUiStore((s) => s.patientView);
   const presenterView = useUiStore((s) => s.presenterView);
 
@@ -242,7 +254,7 @@ export default function App() {
             !patientView && !presenterView && desktopTab === "input" ? "flex flex-col" : "hidden",
           )}
         >
-          <ZoneInputWizard />
+          {overview ? <OverviewScreen tab="input" /> : <ZoneInputWizard />}
         </div>
 
         {/* ── Predictions tab: PredictionPanel (left/top) | 3D (right/bottom) */}
@@ -255,7 +267,7 @@ export default function App() {
             "max-lg:top-0 max-lg:bottom-[58%] max-lg:left-0 max-lg:right-0",
           )}
         >
-          <PredictionPanel />
+          {overview ? <OverviewPanel tab="predictions" /> : <PredictionPanel />}
         </div>
 
         {/* ── Outcomes tab: full-width split workspace ──────────────────── */}
@@ -268,7 +280,7 @@ export default function App() {
             !patientView && !presenterView && desktopTab === "outcomes" ? "flex" : "hidden",
           )}
         >
-          <OutcomesWorkspace />
+          {overview ? <OverviewScreen tab="outcomes" /> : <OutcomesWorkspace />}
         </div>
 
         {/* ── Surgical plan tab: operative plan + inflammation risk + impact ── */}
@@ -278,7 +290,7 @@ export default function App() {
             !patientView && !presenterView && desktopTab === "plan" ? "flex" : "hidden",
           )}
         >
-          <SurgicalPlanWorkspace />
+          {overview ? <OverviewScreen tab="plan" /> : <SurgicalPlanWorkspace />}
         </div>
 
         {/* ── Patient view: full-width Inputs | Recovery, 3D model behind a button ── */}
@@ -308,8 +320,10 @@ export default function App() {
       {!patientView && !presenterView && <MobileTabBar />}
 
       {/* Desktop-only footer */}
-      <footer className="hidden lg:flex h-7 shrink-0 items-center justify-end gap-3 border-t border-border/50 bg-card/60 px-4">
-        <span className="text-[10px] text-muted-foreground/50">
+      <footer className="hidden lg:flex h-7 shrink-0 items-center gap-3 border-t border-border/50 bg-card/60 px-4">
+        {/* Build + update control, left — the header chip carries auth state. */}
+        <BuildStatus />
+        <span className="ml-auto text-[10px] text-muted-foreground/50">
           COMPASS · Tewari Lab · Mount Sinai · Research Use Only
         </span>
         <button
