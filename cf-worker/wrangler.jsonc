@@ -11,6 +11,9 @@
   //  - /api/turso/*  — the Turso proxy.
   //  - /api/chat*    — COMPASS's own Gemini call (holds GEMINI_API_KEY,
   //                    server-side only; browser hits this same-origin).
+  //  - /api/updates/* — update feed for the desktop app (holds
+  //                    RELEASES_READ_PAT, so the shipped app carries no
+  //                    credential of its own) and the web app's version check.
   //  - /patient/*    — SPA fallback for patient-link deep links (open,
   //                    no Access application on this path).
   //  - /clinical/*   — SPA fallback for the clinical app (Access-gated —
@@ -22,6 +25,7 @@
   "routes": [
     { "pattern": "digital-twin.urology.edu.eu.org/api/turso/*", "zone_name": "urology.edu.eu.org" },
     { "pattern": "digital-twin.urology.edu.eu.org/api/chat*", "zone_name": "urology.edu.eu.org" },
+    { "pattern": "digital-twin.urology.edu.eu.org/api/updates/*", "zone_name": "urology.edu.eu.org" },
     { "pattern": "digital-twin.urology.edu.eu.org/patient/*", "zone_name": "urology.edu.eu.org" },
     { "pattern": "digital-twin.urology.edu.eu.org/clinical", "zone_name": "urology.edu.eu.org" },
     { "pattern": "digital-twin.urology.edu.eu.org/clinical/*", "zone_name": "urology.edu.eu.org" }
@@ -35,4 +39,8 @@
   // Secrets — never put them here. Set with `npx wrangler secret put <NAME>`:
   //   TURSO_URL, TURSO_AUTH_TOKEN   — Turso proxy
   //   GEMINI_API_KEY                — /api/chat (aistudio.google.com/apikey)
+  //   RELEASES_READ_PAT             — /api/updates/* (read-only, fine-grained
+  //                                   PAT for Urology-AI/digital-twin-releases;
+  //                                   the same value CI used to bake into the
+  //                                   app before this Worker existed)
 }

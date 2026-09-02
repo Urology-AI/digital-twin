@@ -60,16 +60,26 @@ function send(type, extra) {
 // True once setupAutoUpdate has wired the listeners and a usable feed.
 let updaterReady = false;
 
+// Worker-backed update feed (see cf-worker/src/index.ts, /api/updates/*).
+const UPDATE_FEED_URL = "https://digital-twin.urology.edu.eu.org/api/updates";
+
 function setupAutoUpdate() {
   // Fully usable offline; this only does anything when the machine happens to
-  // be online. Pulls a newer signed build from the PRIVATE releases repo in
-  // the background. The read-only token is written into the bundle at build
-  // time (CI, from RELEASES_READ_PAT) — see electron/update-auth.example.json.
+  // be online. Pulls a newer signed build in the background through the
+  // Worker-backed feed below.
 
   // electron-updater logs to console by default; visible via Console.app or by
   // launching the .app from a terminal. "Update check failed" in the UI now
   // also carries the underlying message (see the 'error' handler below).
   autoUpdater.autoDownload = true;
+  // Differential download is on by default and DOES work on macOS in
+  // electron-updater 6 (MacUpdater caches the previous update.zip and fetches
+  // only the changed blocks). It needs three things, all of which hold here:
+  // the .zip.blockmap published alongside the .zip, a feed that serves it, and
+  // a feed that honours Range requests — the Worker does both. So a typical
+  // update pulls a few MB rather than the ~110 MB the .zip weighs. The first
+  // update after an install is always full: there is no previous zip to diff
+  // against yet.
   autoUpdater.on("checking-for-update", () => send("checking"));
   autoUpdater.on("update-available", (i) => send("available", { version: i.version }));
   autoUpdater.on("update-not-available", () => send("none"));
@@ -92,30 +102,12 @@ function setupAutoUpdate() {
   // error. Skip silently; a dev build is never the thing that needs updating.
   if (!app.isPackaged) return;
 
-  // The read-only feed token is baked in at build time. Without it every
-  // request to the private releases repo 404s and surfaces as an opaque
-  // failure — say so plainly instead.
-  //
-  // The token has to go through setFeedURL, not addAuthHeader: electron-updater
-  // only picks its private-repo provider (authenticated api.github.com) when a
-  // token is present in the feed options or GH_TOKEN is set. app-update.yml
-  // carries `private: true` but no token, so the updater silently fell back to
-  // the PUBLIC provider and fetched github.com/<owner>/<repo>/releases.atom —
-  // a web endpoint that ignores the auth header and 404s on a private repo.
-  try {
-    const auth = require("./update-auth.json");
-    if (!auth || !auth.token) throw new Error("empty token");
-    autoUpdater.setFeedURL({
-      provider: "github",
-      owner: "Urology-AI",
-      repo: "digital-twin-releases",
-      private: true,
-      token: auth.token,
-    });
-  } catch {
-    send("error", { message: "no update token in this build — reinstall from a CI release" });
-    return;
-  }
+  // The feed is our Cloudflare Worker, which holds the read-only GitHub token
+  // as a Worker secret and streams latest-mac.yml and the release assets from
+  // the private releases repo. The app therefore ships with NO credential of
+  // its own: earlier builds baked RELEASES_READ_PAT into the bundle, where any
+  // user could extract it and it could not be rotated without a new release.
+  autoUpdater.setFeedURL({ provider: "generic", url: UPDATE_FEED_URL });
 
   updaterReady = true;
   autoUpdater.checkForUpdates().catch(() => { /* surfaced via the 'error' event */ });

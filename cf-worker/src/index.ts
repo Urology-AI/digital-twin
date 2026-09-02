@@ -33,6 +33,11 @@ import { createClient } from "@libsql/client/web";
 interface Env {
   TURSO_URL: string;
   TURSO_AUTH_TOKEN: string;
+  // Fine-grained, read-only PAT for the PRIVATE releases repo. Held here as a
+  // Worker secret so the desktop app can ship with no credential at all —
+  // before this, every build carried the token inside the bundle, where any
+  // user could extract it and it could not be rotated without a new release.
+  RELEASES_READ_PAT?: string;
   // Optional — bound only once the `ratelimits` namespace is provisioned
   // (see wrangler.jsonc). Absent in local dev / before first provision, so
   // every use is guarded with `?.`.
@@ -359,6 +364,108 @@ async function handleSpaFallback(request: Request): Promise<Response> {
   return withSecurityHeaders(response, response.status === 404 ? 200 : response.status);
 }
 
+// ── /api/updates/* — update feed for the desktop app and the web app ─────────
+//
+// electron-updater's "generic" provider fetches <base>/latest-mac.yml and then
+// each file named in it, so the two routes below are all it needs. The GitHub
+// token stays in Worker secrets: the app authenticates to nothing, holds no
+// credential, and the token can be rotated without shipping a build.
+//
+// The releases repo is private deliberately (the .dmg must not be publicly
+// downloadable), which is why this cannot just be a redirect — a redirect
+// cannot carry the Authorization header, so the asset is streamed through.
+
+const RELEASES_REPO = "Urology-AI/digital-twin-releases";
+
+// Only these names are ever proxied. Without an allowlist this route would be
+// an open proxy for any asset on any release, and path traversal in the name
+// would let a caller reach other GitHub API paths entirely.
+const ASSET_NAME = /^(latest-mac\.yml|COMPASS-Digital-Twin-\d+\.\d+\.\d+-arm64\.(?:dmg|zip|zip\.blockmap))$/;
+
+interface GhAsset { name: string; url: string; size: number }
+interface GhRelease { tag_name: string; published_at: string; assets: GhAsset[] }
+
+async function latestRelease(env: Env): Promise<GhRelease | null> {
+  if (!env.RELEASES_READ_PAT) return null;
+  const res = await fetch(`https://api.github.com/repos/${RELEASES_REPO}/releases/latest`, {
+    headers: {
+      Authorization: `Bearer ${env.RELEASES_READ_PAT}`,
+      Accept: "application/vnd.github+json",
+      // GitHub rejects API requests without one.
+      "User-Agent": "compass-update-feed",
+    },
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as GhRelease;
+}
+
+// What version is current. The web app polls this to offer a reload; it
+// carries no asset URLs and is safe to cache briefly.
+async function handleUpdateLatest(request: Request, env: Env): Promise<Response> {
+  const origin = request.headers.get("Origin");
+  const cors = {
+    "Access-Control-Allow-Origin": origin && ALLOWED_ORIGINS.has(origin) ? origin : "null",
+    Vary: "Origin",
+  };
+  if (!env.RELEASES_READ_PAT) return jsonError("Update feed not configured on server", 503);
+  const release = await latestRelease(env);
+  if (!release) return jsonError("Could not reach the release feed", 502);
+  return new Response(
+    JSON.stringify({
+      version: release.tag_name.replace(/^v/, ""),
+      releasedAt: release.published_at,
+    }),
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=300",
+        ...cors,
+      },
+    },
+  );
+}
+
+// latest-mac.yml and the .zip/.dmg the updater then downloads.
+async function handleUpdateAsset(name: string, request: Request, env: Env): Promise<Response> {
+  if (!ASSET_NAME.test(name)) return jsonError("Not found", 404);
+  if (!env.RELEASES_READ_PAT) return jsonError("Update feed not configured on server", 503);
+
+  const release = await latestRelease(env);
+  if (!release) return jsonError("Could not reach the release feed", 502);
+  const asset = release.assets.find((a) => a.name === name);
+  if (!asset) return jsonError("Not found", 404);
+
+  // Accept: octet-stream turns the API asset URL into the bytes themselves
+  // (via a redirect fetch follows for us). Range is forwarded so the updater
+  // can resume an interrupted download of a ~110 MB file.
+  const range = request.headers.get("Range");
+  const upstream = await fetch(asset.url, {
+    method: request.method === "HEAD" ? "HEAD" : "GET",
+    headers: {
+      Authorization: `Bearer ${env.RELEASES_READ_PAT}`,
+      Accept: "application/octet-stream",
+      "User-Agent": "compass-update-feed",
+      ...(range ? { Range: range } : {}),
+    },
+  });
+  if (!upstream.ok && upstream.status !== 206) {
+    return jsonError(`Upstream returned ${upstream.status}`, 502);
+  }
+
+  // Pass the body straight through; strip upstream headers we don't control.
+  const headers = new Headers();
+  for (const h of ["content-type", "content-length", "content-range", "accept-ranges", "etag"]) {
+    const v = upstream.headers.get(h);
+    if (v) headers.set(h, v);
+  }
+  if (!headers.has("content-type")) {
+    headers.set("Content-Type", name.endsWith(".yml") ? "text/yaml" : "application/octet-stream");
+  }
+  // The yml changes every release; the immutable, version-named binaries don't.
+  headers.set("Cache-Control", name.endsWith(".yml") ? "public, max-age=300" : "public, max-age=86400");
+  return new Response(upstream.body, { status: upstream.status, headers });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url);
@@ -378,6 +485,13 @@ export default {
         }
       }
       if (pathname === "/api/chat") return await handleChat(request, env);
+      if (pathname === "/api/updates/latest.json") return await handleUpdateLatest(request, env);
+      if (pathname.startsWith("/api/updates/")) {
+        if (request.method !== "GET" && request.method !== "HEAD") {
+          return jsonError("GET only", 405);
+        }
+        return await handleUpdateAsset(pathname.slice("/api/updates/".length), request, env);
+      }
       if (pathname === "/api/turso/health") return await handleTursoHealth(env);
       if (pathname === "/api/turso/execute") return await handleTursoExecute(request, env);
       if (pathname === "/api/turso/batch") return await handleTursoBatch(request, env);

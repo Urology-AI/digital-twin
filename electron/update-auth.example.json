@@ -1,4 +1,3 @@
 {
-  "_comment": "Copy to update-auth.json (gitignored). CI writes this from the RELEASES_READ_PAT secret before packaging. The token is a fine-grained GitHub PAT with READ-ONLY Contents access to Urology-AI/digital-twin-releases and nothing else. It ends up inside the app bundle, so scope it to exactly that one private repo, read-only.",
-  "token": ""
+  "_comment": "OBSOLETE as of the Worker-backed update feed. The app no longer carries a GitHub token: electron/main.cjs points electron-updater at https://digital-twin.urology.edu.eu.org/api/updates, and the Worker holds RELEASES_READ_PAT as a secret (npx wrangler secret put RELEASES_READ_PAT). Kept only so an older checkout that still reads update-auth.json has something to copy; nothing in the current build reads this file."
 }

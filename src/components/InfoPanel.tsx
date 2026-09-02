@@ -9,6 +9,30 @@ function VersionFooter() {
   const [status, setStatus] = useState<string | null>(null);
   const desktop = typeof window !== "undefined" ? window.desktop : undefined;
 
+  // Web: the same Worker feed the desktop updater uses reports the current
+  // released version. If the tab is running an older build, say so — a long-
+  // lived tab otherwise sits on stale code until someone happens to reload.
+  // Silent when offline, on the offline build, or where the route isn't served.
+  useEffect(() => {
+    if (desktop || isOfflineBuild()) return;
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const res = await fetch("/api/updates/latest.json", { cache: "no-store" });
+        if (!res.ok) return;
+        const { version } = (await res.json()) as { version?: string };
+        if (!cancelled && version && version !== __APP_VERSION__) {
+          setStatus(`v${version} available — refresh to update`);
+        }
+      } catch {
+        /* offline, or the feed is unreachable — nothing useful to say */
+      }
+    };
+    void check();
+    const id = window.setInterval(check, 30 * 60 * 1000);
+    return () => { cancelled = true; window.clearInterval(id); };
+  }, [desktop]);
+
   useEffect(() => {
     if (!desktop) return;
     return desktop.onUpdateEvent((e) => {
@@ -25,6 +49,7 @@ function VersionFooter() {
   return (
     <div className="mt-10 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border pt-4 text-[11px] text-muted-foreground">
       <span>COMPASS Digital Twin · v{__APP_VERSION__}{isOfflineBuild() ? " · offline build" : ""}</span>
+      {!desktop && status && <span className="text-foreground/70">{status}</span>}
       {desktop && (
         <>
           <button
