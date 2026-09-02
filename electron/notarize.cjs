@@ -33,7 +33,15 @@ exports.default = async function notarize(context) {
   staple(appPath);
 
   // Offline-meaningful checks: these only pass from the embedded ticket.
-  execFileSync("xcrun", ["stapler", "validate", appPath], { stdio: "inherit" });
+  // `stapler validate` is informational — it reports failure for bundles
+  // Gatekeeper accepts on macOS 15+, so it can't be a gate. The authoritative
+  // check is Gatekeeper's own: spctl plus the "=notarized" requirement.
+  try {
+    execFileSync("xcrun", ["stapler", "validate", appPath], { stdio: "inherit" });
+  } catch (e) {
+    console.log(`  • stapler validate reported a failure (informational): ${e.message}`);
+  }
+  execFileSync("spctl", ["-a", "-vvv", "-t", "exec", appPath], { stdio: "inherit" });
   execFileSync(
     "codesign",
     ["--test-requirement==notarized", "--verify", "--verbose=1", appPath],

@@ -1,0 +1,152 @@
+name: Notarization probe
+
+# Diagnostic only — never runs on a tag, never publishes anything.
+#
+# Releases 1.0.11 – 1.0.15 are signed with a valid Developer ID, pass
+# `codesign --verify --deep --strict`, and notarytool returns "Accepted" with
+# every nested cdhash in the ticket — yet macOS 15+ reports
+# "Unnotarized Developer ID" for the shipped .app and users get the
+# "Apple could not verify … is free of malware" dialog.
+#
+# That leaves two possible causes, which this workflow separates:
+#
+#   * the COMPASS bundle — something about the Electron app makes Apple issue
+#     a ticket Gatekeeper won't honour, or
+#   * the account/certificate — the Developer ID cert was issued 2026-09-01,
+#     one day before the first affected build, so nothing signed by this
+#     identity would notarize usably.
+#
+# It signs, notarizes and staples a ~20-line hello-world .app with the SAME
+# certificate and the SAME notarytool credentials, then asks Gatekeeper about
+# it on a cold macOS 15 runner.
+#
+#   probe passes  → the credentials/cert are fine; the problem is our bundle.
+#   probe fails   → nothing this identity signs can notarize; it's the
+#                   account or certificate, and the fix is with Apple
+#                   (check the Developer Program agreement status, then open
+#                   a Developer Technical Support incident quoting the
+#                   submission id this run prints).
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: macos-14
+    steps:
+      - name: Build a minimal signed .app
+        env:
+          MAC_CERT_P12: ${{ secrets.MAC_CERT_P12 }}
+          MAC_CERT_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+        run: |
+          set -e
+          APP="$RUNNER_TEMP/NotarizeProbe.app"
+          mkdir -p "$APP/Contents/MacOS"
+          cat > "$RUNNER_TEMP/main.c" <<'EOF'
+          #include <stdio.h>
+          int main(void) { printf("notarize probe\n"); return 0; }
+          EOF
+          clang -arch arm64 -o "$APP/Contents/MacOS/NotarizeProbe" "$RUNNER_TEMP/main.c"
+          cat > "$APP/Contents/Info.plist" <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>CFBundleExecutable</key><string>NotarizeProbe</string>
+            <key>CFBundleIdentifier</key><string>ai.urology.notarize-probe</string>
+            <key>CFBundleName</key><string>NotarizeProbe</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>1.0</string>
+            <key>CFBundleVersion</key><string>1</string>
+          </dict></plist>
+          EOF
+
+          # Same import dance electron-builder does with CSC_LINK, done by hand
+          # so the probe depends on nothing but the cert itself.
+          echo "$MAC_CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          KC="$RUNNER_TEMP/probe.keychain-db"
+          security create-keychain -p probe "$KC"
+          security set-keychain-settings -lut 3600 "$KC"
+          security unlock-keychain -p probe "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$MAC_CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k probe "$KC" >/dev/null
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | tr -d '"')
+          rm "$RUNNER_TEMP/cert.p12"
+
+          IDENTITY=$(security find-identity -v -p codesigning "$KC" \
+            | grep "Developer ID Application" | head -1 | awk '{print $2}')
+          [ -n "$IDENTITY" ] || { echo "::error::no Developer ID Application identity in MAC_CERT_P12"; exit 1; }
+          echo "signing with $IDENTITY"
+
+          # Hardened runtime + secure timestamp — the same options the real app
+          # is signed with, since both are notarization prerequisites.
+          codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          echo "APP=$APP" >> "$GITHUB_ENV"
+
+      - name: Notarize + staple the probe
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          set -e
+          ZIP="$RUNNER_TEMP/probe.zip"
+          ditto -c -k --keepParent "$APP" "$ZIP"
+          xcrun notarytool submit "$ZIP" \
+            --apple-id "$APPLE_ID" --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" --wait --timeout 30m --output-format json \
+            | tee "$RUNNER_TEMP/submit.json"
+          ID=$(python3 -c 'import json;print(json.load(open("'"$RUNNER_TEMP"'/submit.json"))["id"])')
+          STATUS=$(python3 -c 'import json;print(json.load(open("'"$RUNNER_TEMP"'/submit.json"))["status"])')
+          echo "::notice::probe submission id $ID — $STATUS"
+          xcrun notarytool log "$ID" --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" --team-id "$APPLE_TEAM_ID"
+          [ "$STATUS" = "Accepted" ] || { echo "::error::probe was not Accepted"; exit 1; }
+          xcrun stapler staple "$APP" || echo "::warning::stapling the probe failed — see above"
+          ditto -c -k --keepParent "$APP" "$RUNNER_TEMP/probe-stapled.zip"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notarize-probe
+          path: ${{ runner.temp }}/probe-stapled.zip
+
+  # Cold runner, Apple's ticket endpoints blocked: the same conditions under
+  # which the real app fails.
+  assess:
+    needs: probe
+    runs-on: macos-15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: notarize-probe
+          path: art
+
+      - name: Block Apple's online notarization endpoints
+        run: |
+          sudo tee -a /etc/hosts >/dev/null <<'EOF'
+          0.0.0.0 valid.apple.com
+          0.0.0.0 api.apple-cloudkit.com
+          0.0.0.0 ocsp.apple.com
+          0.0.0.0 ocsp2.apple.com
+          EOF
+          sudo dscacheutil -flushcache || true
+          sudo killall -HUP mDNSResponder || true
+
+      - name: Ask Gatekeeper about the probe
+        run: |
+          UZ=$(mktemp -d); ditto -x -k art/probe-stapled.zip "$UZ"
+          APP="$UZ/NotarizeProbe.app"
+          codesign -dvvv "$APP" 2>&1 | grep -E "Authority|TeamIdentifier|Timestamp" || true
+
+          fail=0
+          spctl -a -vvv -t exec "$APP" || fail=1
+          codesign --test-requirement="=notarized" --verify --verbose=2 "$APP" || fail=1
+          xcrun stapler validate "$APP" || echo "(stapler validate is unreliable on macOS 15+; informational)"
+
+          if [ "$fail" = 0 ]; then
+            echo "::notice::PROBE PASSED — the certificate and notarytool credentials produce a Gatekeeper-accepted app. The COMPASS bundle itself is what Apple's ticket doesn't cover; investigate the app layout (extraResources / app-dist, nested frameworks)."
+          else
+            echo "::error::PROBE FAILED — a 20-line hello-world signed with this identity is also rejected as unnotarized. This is an account/certificate problem, not a COMPASS packaging problem: confirm the Apple Developer Program agreements are accepted for team ${{ secrets.APPLE_TEAM_ID }}, then open a DTS incident quoting the submission id from the probe job."
+            exit 1
+          fi
