@@ -10,9 +10,10 @@ import { FunctionalOutcomesPanel } from "@/components/FunctionalOutcomesPanel";
 
 /**
  * Simplified patient-facing screen — own layout, no clinical tabs, no
- * numeric risk predictions, no coefficient/research tooling. Reads and
- * writes the same `patientStore` as the clinical views so it always stays
- * in sync with the active case; it just shows/edits far less of it.
+ * research tooling or coefficients, and one plain-language risk figure
+ * (recurrence) rather than the six numeric predictions. Reads and writes the
+ * same `patientStore` as the clinical views so it always stays in sync with
+ * the active case; it just shows/edits far less of it.
  *
  * Two columns: Inputs (left) | Recovery (right). The 3D model isn't shown
  * inline — it's the same always-mounted `ThreeCanvas` singleton, repositioned
@@ -247,6 +248,39 @@ function ResetBanner({ isDirty, onReset }: { isDirty: boolean; onReset: () => vo
   );
 }
 
+
+/**
+ * Chance the cancer comes back after surgery (biochemical recurrence — PSA
+ * rising again). The one numeric risk this screen shows: patients ask it first,
+ * and leaving it out sent them looking for the number elsewhere. Framed in
+ * plain words, with the flip side stated, and no other prediction alongside it.
+ */
+function RecurrenceOutlook() {
+  const predictions = usePatientStore((s) => s.predictions);
+  if (!predictions) return null;
+  const risk = Math.round(predictions.bcr * 100);
+
+  return (
+    <div className="rounded-xl border border-border bg-card p-4">
+      <h3 className="mb-1 text-base font-semibold text-foreground">
+        Chance of the cancer coming back
+      </h3>
+      <div className="flex items-baseline gap-2">
+        <span className="text-3xl font-bold tabular-nums text-foreground">{risk}%</span>
+        <span className="text-sm text-muted-foreground">
+          — so about {100 - risk} in 100 men like you would not see it return
+        </span>
+      </div>
+      <p className="mt-2 text-xs leading-snug text-muted-foreground">
+        This is the estimated chance that PSA rises again in the years after surgery, based on
+        your PSA, biopsy grade and scans before the operation. It is an estimate for a group of
+        men with a similar picture, not a prediction about you, and it does not account for any
+        treatment given after surgery. Your surgeon is the person to talk this through with.
+      </p>
+    </div>
+  );
+}
+
 export function PatientView() {
   const heatmapVisible = useUiStore((s) => s.heatmapVisible);
   const toggleHeatmap = useUiStore((s) => s.toggleHeatmap);
@@ -290,9 +324,12 @@ export function PatientView() {
       </div>
       {/* Right: Recovery */}
       <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain app-scroll px-4 py-4 lg:px-6 lg:py-6">
-        <div className="rounded-xl border border-border bg-card p-4">
-          <h3 className="mb-3 text-base font-semibold text-foreground">Recovery outlook</h3>
-          <FunctionalOutcomesPanel />
+        <div className="space-y-4">
+          <RecurrenceOutlook />
+          <div className="rounded-xl border border-border bg-card p-4">
+            <h3 className="mb-3 text-base font-semibold text-foreground">Recovery outlook</h3>
+            <FunctionalOutcomesPanel />
+          </div>
         </div>
       </div>
     </div>

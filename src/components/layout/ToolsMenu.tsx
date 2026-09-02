@@ -16,8 +16,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * "More" dropdown for the header's secondary actions — the clinician tools
- * that don't need to be one click away (case log, patient summary, overview
- * mode, share, print, about). Keeps the top bar from overflowing on smaller
+ * that don't need to be one click away (case log, patient summary, presenter
+ * view, share, print, about). Keeps the top bar from overflowing on smaller
  * screens. Only rendered outside demo mode (AppHeader gates it).
  */
 export function ToolsMenu() {
@@ -63,7 +63,7 @@ export function ToolsMenu() {
     { label: "Case log", Icon: BookOpen, onClick: run(() => setCaseLogOpen(true)) },
     { label: "Patient summary", Icon: UserRound, onClick: run(() => setPatientView(true)) },
     {
-      label: presenterView ? "Exit overview mode" : "Overview mode",
+      label: presenterView ? "Exit presenter view" : "Presenter view",
       Icon: Monitor,
       onClick: run(() => setPresenterView(!presenterView)),
       active: presenterView,

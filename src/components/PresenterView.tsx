@@ -71,7 +71,7 @@ export function PresenterView() {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <div>
-          <div className="text-base font-semibold">Overview mode</div>
+          <div className="text-base font-semibold">Presenter view</div>
           {entry && <div className="text-xs text-muted-foreground">{entry.name}</div>}
         </div>
         <Button

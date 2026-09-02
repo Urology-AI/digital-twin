@@ -5,6 +5,7 @@ import {
   FlaskConical,
   Info,
   Layers,
+  ListChecks,
   Lock,
   LockOpen,
   MessageCircle,
@@ -98,6 +99,8 @@ export function AppHeader() {
   const setDark = useUiStore((s) => s.setDark);
   const desktopTab = useUiStore((s) => s.desktopTab);
   const setDesktopTab = useUiStore((s) => s.setDesktopTab);
+  const overview = useUiStore((s) => s.overview);
+  const setOverview = useUiStore((s) => s.setOverview);
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
   const setWelcomeOpen = useUiStore((s) => s.setWelcomeOpen);
   const patients = usePatientStore((s) => s.patients);
@@ -166,6 +169,25 @@ export function AppHeader() {
 
       {/* Right actions */}
       <div className="ml-auto lg:ml-0 flex shrink-0 items-center gap-0.5">
+        {/* Overview: every tab collapses to its key points until switched off */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-pressed={overview}
+          className={cn(
+            "h-8 gap-1.5 px-2",
+            overview ? "bg-primary/10 text-primary hover:bg-primary/15" : "text-muted-foreground hover:text-foreground",
+          )}
+          title={overview ? "Show the full detail on every tab" : "Collapse every tab to its key points"}
+          onClick={() => setOverview(!overview)}
+        >
+          <ListChecks className="h-[15px] w-[15px]" />
+          <span className="hidden text-xs font-medium lg:inline">Overview</span>
+        </Button>
+
+        <div className="mx-1 h-4 w-px shrink-0 bg-border/60" />
+
         {/* Undo/Redo — editing is disabled in the public preview */}
         {!demo && (
           <>

@@ -84,6 +84,8 @@ interface UiState {
   targetRot: { x: number; y: number };
   /** Active workspace tab — same on desktop and mobile */
   desktopTab: DesktopTab;
+  /** Overview mode: every tab renders its key points instead of full detail. */
+  overview: boolean;
   /** Simplified patient-facing screen — own layout, no clinical tabs/numbers. */
   patientView: boolean;
   /**
@@ -117,6 +119,7 @@ interface UiState {
   setExplainKey: (k: string | null) => void;
   setView: (name: keyof typeof VIEWS) => void;
   setDesktopTab: (t: DesktopTab) => void;
+  setOverview: (v: boolean) => void;
   setPatientView: (v: boolean) => void;
   setPatientView3DOpen: (v: boolean) => void;
   setPresenterView: (v: boolean) => void;
@@ -155,6 +158,7 @@ export const useUiStore = create<UiState>((set, get) => ({
   wizardTab: null,
   targetRot: { x: 0, y: 0 },
   desktopTab: "input" as DesktopTab,
+  overview: false,
   patientView: initialPatientView,
   patientViewLocked: initialPatientViewLocked,
   patientView3DOpen: false,
@@ -187,6 +191,7 @@ export const useUiStore = create<UiState>((set, get) => ({
     if (v) set({ targetRot: { x: v.x, y: v.y } });
   },
   setDesktopTab: (t) => set({ desktopTab: t }),
+  setOverview: (v) => set({ overview: v }),
   setPatientView: (v) => {
     // A clinician's own "Switch to patient view" toggle is never locked —
     // only a link opened with ?view=patient sets patientViewLocked. Leaving
