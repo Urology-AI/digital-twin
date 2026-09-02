@@ -5,6 +5,7 @@ import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydrateP
 import { cn } from "@/lib/utils";
 import { pushCases, pullCases, checkTursoHealth, hasCloudId } from "@/lib/turso";
 import { isOfflineBuild } from "@/lib/offlineBuild";
+import { deidentifyBundle } from "@/lib/deidentify";
 
 const CASE_LOG_KEY = "compass_cases";
 const CASE_BUNDLE_SCHEMA = "compass-case-bundle-v1";
@@ -384,18 +385,22 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
     setCases(merged);
   };
 
-  const exportJSON = () => {
+  const exportJSON = (phiRemoved = false) => {
     const bundle = {
       _schema: CASE_BUNDLE_SCHEMA,
       exportedAt: new Date().toISOString(),
       cases: getCases(),
       library: getPatientLibrary(),
     };
-    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+    // The de-identified bundle drops every date (including exportedAt) and
+    // swaps ages for bands, so it is no longer re-importable as a case log —
+    // it is for sharing/analysis only.
+    const payload = phiRemoved ? deidentifyBundle(bundle) : bundle;
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `compass-cases-${new Date().toISOString().split("T")[0]}.json`;
+    a.download = `compass-cases${phiRemoved ? "-deidentified" : ""}-${new Date().toISOString().split("T")[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -490,8 +495,11 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
           <Button size="sm" variant="outline" onClick={exportCSV}>
             Export CSV
           </Button>
-          <Button size="sm" variant="outline" onClick={exportJSON}>
+          <Button size="sm" variant="outline" onClick={() => exportJSON()}>
             Export JSON
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => exportJSON(true)} title="No dates, no names/MRNs, age as a range">
+            Export JSON (PHI removed)
           </Button>
           {tursoAvailable && (
             <>
