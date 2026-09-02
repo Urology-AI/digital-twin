@@ -90,8 +90,8 @@ function bx(o: Partial<LesionRow> & { side: "L" | "R"; level: LesionRow["level"]
 export const DEMO_CASES: DemoCase[] = [
   {
     id: "low-risk",
-    name: "Low-risk / AS candidate",
-    blurb: "GG1 bilateral · PSAD 0.15 · PI-RADS 2 — low risk across the board",
+    name: "Low-volume GG1, bilateral",
+    blurb: "GG1 both lobes · PSAD 0.15 · PI-RADS 2 — low risk across the board, NS unconstrained",
     record: mkRecord({
       patient: { age: 60, psa: 4.48, psa_density: 0.149, bmi: 26, shim: 21, ipss: 6 },
       prostate: { volume_cc: 30 },
@@ -139,7 +139,7 @@ export const DEMO_CASES: DemoCase[] = [
         max_pct_pattern45: 60, has_cribriform: 1, has_pni: 1, laterality: "bilateral",
         gg_left: 4, gg_right: 4, cores_left: 3, cores_right: 3,
       },
-      staging: { max_pirads: 4, lesion_size_cm: 0.8, max_suv: 11.1, psma_epe: true },
+      staging: { max_pirads: 4, lesion_size_cm: 0.8, max_suv: 11.1 },
     }),
     lesionRows: [
       mri({ side: "L", level: "Base", zone: "Posterolateral", pirads: 4, mriSize: 8 }),
@@ -324,7 +324,7 @@ export const DEMO_CASES: DemoCase[] = [
         max_pct_pattern45: 15, laterality: "bilateral",
         gg_left: 1, gg_right: 2, cores_left: 2, cores_right: 3,
       },
-      staging: { max_pirads: 2, max_suv: 27.2, psma_epe: true },
+      staging: { max_pirads: 2, max_suv: 27.2 },
     }),
     lesionRows: [
       mri({ side: "R", level: "Mid", zone: "Posterolateral", pirads: 2 }),
@@ -384,9 +384,7 @@ export const DEMO_CASES: DemoCase[] = [
         max_pct_pattern45: 45, has_cribriform: 1, laterality: "bilateral",
         gg_left: 3, gg_right: 2, cores_left: 3, cores_right: 2,
       },
-      staging: {
-        max_pirads: 5, abutment: 4, max_suv: 52.3, lymph_nodes_psma: 1, psma_epe: true,
-      },
+      staging: { max_pirads: 5, abutment: 4, max_suv: 52.3, lymph_nodes_psma: 1 },
     }),
     lesionRows: [
       mri({ side: "L", level: "Base", zone: "Posterolateral", pirads: 5 }),
