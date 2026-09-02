@@ -5,6 +5,11 @@ name: Release macOS app
 # code. The build version comes from the tag, not package.json.
 # Run manually (workflow_dispatch) with `preflight` to only check the
 # signing/notarization secrets without building.
+#
+# Three jobs: build (sign + notarize + staple on macos-14), verify (cold
+# Gatekeeper check on a SEPARATE macos-15 runner that never touched the
+# notarization — so its verdict reflects what a user's Mac sees, not a warm
+# local cache), publish (only if verify passed).
 on:
   push:
     tags:
@@ -19,8 +24,8 @@ on:
 jobs:
   build:
     runs-on: macos-14
-    permissions:
-      contents: write
+    outputs:
+      ver: ${{ steps.ver.outputs.v }}
     steps:
       - uses: actions/checkout@v4
 
@@ -120,7 +125,7 @@ jobs:
         if: ${{ !inputs.preflight }}
         run: sudo mdutil -a -i off || true
 
-      - name: Build, sign, notarize
+      - name: Build, sign, notarize, staple
         if: ${{ !inputs.preflight }}
         run: |
           for attempt in 1 2 3; do
@@ -141,42 +146,101 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      # Hard gate — refuse to publish a build whose .app isn't notarized +
-      # stapled. Checks the .app exactly as a downloaded copy would be seen:
-      # mount the .dmg, then run the Gatekeeper assessment offline.
-      - name: Verify notarization
+      - name: Upload release artifacts
         if: ${{ !inputs.preflight }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-mac
+          if-no-files-found: error
+          path: |
+            release/COMPASS-Digital-Twin-*-arm64.dmg
+            release/COMPASS-Digital-Twin-*-arm64.zip
+            release/COMPASS-Digital-Twin-*-arm64.zip.blockmap
+            release/latest-mac.yml
+
+  # Cold Gatekeeper check on a runner that never performed the notarization,
+  # with Apple's online notarization endpoints blocked — so `stapler` and
+  # `spctl` can only succeed from an embedded (stapled) ticket, exactly like a
+  # user's Mac opening the download offline. The old in-job check passed off a
+  # warm local cache and shipped un-notarized builds for three releases.
+  verify:
+    needs: build
+    if: ${{ !inputs.preflight }}
+    runs-on: macos-15
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-mac
+          path: art
+
+      - name: Block Apple's online notarization endpoints
+        run: |
+          sudo tee -a /etc/hosts >/dev/null <<'EOF'
+          0.0.0.0 valid.apple.com
+          0.0.0.0 api.apple-cloudkit.com
+          0.0.0.0 ocsp.apple.com
+          0.0.0.0 ocsp2.apple.com
+          EOF
+          sudo dscacheutil -flushcache || true
+          sudo killall -HUP mDNSResponder || true
+
+      - name: Verify .dmg and .zip are notarized + stapled (offline)
         run: |
           set -e
-          DMG="release/COMPASS-Digital-Twin-${{ steps.ver.outputs.v }}-arm64.dmg"
+          VER="${{ needs.build.outputs.ver }}"
+          DMG="art/COMPASS-Digital-Twin-$VER-arm64.dmg"
+          ZIP="art/COMPASS-Digital-Twin-$VER-arm64.zip"
+
+          echo "::group::.dmg — the disk image itself"
+          xcrun stapler validate "$DMG"
+          # Informational: an unsigned-but-notarized image has no primary
+          # signature for spctl to report on; the authoritative checks are on
+          # the .app below.
+          spctl -a -vvv -t open "$DMG" || true
+          echo "::endgroup::"
+
+          echo "::group::.dmg — the .app inside"
           MP=$(mktemp -d)
           hdiutil attach -nobrowse -quiet -mountpoint "$MP" "$DMG"
-          APP=$(find "$MP" -maxdepth 1 -name "*.app" -print -quit)
-          # Copy off the read-only image and cut network so this is a true
-          # offline Gatekeeper check, exactly what the user's Mac does.
-          WORK=$(mktemp -d); cp -R "$APP" "$WORK/"; hdiutil detach "$MP" -quiet
-          APP2="$WORK/$(basename "$APP")"
-          xcrun stapler validate "$APP2"
-          spctl -a -vvv -t exec "$APP2"
-          # Offline proof: this requirement can only be satisfied by an
-          # embedded (stapled) ticket, no network fallback.
-          codesign --test-requirement="=notarized" --verify --verbose=2 "$APP2"
-          echo "→ $DMG: .app is signed, notarized and stapled (offline-verified)"
+          WORK=$(mktemp -d); cp -R "$MP"/*.app "$WORK/"; hdiutil detach "$MP" -quiet
+          APP=$(find "$WORK" -maxdepth 1 -name "*.app" -print -quit)
+          xcrun stapler validate "$APP"
+          spctl -a -vvv -t exec "$APP"
+          codesign --test-requirement="=notarized" --verify --verbose=2 "$APP"
+          echo "::endgroup::"
+
+          echo "::group::.zip — the .app the auto-updater installs"
+          UZ=$(mktemp -d); ditto -x -k "$ZIP" "$UZ"
+          ZAPP=$(find "$UZ" -maxdepth 1 -name "*.app" -print -quit)
+          xcrun stapler validate "$ZAPP"
+          spctl -a -vvv -t exec "$ZAPP"
+          codesign --test-requirement="=notarized" --verify --verbose=2 "$ZAPP"
+          echo "::endgroup::"
+
+          echo "→ v$VER: .dmg and .zip are signed, notarized and stapled (offline-verified on a cold runner)"
+
+  publish:
+    needs: [build, verify]
+    if: ${{ !inputs.preflight }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-mac
+          path: art
 
       - name: Publish to the private releases repo
-        if: ${{ !inputs.preflight }}
         env:
           GH_TOKEN: ${{ secrets.RELEASES_WRITE_PAT }}
         run: |
           set -e
-          VER="${{ steps.ver.outputs.v }}"
+          VER="${{ needs.build.outputs.ver }}"
           gh release delete "v$VER" --repo Urology-AI/digital-twin-releases --yes --cleanup-tag 2>/dev/null || true
           gh release create "v$VER" \
             --repo Urology-AI/digital-twin-releases \
             --title "$VER" --notes "Automated release. Signed, notarized, stapled." \
-            release/COMPASS-Digital-Twin-*.dmg \
-            release/COMPASS-Digital-Twin-*.dmg.blockmap \
-            release/COMPASS-Digital-Twin-*.zip \
-            release/COMPASS-Digital-Twin-*.zip.blockmap \
-            release/latest-mac.yml
+            art/COMPASS-Digital-Twin-*.dmg \
+            art/COMPASS-Digital-Twin-*.zip \
+            art/COMPASS-Digital-Twin-*.zip.blockmap \
+            art/latest-mac.yml
           echo "::notice::Published v$VER"

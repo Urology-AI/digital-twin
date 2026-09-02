@@ -26,12 +26,19 @@ certificate (in your login keychain, or exported as a `.p12`).
 Copy `.env.example` to `.env` at the repo root and fill it in — `electron-builder`
 loads it automatically. `.env` is gitignored; never commit it.
 
-Notarization is electron-builder's built-in step (`mac.notarize` in
-`electron-builder.yml`): it submits the `.app` to Apple and staples the
-ticket. The `.dmg` is not separately notarized — Gatekeeper accepts a `.dmg`
-whose `.app` is stapled. CI's "Verify notarization" step mounts the built
-`.dmg` and runs an offline Gatekeeper assessment before publishing; a build
-that fails it is never released.
+Notarization is done by two hooks (electron-builder's built-in `mac.notarize`
+is off): `electron/notarize.cjs` (`afterSign`) submits and staples the `.app`
+before it's packed; `electron/notarize-artifacts.cjs` (`afterAllArtifactBuild`)
+submits and staples the finished `.dmg` (needed on macOS 15+, where an
+un-notarized disk image trips "Apple could not verify …" even when the `.app`
+inside is fine) and patches its now-stale `sha512`/`size` in `latest-mac.yml`.
+
+The release workflow's `verify` job then re-checks the published `.dmg` and
+`.zip` on a **separate** `macos-15` runner with Apple's online notarization
+endpoints blocked — so `stapler`/`spctl` can only pass from an embedded
+ticket, exactly like a user's Mac offline. It must run on a runner that never
+performed the notarization: the same runner keeps a warm Gatekeeper cache that
+reports "notarized" even when the shipped ticket is invalid.
 
 ## Releases & auto-update
 
