@@ -11,10 +11,6 @@ files:
   - dist/**/*
   - package.json
 
-# notarize-app.cjs does the full notarize + staple of the .app (notarytool
-# direct). electron-builder's built-in `notarize` only submits, never staples.
-afterSign: electron/notarize-app.cjs
-
 # The renderer is fully offline; nothing is fetched at runtime.
 asarUnpack:
   - dist/**/*
@@ -33,9 +29,10 @@ mac:
   entitlements: electron/entitlements.mac.plist
   entitlementsInherit: electron/entitlements.mac.plist
   # Signing identity is picked up from the keychain, or from CSC_LINK /
-  # CSC_KEY_PASSWORD env vars in CI. Notarization is handled by the
-  # afterSign hook (notarize-app.cjs) — the built-in step doesn't staple.
-  notarize: false
+  # CSC_KEY_PASSWORD env vars in CI. Notarization (submit + staple the .app)
+  # is electron-builder 26's built-in step — needs APPLE_ID,
+  # APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID in the environment.
+  notarize: true
 
 dmg:
   title: ${productName} ${version}
