@@ -111,18 +111,30 @@ jobs:
           name: notarize-probe
           path: ${{ runner.temp }}/probe-stapled.zip
 
-  # Cold runner, Apple's ticket endpoints blocked: the same conditions under
-  # which the real app fails.
+  # The release job's verify runs on macOS 15 with Apple's endpoints blocked.
+  # A real user's Mac is a newer OS and online — those are not the same check,
+  # and v1.0.18 passes the former while failing the latter. Assess the probe
+  # and the real shipped app across both axes so we can see which one moves.
   assess:
     needs: probe
-    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+        network: [online, blocked]
+    runs-on: ${{ matrix.os }}
+    continue-on-error: true
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: notarize-probe
           path: art
 
-      - name: Block Apple's online notarization endpoints
+      - name: Report the runner OS
+        run: sw_vers
+
+      - name: Block Apple's notarization endpoints
+        if: ${{ matrix.network == 'blocked' }}
         run: |
           sudo tee -a /etc/hosts >/dev/null <<'EOF'
           0.0.0.0 valid.apple.com
@@ -133,20 +145,24 @@ jobs:
           sudo dscacheutil -flushcache || true
           sudo killall -HUP mDNSResponder || true
 
-      - name: Ask Gatekeeper about the probe
+      - name: Fetch the shipped v1.0.18 app for comparison
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_READ_PAT }}
+        run: |
+          gh release download v1.0.18 --repo Urology-AI/digital-twin-releases \
+            -p "*arm64.zip" -D art || echo "::warning::could not fetch v1.0.18"
+
+      - name: Assess
         run: |
           UZ=$(mktemp -d); ditto -x -k art/probe-stapled.zip "$UZ"
-          APP="$UZ/NotarizeProbe.app"
-          codesign -dvvv "$APP" 2>&1 | grep -E "Authority|TeamIdentifier|Timestamp" || true
+          echo "=== hello-world probe (same cert, same notarytool credentials)"
+          spctl -a -vv --ignore-cache --no-cache -t exec "$UZ/NotarizeProbe.app" \
+            && echo "PROBE: accepted" || echo "PROBE: REJECTED"
 
-          fail=0
-          spctl -a -vvv -t exec "$APP" || fail=1
-          codesign --test-requirement="=notarized" --verify --verbose=2 "$APP" || fail=1
-          xcrun stapler validate "$APP" || echo "(stapler validate is unreliable on macOS 15+; informational)"
-
-          if [ "$fail" = 0 ]; then
-            echo "::notice::PROBE PASSED — the certificate and notarytool credentials produce a Gatekeeper-accepted app. The COMPASS bundle itself is what Apple's ticket doesn't cover; investigate the app layout (extraResources / app-dist, nested frameworks)."
-          else
-            echo "::error::PROBE FAILED — a 20-line hello-world signed with this identity is also rejected as unnotarized. This is an account/certificate problem, not a COMPASS packaging problem: confirm the Apple Developer Program agreements are accepted for team ${{ secrets.APPLE_TEAM_ID }}, then open a DTS incident quoting the submission id from the probe job."
-            exit 1
+          SHIPPED=$(ls art/COMPASS-Digital-Twin-*-arm64.zip 2>/dev/null | head -1)
+          if [ -n "$SHIPPED" ]; then
+            SZ=$(mktemp -d); ditto -x -k "$SHIPPED" "$SZ"
+            echo "=== shipped COMPASS app"
+            spctl -a -vv --ignore-cache --no-cache -t exec "$SZ"/*.app \
+              && echo "SHIPPED: accepted" || echo "SHIPPED: REJECTED"
           fi
