@@ -6,15 +6,14 @@
 // malware" even when the app inside is fine. So the .dmg needs its own ticket.
 //
 // Stapling rewrites the .dmg, so its sha512/size in latest-mac.yml go stale.
-// We try to patch them here, but electron-builder generally writes that file
-// after this hook runs; electron/patch-dmg-hash.cjs, invoked from the release
-// workflow once everything has settled, is what actually fixes it. (macOS auto-update pulls the .zip, not the
-// .dmg, so nothing consumes the .dmg entry at runtime, but keep it honest.)
+// Patching that does NOT belong here: electron-builder writes latest-mac.yml
+// after this hook runs, so an attempt here silently no-ops (which is how
+// v1.0.21 shipped a stale .dmg entry). electron/patch-dmg-hash.cjs, run from
+// the release workflow once everything has settled, owns it.
 // The .dmg.blockmap only supports differential .dmg downloads, which
 // electron-updater never does on mac; we drop it rather than regenerate it.
 
-const { createHash } = require("node:crypto");
-const { readFileSync, writeFileSync, rmSync, existsSync, statSync } = require("node:fs");
+const { rmSync, statSync } = require("node:fs");
 const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 const { submit, staple, dumpNotaryLog } = require("./notarize-lib.cjs");
@@ -32,24 +31,6 @@ function waitForStableSize(file, tries = 30) {
     execFileSync("sleep", ["1"]);
   }
   throw new Error(`${path.basename(file)} kept changing size after stapling`);
-}
-
-function patchYml(ymlPath, dmgName, dmg) {
-  // electron-builder writes latest-mac.yml AFTER this hook, so this is
-  // normally a no-op and the real patching happens in the release workflow
-  // (electron/patch-dmg-hash.cjs). Say so instead of returning silently —
-  // the silent return is exactly why v1.0.21 shipped a stale .dmg hash.
-  if (!existsSync(ymlPath)) {
-    console.log(`  • ${path.basename(ymlPath)} not written yet — patched later by electron/patch-dmg-hash.cjs`);
-    return;
-  }
-  const sha512 = createHash("sha512").update(readFileSync(dmg)).digest("base64");
-  const size = statSync(dmg).size;
-  const esc = dmgName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const block = new RegExp(`( {2}- url: ${esc}\\n {4}sha512: )[^\\n]*(\\n {4}size: )\\d+`);
-  const next = readFileSync(ymlPath, "utf8").replace(block, `$1${sha512}$2${size}`);
-  writeFileSync(ymlPath, next);
-  console.log(`  • patched ${path.basename(ymlPath)} for ${dmgName} (size ${size})`);
 }
 
 exports.default = async function notarizeArtifacts(context) {
@@ -76,12 +57,8 @@ exports.default = async function notarizeArtifacts(context) {
       console.log(`  • stapler validate ${name} reported a failure (informational): ${e.message}`);
     }
 
-    const blockmap = `${dmg}.blockmap`;
-    if (existsSync(blockmap)) rmSync(blockmap);
+    rmSync(`${dmg}.blockmap`, { force: true });
 
-    for (const yml of ["latest-mac.yml", "beta-mac.yml", "alpha-mac.yml"]) {
-      patchYml(path.join(context.outDir, yml), name, dmg);
-    }
     console.log(`  • ${name} notarized + stapled`);
   }
 };
