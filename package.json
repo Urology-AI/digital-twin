@@ -14,7 +14,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "build:offline": "VITE_OFFLINE=1 vite build",
+    "build:offline": "cross-env VITE_OFFLINE=1 vite build",
     "electron": "npm run build:offline && electron .",
     "dist:mac": "npm run build:offline && electron-builder --mac",
     "dist:win": "npm run build:offline && electron-builder --win"
@@ -49,6 +49,7 @@
     "@types/three": "^0.170.0",
     "@vitejs/plugin-react": "^4.3.3",
     "autoprefixer": "^10.4.20",
+    "cross-env": "^10.1.0",
     "electron": "^33.4.11",
     "electron-builder": "^26.15.3",
     "eslint": "^9.13.0",
