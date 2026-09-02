@@ -5,8 +5,10 @@
 // an un-notarized disk image trips "Apple could not verify … is free of
 // malware" even when the app inside is fine. So the .dmg needs its own ticket.
 //
-// Stapling rewrites the .dmg, so its sha512/size in latest-mac.yml go stale —
-// we recompute and patch them here. (macOS auto-update pulls the .zip, not the
+// Stapling rewrites the .dmg, so its sha512/size in latest-mac.yml go stale.
+// We try to patch them here, but electron-builder generally writes that file
+// after this hook runs; electron/patch-dmg-hash.cjs, invoked from the release
+// workflow once everything has settled, is what actually fixes it. (macOS auto-update pulls the .zip, not the
 // .dmg, so nothing consumes the .dmg entry at runtime, but keep it honest.)
 // The .dmg.blockmap only supports differential .dmg downloads, which
 // electron-updater never does on mac; we drop it rather than regenerate it.
@@ -33,7 +35,14 @@ function waitForStableSize(file, tries = 30) {
 }
 
 function patchYml(ymlPath, dmgName, dmg) {
-  if (!existsSync(ymlPath)) return;
+  // electron-builder writes latest-mac.yml AFTER this hook, so this is
+  // normally a no-op and the real patching happens in the release workflow
+  // (electron/patch-dmg-hash.cjs). Say so instead of returning silently —
+  // the silent return is exactly why v1.0.21 shipped a stale .dmg hash.
+  if (!existsSync(ymlPath)) {
+    console.log(`  • ${path.basename(ymlPath)} not written yet — patched later by electron/patch-dmg-hash.cjs`);
+    return;
+  }
   const sha512 = createHash("sha512").update(readFileSync(dmg)).digest("base64");
   const size = statSync(dmg).size;
   const esc = dmgName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
