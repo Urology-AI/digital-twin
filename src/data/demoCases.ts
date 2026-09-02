@@ -6,8 +6,9 @@
  *
  * Every case is grounded in a de-identified row of the COMPASS RARP working
  * cohort — none are invented. The first eleven are carried over verbatim:
- * demographics, biopsy, staging and the full zone-level lesion map are the
- * de-identified record as exported. The `cohort-*` cases that follow take only
+ * biopsy, staging and the full zone-level lesion map are the de-identified
+ * record as exported; age is rounded to the midpoint of its 5-year band, so
+ * no case carries an exact age. The `cohort-*` cases that follow take only
  * the tumour profile (PSA, volume, grade, core involvement, PI-RADS, PSMA/SUV,
  * laterality) from cohort rows whose export carried no demographics; age, BMI,
  * SHIM, IPSS and lifestyle there are plausible defaults. No identifiers, dates
@@ -92,7 +93,7 @@ export const DEMO_CASES: DemoCase[] = [
   {
     id: "gg1-large-gland",
     name: "GG1 in a 160 cc gland",
-    blurb: "GG1 right \u00b7 PSAD 0.05 \u00b7 PI-RADS 4 apex \u2014 ECE 4%, but the highest upgrade risk on the board",
+    blurb: "GG1 right · PSAD 0.05 · PI-RADS 4 apex — ECE 4%, but the highest upgrade risk on the board",
     record: {
       _schema: "prostate-3d-input-v1",
       patient: { age: 62, psa: 7.9, psa_density: null, bmi: 25, shim: 12, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "active", pfmt: "intensive", alcohol: "none", pde5: true, pde5_plan: "daily" },
@@ -113,10 +114,10 @@ export const DEMO_CASES: DemoCase[] = [
   {
     id: "gg2-unilateral",
     name: "GG2 left only, 66 cc",
-    blurb: "GG2 left \u00b7 PSMA 6.8 \u00b7 SHIM 1 at 74 \u2014 one-sided NS trade-off with no functional reserve",
+    blurb: "GG2 left · PSMA 6.8 · SHIM 1 in his 70s — one-sided NS trade-off with no functional reserve",
     record: {
       _schema: "prostate-3d-input-v1",
-      patient: { age: 74, psa: 4.8, psa_density: null, bmi: 26, shim: 1, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "active", pfmt: "intensive", alcohol: "none", pde5: true, pde5_plan: "daily" },
+      patient: { age: 72, psa: 4.8, psa_density: null, bmi: 26, shim: 1, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "active", pfmt: "intensive", alcohol: "none", pde5: true, pde5_plan: "daily" },
       prostate: { volume_cc: 66, dimensions_cm: null, median_lobe_grade: 0 },
       biopsy: { max_grade_group: 2, total_positive_cores: 0, total_cores: 0, max_core_involvement_pct: 35, max_linear_extent_mm: 0, max_pct_pattern45: 0, has_cribriform: 0, has_idc: 0, has_pni: 0, laterality: "bilateral", gg_left: null, gg_right: null, cores_left: null, cores_right: null, mc_left: null, mc_right: null, linear_left: null, linear_right: null, decipher_score: null },
       staging: { epe: false, svi: false, max_pirads: 1, max_suv: null, lesion_size_cm: null, abutment: null, adc_mean: null, epe_mus: false, svi_mus: false, psma_epe: false, psma_svi: false },
@@ -138,10 +139,10 @@ export const DEMO_CASES: DemoCase[] = [
   {
     id: "gg2-apex-concordant",
     name: "Apical GG2, concordant imaging",
-    blurb: "GG2 right \u00b7 PI-RADS 4 at 0.6 cm \u00b7 PSAD 0.21 \u2014 apical margin focus, NS 1 left / 2 right",
+    blurb: "GG2 right · PI-RADS 4 at 0.6 cm · PSAD 0.21 — apical margin focus, NS 1 left / 2 right",
     record: {
       _schema: "prostate-3d-input-v1",
-      patient: { age: 60, psa: 7.19, psa_density: null, bmi: 29, shim: 17, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
+      patient: { age: 62, psa: 7.19, psa_density: null, bmi: 29, shim: 17, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
       prostate: { volume_cc: 35, dimensions_cm: null, median_lobe_grade: 0 },
       biopsy: { max_grade_group: 2, total_positive_cores: 0, total_cores: 0, max_core_involvement_pct: 30, max_linear_extent_mm: 0, max_pct_pattern45: 0, has_cribriform: 0, has_idc: 0, has_pni: 0, laterality: "bilateral", gg_left: null, gg_right: null, cores_left: null, cores_right: null, mc_left: null, mc_right: null, linear_left: null, linear_right: null, decipher_score: null },
       staging: { epe: false, svi: false, max_pirads: 1, max_suv: null, lesion_size_cm: null, abutment: null, adc_mean: null, epe_mus: false, svi_mus: false, psma_epe: false, psma_svi: false },
@@ -164,10 +165,10 @@ export const DEMO_CASES: DemoCase[] = [
   {
     id: "gg2-right-small-gland",
     name: "Right-sided GG2, 23 cc gland",
-    blurb: "GG2 right \u00b7 cores 45% \u00b7 PI-RADS 4 apex \u2014 NS 1 left / 2 right, the asymmetry case",
+    blurb: "GG2 right · cores 45% · PI-RADS 4 apex — NS 1 left / 2 right, the asymmetry case",
     record: {
       _schema: "prostate-3d-input-v1",
-      patient: { age: 51, psa: 3.4, psa_density: null, bmi: 24, shim: 16, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
+      patient: { age: 52, psa: 3.4, psa_density: null, bmi: 24, shim: 16, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
       prostate: { volume_cc: 23, dimensions_cm: null, median_lobe_grade: 0 },
       biopsy: { max_grade_group: 2, total_positive_cores: 0, total_cores: 0, max_core_involvement_pct: 45, max_linear_extent_mm: 0, max_pct_pattern45: 0, has_cribriform: 0, has_idc: 0, has_pni: 0, laterality: "bilateral", gg_left: null, gg_right: null, cores_left: null, cores_right: null, mc_left: null, mc_right: null, linear_left: null, linear_right: null, decipher_score: null },
       staging: { epe: false, svi: false, max_pirads: 1, max_suv: null, lesion_size_cm: null, abutment: null, adc_mean: null, epe_mus: false, svi_mus: false, psma_epe: false, psma_svi: false },
@@ -191,7 +192,7 @@ export const DEMO_CASES: DemoCase[] = [
   {
     id: "gg2-psma-only",
     name: "GG2 mapped by PSMA, not MRI",
-    blurb: "PI-RADS 3 \u00b7 SUV 9.8 bilateral \u00b7 SHIM 28 at 57 \u2014 PSMA carries the map, functional reserve is high",
+    blurb: "PI-RADS 3 · SUV 9.8 bilateral · SHIM 28 in his 50s — PSMA carries the map, functional reserve is high",
     record: {
       _schema: "prostate-3d-input-v1",
       patient: { age: 57, psa: 7.4, psa_density: null, bmi: 28, shim: 28, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "active", pfmt: "intensive", alcohol: "none", pde5: true, pde5_plan: "daily" },
@@ -216,10 +217,10 @@ export const DEMO_CASES: DemoCase[] = [
   {
     id: "gg2-high-psa-burden",
     name: "PSA 13, cores to 100%",
-    blurb: "GG2 right \u00b7 10 positive cores \u00b7 PI-RADS 4 at 1.1 cm \u2014 volume of disease, not grade, drives ECE right",
+    blurb: "GG2 right · 10 positive cores · PI-RADS 4 at 1.1 cm — volume of disease, not grade, drives ECE right",
     record: {
       _schema: "prostate-3d-input-v1",
-      patient: { age: 68, psa: 12.98, psa_density: null, bmi: 24, shim: 25, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
+      patient: { age: 67, psa: 12.98, psa_density: null, bmi: 24, shim: 25, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
       prostate: { volume_cc: 57, dimensions_cm: null, median_lobe_grade: 0 },
       biopsy: { max_grade_group: 2, total_positive_cores: 0, total_cores: 0, max_core_involvement_pct: 100, max_linear_extent_mm: 9, max_pct_pattern45: 0, has_cribriform: 0, has_idc: 0, has_pni: 0, laterality: "bilateral", gg_left: null, gg_right: null, cores_left: null, cores_right: null, mc_left: null, mc_right: null, linear_left: null, linear_right: null, decipher_score: null },
       staging: { epe: false, svi: false, max_pirads: 1, max_suv: null, lesion_size_cm: null, abutment: null, adc_mean: null, epe_mus: false, svi_mus: false, psma_epe: false, psma_svi: false },
@@ -243,10 +244,10 @@ export const DEMO_CASES: DemoCase[] = [
   {
     id: "gg1-anterior-pirads5",
     name: "Anterior GG1 under a PI-RADS 5",
-    blurb: "Bx GG1 \u00b7 PI-RADS 5 anterior \u00b7 56 cc \u2014 low ECE, upgrade risk 35%",
+    blurb: "Bx GG1 · PI-RADS 5 anterior · 56 cc — low ECE, upgrade risk 35%",
     record: {
       _schema: "prostate-3d-input-v1",
-      patient: { age: 56, psa: 3.71, psa_density: null, bmi: 31.4, shim: 25, ipss: 3, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
+      patient: { age: 57, psa: 3.71, psa_density: null, bmi: 31.4, shim: 25, ipss: 3, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
       prostate: { volume_cc: 56, dimensions_cm: null, median_lobe_grade: 0 },
       biopsy: { max_grade_group: 1, total_positive_cores: 0, total_cores: 0, max_core_involvement_pct: 60, max_linear_extent_mm: 0, max_pct_pattern45: 0, has_cribriform: 0, has_idc: 0, has_pni: 0, laterality: "bilateral", gg_left: null, gg_right: null, cores_left: null, cores_right: null, mc_left: null, mc_right: null, linear_left: null, linear_right: null, decipher_score: 0.15 },
       staging: { epe: false, svi: false, max_pirads: 1, max_suv: null, lesion_size_cm: null, abutment: null, adc_mean: null, epe_mus: false, svi_mus: false, psma_epe: false, psma_svi: false },
@@ -262,7 +263,7 @@ export const DEMO_CASES: DemoCase[] = [
   {
     id: "gg5-negative-mri",
     name: "PI-RADS 2 hiding a GG5",
-    blurb: "PI-RADS 2 \u00b7 SUV 4.5 \u00b7 biopsy GG5 right \u2014 imaging says quiet, grade says otherwise",
+    blurb: "PI-RADS 2 · SUV 4.5 · biopsy GG5 right — imaging says quiet, grade says otherwise",
     record: {
       _schema: "prostate-3d-input-v1",
       patient: { age: 52, psa: 5.6, psa_density: null, bmi: 30, shim: 22, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
@@ -286,10 +287,10 @@ export const DEMO_CASES: DemoCase[] = [
   {
     id: "gg3-pirads5-ece",
     name: "PI-RADS 5, GG3 both lobes",
-    blurb: "GG3 bilateral \u00b7 left cores 70% \u00b7 PI-RADS 5 \u2014 ECE 33%, NS narrows on the left",
+    blurb: "GG3 bilateral · left cores 70% · PI-RADS 5 — ECE 33%, NS narrows on the left",
     record: {
       _schema: "prostate-3d-input-v1",
-      patient: { age: 56, psa: 4.3, psa_density: null, bmi: 25, shim: 24, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
+      patient: { age: 57, psa: 4.3, psa_density: null, bmi: 25, shim: 24, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
       prostate: { volume_cc: 40, dimensions_cm: null, median_lobe_grade: 0 },
       biopsy: { max_grade_group: 3, total_positive_cores: 0, total_cores: 0, max_core_involvement_pct: 70, max_linear_extent_mm: 0, max_pct_pattern45: 0, has_cribriform: 0, has_idc: 0, has_pni: 0, laterality: "bilateral", gg_left: null, gg_right: null, cores_left: null, cores_right: null, mc_left: null, mc_right: null, linear_left: null, linear_right: null, decipher_score: null },
       staging: { epe: false, svi: false, max_pirads: 1, max_suv: null, lesion_size_cm: null, abutment: null, adc_mean: null, epe_mus: false, svi_mus: false, psma_epe: false, psma_svi: false },
@@ -310,10 +311,10 @@ export const DEMO_CASES: DemoCase[] = [
   {
     id: "gg4-psma-heavy",
     name: "High-risk GG4, PSMA-heavy",
-    blurb: "GG4 both lobes \u00b7 SUV 11.1 \u00b7 PSMA in every level \u2014 bilateral ECE near 1 in 3",
+    blurb: "GG4 both lobes · SUV 11.1 · PSMA in every level — bilateral ECE near 1 in 3",
     record: {
       _schema: "prostate-3d-input-v1",
-      patient: { age: 51, psa: 7.7, psa_density: null, bmi: 31, shim: 21, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
+      patient: { age: 52, psa: 7.7, psa_density: null, bmi: 31, shim: 21, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "moderate", pde5: false },
       prostate: { volume_cc: 46, dimensions_cm: null, median_lobe_grade: 0 },
       biopsy: { max_grade_group: 4, total_positive_cores: 0, total_cores: 0, max_core_involvement_pct: 59, max_linear_extent_mm: 0, max_pct_pattern45: 0, has_cribriform: 0, has_idc: 0, has_pni: 0, laterality: "bilateral", gg_left: null, gg_right: null, cores_left: null, cores_right: null, mc_left: null, mc_right: null, linear_left: null, linear_right: null, decipher_score: null },
       staging: { epe: false, svi: false, max_pirads: 1, max_suv: null, lesion_size_cm: null, abutment: null, adc_mean: null, epe_mus: false, svi_mus: false, psma_epe: false, psma_svi: false },
@@ -345,10 +346,10 @@ export const DEMO_CASES: DemoCase[] = [
   {
     id: "gg2-mri-epe",
     name: "MRI EPE+ on a GG2",
-    blurb: "GG2 bilateral \u00b7 cores 100% \u00b7 PI-RADS 5 with EPE \u2014 ECE 48% on a grade you'd normally spare",
+    blurb: "GG2 bilateral · cores 100% · PI-RADS 5 with EPE — ECE 48% on a grade you'd normally spare",
     record: {
       _schema: "prostate-3d-input-v1",
-      patient: { age: 65, psa: 6.9, psa_density: null, bmi: 23, shim: 25, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "active", pfmt: "moderate", alcohol: "moderate", pde5: true, pde5_plan: "daily" },
+      patient: { age: 67, psa: 6.9, psa_density: null, bmi: 23, shim: 25, ipss: null, dm: false, htn: false, cad: false, statin: false, smoking: "never", exercise: "active", pfmt: "moderate", alcohol: "moderate", pde5: true, pde5_plan: "daily" },
       prostate: { volume_cc: 22, dimensions_cm: null, median_lobe_grade: 0 },
       biopsy: { max_grade_group: 2, total_positive_cores: 0, total_cores: 0, max_core_involvement_pct: 100, max_linear_extent_mm: 9, max_pct_pattern45: 0, has_cribriform: 0, has_idc: 0, has_pni: 0, laterality: "bilateral", gg_left: null, gg_right: null, cores_left: null, cores_right: null, mc_left: null, mc_right: null, linear_left: null, linear_right: null, decipher_score: null },
       staging: { epe: true, svi: false, max_pirads: 1, max_suv: null, lesion_size_cm: null, abutment: null, adc_mean: null, epe_mus: false, svi_mus: false, psma_epe: false, psma_svi: false },
