@@ -367,6 +367,189 @@ function ZoneDetail({ zone, data, onUpdate, onClear, onClose }: {
   );
 }
 
+// ── Add-a-finding quick form ─────────────────────────────────────────────────
+// Plain-language entry that stamps one score across every matching grid zone at
+// once, so a multi-level / bilateral lesion is one action instead of many.
+type Lvl = "Base" | "Mid" | "Apex";
+interface FindingInput {
+  test: "MRI" | "Bx" | "MUS" | "PSMA";
+  side: "L" | "R" | "Both";
+  region: "front" | "back" | "corner";
+  levels: Lvl[];
+  score: string;
+  epe: boolean;
+  svi: boolean;
+}
+
+const TEST_OPTS = [
+  { v: "MRI", l: "MRI" },
+  { v: "Bx", l: "Biopsy" },
+  { v: "MUS", l: "Micro-US" },
+  { v: "PSMA", l: "PSMA PET" },
+] as const;
+
+const REGION_OPTS = [
+  { v: "front", l: "Front" },
+  { v: "back", l: "Back" },
+  { v: "corner", l: "Back corner" },
+] as const;
+
+const SIDE_OPTS = [
+  { v: "L", l: "Left" },
+  { v: "R", l: "Right" },
+  { v: "Both", l: "Both" },
+] as const;
+
+const LVLS: Lvl[] = ["Base", "Mid", "Apex"];
+
+const SCORE_META: Record<
+  FindingInput["test"],
+  { label: string; hint: string; lo: number; hi: number }
+> = {
+  MRI: { label: "PI-RADS", hint: "1–5", lo: 1, hi: 5 },
+  Bx: { label: "Grade Group", hint: "1–5", lo: 1, hi: 5 },
+  MUS: { label: "PRI-MUS", hint: "1–5", lo: 1, hi: 5 },
+  PSMA: { label: "SUVmax", hint: "e.g. 12.4", lo: 0.1, hi: 200 },
+};
+
+function Seg<T extends string>({ value, options, onChange }: {
+  value: T;
+  options: readonly { v: T; l: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {options.map((o) => (
+        <button
+          key={o.v}
+          type="button"
+          onClick={() => onChange(o.v)}
+          className={cn(
+            "h-8 rounded-md px-2.5 text-xs font-semibold transition-colors",
+            value === o.v
+              ? "bg-primary text-primary-foreground"
+              : "bg-muted/50 text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+          )}
+        >
+          {o.l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AddFindingForm({ onAdd }: { onAdd: (f: FindingInput) => number }) {
+  const [test, setTest] = useState<FindingInput["test"]>("MRI");
+  const [side, setSide] = useState<FindingInput["side"]>("R");
+  const [region, setRegion] = useState<FindingInput["region"]>("back");
+  const [levels, setLevels] = useState<Lvl[]>([]);
+  const [score, setScore] = useState("");
+  const [epe, setEpe] = useState(false);
+  const [svi, setSvi] = useState(false);
+  const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+
+  const meta = SCORE_META[test];
+  const showSvi = test === "MRI" || test === "PSMA";
+
+  const toggleLvl = (l: Lvl) =>
+    setLevels((cur) => (cur.includes(l) ? cur.filter((x) => x !== l) : [...cur, l]));
+
+  const submit = () => {
+    const n = parseFloat(score);
+    if (levels.length === 0) {
+      setMsg({ kind: "err", text: "Pick at least one level (base / mid / apex)." });
+      return;
+    }
+    if (isNaN(n) || n < meta.lo || n > meta.hi) {
+      setMsg({ kind: "err", text: `Enter a ${meta.label} value (${meta.hint}).` });
+      return;
+    }
+    const count = onAdd({ test, side, region, levels, score, epe, svi });
+    if (count <= 0) {
+      setMsg({ kind: "err", text: "No matching zone in the grid for that side / location / level." });
+      return;
+    }
+    setMsg({ kind: "ok", text: `Added ${meta.label} ${score} to ${count} zone${count === 1 ? "" : "s"}.` });
+    setScore("");
+    setEpe(false);
+    setSvi(false);
+  };
+
+  return (
+    <div className="shrink-0 rounded-lg border border-primary/30 bg-primary/[0.03] p-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-primary">Add a finding</h4>
+        <span className="text-[10px] text-muted-foreground">fills the grid below — or click a zone to edit it directly</span>
+      </div>
+      <div className="grid gap-2.5 sm:grid-cols-2">
+        <div className="space-y-1">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Test</span>
+          <Seg value={test} options={TEST_OPTS} onChange={(v) => { setTest(v); setMsg(null); }} />
+        </div>
+        <div className="space-y-1">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Side</span>
+          <Seg value={side} options={SIDE_OPTS} onChange={setSide} />
+        </div>
+        <div className="space-y-1">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Front or back</span>
+          <Seg value={region} options={REGION_OPTS} onChange={setRegion} />
+        </div>
+        <div className="space-y-1">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Level</span>
+          <div className="flex flex-wrap gap-1">
+            {LVLS.map((l) => (
+              <button
+                key={l}
+                type="button"
+                onClick={() => toggleLvl(l)}
+                className={cn(
+                  "h-8 rounded-md px-2.5 text-xs font-semibold transition-colors",
+                  levels.includes(l)
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted/80 hover:text-foreground",
+                )}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-1">
+          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {meta.label} <span className="font-normal normal-case text-muted-foreground/70">({meta.hint})</span>
+          </span>
+          <Input
+            type="number"
+            inputMode="decimal"
+            placeholder={meta.hint}
+            value={score}
+            onChange={(e) => setScore(e.target.value)}
+            className="h-9 w-32 text-sm"
+          />
+        </div>
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-1 pb-1">
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+            <input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary" checked={epe} onChange={(e) => setEpe(e.target.checked)} />
+            extends outside capsule
+          </label>
+          {showSvi && (
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+              <input type="checkbox" className="h-3.5 w-3.5 rounded accent-primary" checked={svi} onChange={(e) => setSvi(e.target.checked)} />
+              into seminal vesicle
+            </label>
+          )}
+        </div>
+      </div>
+      <div className="mt-2.5 flex flex-wrap items-center gap-3">
+        <Button type="button" size="sm" onClick={submit}>+ Add finding</Button>
+        {msg && (
+          <span className={cn("text-xs", msg.kind === "ok" ? "text-emerald-500" : "text-amber-500")}>{msg.text}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Main wizard ───────────────────────────────────────────────────────────────
 export function ZoneInputWizard() {
   const patients           = usePatientStore((s) => s.patients);
@@ -433,6 +616,41 @@ export function ZoneInputWizard() {
     });
     setSelectedZone(null);
   }, [updateLesionRows]);
+
+  const addFinding = useCallback((f: FindingInput): number => {
+    const pos =
+      f.region === "front" ? "Anterior" : f.region === "back" ? "Posterior" : "Posterolateral";
+    const targets = ALL_ZONES.filter(
+      (z) => (f.side === "Both" || z.side === f.side) && z.pos === pos && f.levels.includes(z.level),
+    );
+    if (targets.length === 0) return 0;
+    const n = parseFloat(f.score);
+    setZoneData((prev) => {
+      const next = { ...prev };
+      for (const z of targets) {
+        const d: ZoneModality = { ...(next[z.id] ?? {}) };
+        if (f.test === "MRI") {
+          d.pirads = n;
+          if (f.epe) d.mriEpe = true;
+          if (f.svi) d.mriSvi = true;
+        } else if (f.test === "Bx") {
+          d.gg = n;
+        } else if (f.test === "MUS") {
+          d.primus = n;
+          if (f.epe) d.musEce = true;
+        } else {
+          d.suv = n;
+          if (f.epe) d.psmaEpe = true;
+          if (f.svi) d.psmaSvi = true;
+        }
+        next[z.id] = d;
+      }
+      updateLesionRows(zoneDataToRows(next));
+      return next;
+    });
+    pushHistory();
+    return targets.length;
+  }, [updateLesionRows, pushHistory]);
 
   const clearAllZones = useCallback(() => {
     if (!window.confirm("Clear all zone locations? This cannot be undone until you apply a new checkpoint.")) return;
@@ -636,40 +854,43 @@ export function ZoneInputWizard() {
     <div className="flex h-full flex-col overflow-hidden">
 
       {/* ── Tab bar ── */}
-      <div className="flex shrink-0 items-center border-b border-border bg-muted/20">
+      <div className="flex shrink-0 items-stretch border-b border-border bg-muted/20">
         {TABS.map((tab) => (
           <button
             key={tab.n}
             type="button"
             onClick={() => { setActiveTab(tab.n); setSelectedZone(null); }}
             className={cn(
-              "flex flex-1 items-center justify-center gap-2 border-b-[3px] py-3 text-sm font-bold transition-colors sm:gap-3 sm:py-[18px] sm:text-base",
+              "flex min-w-0 flex-1 items-center justify-center gap-2 border-b-[3px] px-1 py-3 text-sm font-bold transition-colors sm:gap-3 sm:py-[18px] sm:text-base",
               activeTab === tab.n
                 ? "border-primary bg-primary/5 text-primary"
                 : "border-transparent text-muted-foreground hover:bg-muted/20 hover:text-foreground",
             )}
           >
             <span className={cn(
-              "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-sm font-black",
+              "inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-xs font-black sm:h-7 sm:w-7 sm:text-sm",
               activeTab === tab.n ? "bg-primary text-primary-foreground" : "bg-muted/60 text-muted-foreground",
             )}>
               {activeTab > tab.n ? "✓" : tab.n}
             </span>
-            <span className="flex flex-col items-start leading-none">
-              <span className="text-[9px] font-semibold uppercase tracking-wide opacity-60">Step {tab.n} of 2</span>
-              <span>{tab.label}</span>
+            <span className="flex min-w-0 flex-col items-start leading-none">
+              <span className="hidden text-[9px] font-semibold uppercase tracking-wide opacity-60 sm:block">Step {tab.n} of 2</span>
+              <span className="truncate">{tab.label}</span>
             </span>
             {tab.n === 2 && totalFilled > 0 && (
-              <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-xs font-bold text-primary">{totalFilled}</span>
+              <span className="shrink-0 rounded-full bg-primary/20 px-1.5 py-0.5 text-xs font-bold text-primary">{totalFilled}</span>
             )}
           </button>
         ))}
         <button
           type="button"
           onClick={() => setShowNoteImport(true)}
-          className="mr-3 flex shrink-0 items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary transition-colors hover:bg-primary/15"
+          title="Paste clinic note"
+          className="flex shrink-0 items-center gap-1.5 border-l border-border px-3 text-xs font-bold text-primary transition-colors hover:bg-primary/10"
         >
-          ↑ Paste clinic note
+          <span aria-hidden>↑</span>
+          <span className="hidden lg:inline">Paste note</span>
+          <span className="sr-only">Paste clinic note</span>
         </button>
       </div>
 
@@ -922,6 +1143,7 @@ export function ZoneInputWizard() {
         <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
           {/* Zone grids */}
           <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:p-4">
+            <AddFindingForm onAdd={addFinding} />
             {/* Legend + import button */}
             <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-5 gap-y-1.5 text-xs text-muted-foreground/80">
               <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
