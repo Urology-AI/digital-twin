@@ -19,7 +19,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [javascript-typescript, python]
+        # `actions` scans the workflows themselves; the repo's CodeQL config
+        # expects it, and a missing one fails the aggregate check.
+        language: [javascript-typescript, python, actions]
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3
