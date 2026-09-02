@@ -4,6 +4,12 @@ import { ChevronsUpDown, FilePlus2, RotateCcw, Upload, Check } from "lucide-reac
 import { usePatientStore } from "@/store/patientStore";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { DEMO_CASES } from "@/data/demoCases";
+
+/**
+ * Shortcut key per demo case, in picker order: 1–9, then 0 for the tenth, then
+ * letters. Cases past the end of this list simply have no shortcut.
+ */
+const DEMO_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Q", "W", "E", "R", "T", "Y"];
 import { cn } from "@/lib/utils";
 
 /** Compact risk label from the current predictions, for the trigger chip. */
@@ -66,15 +72,15 @@ export function CasePicker({ sampleOnly = false }: { sampleOnly?: boolean }) {
     };
   }, [open]);
 
-  // Number keys 1–4 load the matching demo case (unless typing in a field)
+  // Shortcut keys load the matching demo case (unless typing in a field)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
-      const n = Number(e.key);
-      if (n >= 1 && n <= Math.min(9, DEMO_CASES.length)) {
-        loadDemoCase(DEMO_CASES[n - 1]!);
+      const i = DEMO_KEYS.indexOf(e.key.toUpperCase());
+      if (i >= 0 && i < DEMO_CASES.length) {
+        loadDemoCase(DEMO_CASES[i]!);
         setOpen(false);
       }
     };
@@ -148,12 +154,12 @@ export function CasePicker({ sampleOnly = false }: { sampleOnly?: boolean }) {
                   <kbd
                     className={cn(
                       "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-bold",
-                      i < 9
+                      DEMO_KEYS[i]
                         ? "border-border bg-muted text-muted-foreground"
                         : "border-transparent text-transparent",
                     )}
                   >
-                    {i + 1}
+                    {DEMO_KEYS[i] ?? ""}
                   </kbd>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5 text-sm font-semibold text-foreground">
