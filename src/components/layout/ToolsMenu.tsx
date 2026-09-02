@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import {
   BookOpen,
   Info,
+  ListChecks,
   MoreHorizontal,
   Monitor,
   Printer,
@@ -16,8 +17,8 @@ import { cn } from "@/lib/utils";
 
 /**
  * "More" dropdown for the header's secondary actions — the clinician tools
- * that don't need to be one click away (case log, patient summary, presenter
- * view, share, print, about). Keeps the top bar from overflowing on smaller
+ * that don't need to be one click away (case log, patient summary, overview
+ * mode, presenter view, share, print, about). Keeps the top bar from overflowing on smaller
  * screens. Only rendered outside demo mode (AppHeader gates it).
  */
 export function ToolsMenu() {
@@ -26,6 +27,8 @@ export function ToolsMenu() {
   const setShareOpen = useUiStore((s) => s.setShareOpen);
   const setPatientView = useUiStore((s) => s.setPatientView);
   const presenterView = useUiStore((s) => s.presenterView);
+  const overview = useUiStore((s) => s.overview);
+  const setOverview = useUiStore((s) => s.setOverview);
   const setPresenterView = useUiStore((s) => s.setPresenterView);
 
   const offline = isOfflineBuild();
@@ -62,6 +65,14 @@ export function ToolsMenu() {
   const items: { label: string; Icon: React.ElementType; onClick: () => void; active?: boolean }[] = [
     { label: "Case log", Icon: BookOpen, onClick: run(() => setCaseLogOpen(true)) },
     { label: "Patient summary", Icon: UserRound, onClick: run(() => setPatientView(true)) },
+    {
+      // Overview = every tab collapsed to its key points (also the header
+      // toggle). Presenter view is the separate full-screen consult display.
+      label: overview ? "Exit overview mode" : "Overview mode",
+      Icon: ListChecks,
+      onClick: run(() => setOverview(!overview)),
+      active: overview,
+    },
     {
       label: presenterView ? "Exit presenter view" : "Presenter view",
       Icon: Monitor,
