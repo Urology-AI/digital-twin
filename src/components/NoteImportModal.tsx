@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { parseClinicNote } from "@/lib/parseClinicNote";
-import { parseClinicalText } from "@/lib/api";
+import { isAiParsingEnabled, parseClinicalText } from "@/lib/api";
 import { emptyLesion, type LesionRow, type LesionSource } from "@/types/lesion";
 import { cn } from "@/lib/utils";
 
@@ -169,11 +169,15 @@ export function NoteImportModal({ onClose, onApply }: Props) {
       }
       const noteWarnings = [...(parsed.warnings ?? [])];
       let demographics: NoteImportClinical = {};
-      try {
-        const llm = await parseClinicalText(noteText);
-        demographics = { age: llm.age, psa: llm.psa, bmi: llm.bmi, decipher: llm.decipher, shim: llm.shim, ipss: llm.ipss };
-      } catch {
-        noteWarnings.push("LLM-assisted demographic extraction unavailable — only zone/volume data from text patterns was used.");
+      if (isAiParsingEnabled()) {
+        try {
+          const llm = await parseClinicalText(noteText);
+          demographics = { age: llm.age, psa: llm.psa, bmi: llm.bmi, decipher: llm.decipher, shim: llm.shim, ipss: llm.ipss };
+        } catch {
+          noteWarnings.push("AI demographic extraction failed — used offline text patterns only for zone/volume data.");
+        }
+      } else {
+        noteWarnings.push("Parsed offline — note text stayed in your browser. Age / PSA / BMI etc. were not auto-filled (turn on AI parsing in AI Settings to send text to Google Gemini for those).");
       }
 
       setEntries(collapseToReviewEntries(parsed.lesions));
@@ -322,7 +326,17 @@ export function NoteImportModal({ onClose, onApply }: Props) {
         {step === "paste" && (
           <>
             <div className="flex-1 overflow-y-auto px-5 py-4">
-              <p className="mb-3 text-sm text-muted-foreground">Paste your clinical note below. The parser handles copy-pasted EHR text, tab-indented tables, and inline section headers.</p>
+              <p className="mb-2 text-sm text-muted-foreground">Paste your clinical note below. The parser handles copy-pasted EHR text, tab-indented tables, and inline section headers.</p>
+              <p className={cn(
+                "mb-3 rounded-md border px-2.5 py-1.5 text-xs",
+                isAiParsingEnabled()
+                  ? "border-amber-500/30 bg-amber-500/5 text-amber-600"
+                  : "border-emerald-500/30 bg-emerald-500/5 text-emerald-600",
+              )}>
+                {isAiParsingEnabled()
+                  ? "AI parsing ON — note text is de-identified, then sent to Google Gemini."
+                  : "Offline parsing — note text stays in your browser. Nothing is sent out."}
+              </p>
               <textarea
                 className="h-60 w-full resize-none rounded-lg border border-input bg-muted/20 p-3 font-mono text-xs text-foreground placeholder:text-muted-foreground/40 focus:bg-background focus:outline-none focus:ring-1 focus:ring-ring/60"
                 placeholder={EXAMPLE_NOTE}

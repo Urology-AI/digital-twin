@@ -1,27 +1,73 @@
+import { deidentify, deidentifyClinical } from "@/lib/deidentify";
+
 // ── localStorage keys ─────────────────────────────────────────────────────────
 const LS_URL   = "compass_llm_url";
 const LS_MODEL = "compass_llm_model";
 const LS_KEY   = "compass_llm_key";
+// Opt-in gate for AI note parsing. OFF by default: when OFF, note text is
+// parsed entirely offline in the browser; when ON, note text is sent to the
+// configured LLM endpoint (the shared proxy forwards to Google Gemini).
+const LS_AI_PARSE = "compass_ai_parse_enabled";
+
+const FETCH_TIMEOUT_MS = 30_000;
+
+/** fetch() with an AbortController timeout so a hung endpoint can't hang the UI. */
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+export function isAiParsingEnabled(): boolean {
+  try {
+    return localStorage.getItem(LS_AI_PARSE) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function setAiParsingEnabled(on: boolean): void {
+  if (on) localStorage.setItem(LS_AI_PARSE, "1");
+  else localStorage.removeItem(LS_AI_PARSE);
+}
 
 // ── LLM config ────────────────────────────────────────────────────────────────
+
+// Default: our own cf-worker route (same-origin). It holds the Gemini key
+// server-side and speaks the OpenAI request/response shape, so nothing about
+// the upstream provider — URL or key — ever ships in this bundle.
+const DEFAULT_LLM_URL = "/api/chat";
 
 function normalizeUrl(url: string): string {
   url = url.trim().replace(/\/$/, "");
   if (!url) return "";
-  if (url.endsWith("/chat/completions")) return url;
+  // Our worker route (or any explicit chat-completions URL) is used as-is.
+  if (url.endsWith("/api/chat") || url.endsWith("/chat/completions")) return url;
   if (url.endsWith("/v1/models")) return url.slice(0, -"/v1/models".length) + "/v1/chat/completions";
   if (url.endsWith("/v1")) return url + "/chat/completions";
   return url + "/v1/chat/completions";
 }
 
 export function getLlmUrl(): string {
-  return normalizeUrl(localStorage.getItem(LS_URL) ?? import.meta.env.VITE_LLM_URL ?? "");
+  return normalizeUrl(
+    localStorage.getItem(LS_URL) ?? import.meta.env.VITE_LLM_URL ?? DEFAULT_LLM_URL,
+  );
 }
 
 export function getLlmModel(): string {
   return localStorage.getItem(LS_MODEL) ?? import.meta.env.VITE_LLM_MODEL ?? "";
 }
 
+/**
+ * NOT a real secret. Anything from `VITE_LLM_KEY` is baked into the client
+ * bundle and anything in localStorage is readable by the page — treat this
+ * only as a coarse rate-gate token for a shared proxy, never as a credential
+ * that protects data.
+ */
 export function getLlmKey(): string {
   return localStorage.getItem(LS_KEY) ?? import.meta.env.VITE_LLM_KEY ?? "";
 }
@@ -60,10 +106,23 @@ export async function testLlmEndpoint(rawUrl?: string): Promise<TestLlmResponse>
   if (model) payload.model = model;
 
   try {
-    await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
+    const res = await fetchWithTimeout(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+    // A 4xx/5xx means we reached something but it rejected us — that is NOT a
+    // healthy endpoint. Only a 2xx counts as connected.
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, error: `HTTP ${res.status}${body ? ` — ${body.slice(0, 200)}` : ""}` };
+    }
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    const msg = e instanceof Error && e.name === "AbortError"
+      ? `No response within ${FETCH_TIMEOUT_MS / 1000}s`
+      : e instanceof Error ? e.message : String(e);
+    return { ok: false, error: msg };
   }
 }
 
@@ -132,7 +191,7 @@ async function llmChat(
   };
   if (model) payload.model = model;
 
-  const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
+  const res = await fetchWithTimeout(url, { method: "POST", headers, body: JSON.stringify(payload) });
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText);
     throw new Error(`LLM error (${res.status}): ${text.slice(0, 300)}`);
@@ -204,11 +263,25 @@ const PARSE_SYSTEM =
   "shim (SHIM erectile function score 1-25), ipss (IPSS urinary symptom score 0-35).\n" +
   "Return only a JSON object. Do not guess values not present in the text.";
 
+export class AiParsingDisabledError extends Error {
+  constructor() {
+    super("AI parsing is off — note text stays in the browser. Enable it in AI Settings to send text to Google Gemini.");
+    this.name = "AiParsingDisabledError";
+  }
+}
+
+/**
+ * LLM-assisted extraction of clinical values from free text. Gated: throws
+ * `AiParsingDisabledError` unless the user has explicitly opted in. When it
+ * does run, the text is de-identified first (best effort — see deidentify.ts).
+ */
 export async function parseClinicalText(text: string): Promise<ParsedClinicalFields> {
+  if (!isAiParsingEnabled()) throw new AiParsingDisabledError();
+  const { text: safeText } = deidentify(text);
   const reply = await llmChat(
     [
       { role: "system", content: PARSE_SYSTEM },
-      { role: "user", content: text },
+      { role: "user", content: safeText },
     ],
     { temperature: 0, maxTokens: 512 },
   );
@@ -226,8 +299,10 @@ export async function chatWithAssistant(
   clinical?: Record<string, unknown>,
   attachments?: ChatAttachment[],
 ): Promise<ChatResponse> {
+  // Drop identifier-bearing keys (patient_name, mrn, dob…) before the record
+  // is serialised — the assistant only needs the clinical numbers.
   const clinicalBlock = clinical
-    ? "CURRENT COMPASS PATIENT DATA:\n" + JSON.stringify(clinical, null, 2)
+    ? "CURRENT COMPASS PATIENT DATA:\n" + JSON.stringify(deidentifyClinical(clinical), null, 2)
     : "No patient data loaded in COMPASS yet.";
 
   const system =
@@ -239,8 +314,9 @@ export async function chatWithAssistant(
     { role: "system", content: system },
   ];
 
+  // Scrub identifiers from the clinician's own typed messages (best effort).
   for (const m of messages) {
-    llmMessages.push({ role: m.role, content: m.content });
+    llmMessages.push({ role: m.role, content: deidentify(m.content).text });
   }
 
   // Attach files/images to the last user message
@@ -255,7 +331,7 @@ export async function chatWithAssistant(
       if (a.data_url && a.mime.startsWith("image/")) {
         parts.push({ type: "image_url", image_url: { url: a.data_url } });
       } else if (a.text) {
-        textBlobs.push(`--- ${a.name} (${a.mime}) ---\n${a.text}`);
+        textBlobs.push(`--- ${a.name} (${a.mime}) ---\n${deidentify(a.text).text}`);
       }
     }
     if (textBlobs.length) {

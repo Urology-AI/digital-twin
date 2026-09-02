@@ -33,7 +33,24 @@ import { createClient } from "@libsql/client/web";
 interface Env {
   TURSO_URL: string;
   TURSO_AUTH_TOKEN: string;
+  // Optional — bound only once the `ratelimits` namespace is provisioned
+  // (see wrangler.jsonc). Absent in local dev / before first provision, so
+  // every use is guarded with `?.`.
+  TURSO_RL?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
+  // Google Generative Language API key (free tier: aistudio.google.com/apikey).
+  //   npx wrangler secret put GEMINI_API_KEY
+  GEMINI_API_KEY?: string;
 }
+
+// COMPASS's own Gemini call lives here so the API key never ships in the
+// client bundle — the browser hits this Worker same-origin at /api/chat.
+// NOTE: the Google Generative Language API is NOT covered by a BAA. The
+// client de-identifies before sending (src/lib/deidentify.ts) and this
+// Worker logs status codes only — never prompt or response text.
+const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_URL = (model: string, key: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+const MAX_CHAT_BODY_BYTES = 600_000; // room for a base64 screenshot
 
 /**
  * Origin allowlist — the two front-ends that legitimately call this proxy.
@@ -44,16 +61,22 @@ interface Env {
 const ALLOWED_ORIGINS = new Set([
   "https://digital-twin.urology.edu.eu.org",
   "https://urology-ai.github.io",
+  "http://localhost:5173", // vite dev
+  "http://localhost:4173", // vite preview
 ]);
 
 /**
  * SQL allowlist. The proxy is public (no Access application on /api/*), so
  * without this any caller could `SELECT * FROM patient_shares` and dump
- * every shared patient record. Only the exact statements src/lib/turso.ts
- * issues are permitted:
- *  - patient_shares (holds identified records) — matched exactly, incl. arg count.
- *  - case_log (de-identified research log) — matched by statement shape.
- * Anything else is refused.
+ * every shared patient record — or `SELECT * FROM sqlite_master` to map the
+ * whole schema. Only the exact statements src/lib/turso.ts issues are
+ * permitted:
+ *  - patient_shares (holds identified records) — full statement + arg count.
+ *  - case_log (de-identified research log) — the one SELECT it runs, plus
+ *    the CREATE/ALTER shapes its schema-evolution path emits.
+ * There is deliberately NO bare "select " allowance: a generic SELECT prefix
+ * would re-open arbitrary reads of any non-patient_shares table (and the
+ * schema). Anything not matched below is refused.
  */
 function normalizeSql(sql: string): string {
   return sql.trim().replace(/\s+/g, " ").replace(/;\s*$/, "");
@@ -64,9 +87,11 @@ const SHARE_PUT =
   "INSERT OR REPLACE INTO patient_shares (id, record, created_at) VALUES (?, ?, ?)";
 const SHARE_CREATE =
   "CREATE TABLE IF NOT EXISTS patient_shares ( id TEXT PRIMARY KEY, record TEXT NOT NULL, created_at TEXT NOT NULL )";
+// The single read pullCases() issues (src/lib/turso.ts) — case_log is the
+// de-identified research log, so a full-table read of it is by design.
+const CASE_LOG_SELECT = "SELECT * FROM case_log ORDER BY date DESC";
 
 const ALLOWED_SQL_PREFIXES = [
-  "select ",
   "create table if not exists case_log ",
   "alter table case_log add column ",
   "insert or replace into case_log ",
@@ -77,8 +102,9 @@ function isAllowedSql(sql: string, args: unknown[]): boolean {
   if (s === SHARE_GET) return args.length === 1;
   if (s === SHARE_PUT) return args.length === 3;
   if (s === SHARE_CREATE) return true;
-  // No other access to the identified-records table.
-  if (/patient_shares/i.test(s)) return false;
+  if (s === CASE_LOG_SELECT) return args.length === 0;
+  // Nothing else may touch patient_shares, and no other SELECT is allowed.
+  if (/patient_shares/i.test(s) || /^select\b/i.test(s)) return false;
   const low = s.toLowerCase();
   return ALLOWED_SQL_PREFIXES.some((p) => low.startsWith(p));
 }
@@ -211,6 +237,119 @@ function withSecurityHeaders(response: Response, status = response.status): Resp
   return new Response(response.body, { status, headers });
 }
 
+// ── /api/chat — COMPASS's own Gemini call ─────────────────────────────────────
+// The browser POSTs an OpenAI-style body ({ messages, temperature?, max_tokens?,
+// model? }) to this same-origin route; the Worker translates to Gemini's
+// generateContent, calls Google with the server-held key, and translates the
+// reply back to the OpenAI shape src/lib/api.ts already expects.
+
+interface OaPart { type: "text" | "image_url"; text?: string; image_url?: { url: string } }
+interface OaMessage { role: "system" | "user" | "assistant"; content: string | OaPart[] }
+interface GeminiPart { text?: string; inline_data?: { mime_type: string; data: string } }
+
+function toGeminiParts(content: string | OaPart[]): GeminiPart[] {
+  if (typeof content === "string") return [{ text: content }];
+  const parts: GeminiPart[] = [];
+  for (const p of content) {
+    if (p.type === "text" && p.text) parts.push({ text: p.text });
+    else if (p.type === "image_url" && p.image_url?.url?.startsWith("data:")) {
+      const m = /^data:([^;]+);base64,(.*)$/s.exec(p.image_url.url);
+      if (m) parts.push({ inline_data: { mime_type: m[1], data: m[2] } });
+    }
+  }
+  return parts.length ? parts : [{ text: "" }];
+}
+
+interface GeminiBody {
+  system_instruction?: { parts: GeminiPart[] };
+  contents: { role: "user" | "model"; parts: GeminiPart[] }[];
+  generationConfig: { temperature: number; maxOutputTokens: number };
+}
+
+function oaToGemini(messages: OaMessage[], temperature: number, maxTokens: number): GeminiBody {
+  const sys = messages.filter((m) => m.role === "system").map((m) => toGeminiParts(m.content)).flat();
+  const contents = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: (m.role === "assistant" ? "model" : "user") as "user" | "model", parts: toGeminiParts(m.content) }));
+  const body: GeminiBody = { contents, generationConfig: { temperature, maxOutputTokens: maxTokens } };
+  if (sys.length) body.system_instruction = { parts: sys };
+  return body;
+}
+
+async function handleChat(request: Request, env: Env): Promise<Response> {
+  const origin = request.headers.get("Origin");
+  const cors: Record<string, string> = {
+    "Access-Control-Allow-Origin": origin && ALLOWED_ORIGINS.has(origin) ? origin : "null",
+    "Vary": "Origin",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+  const reply = (obj: unknown, status: number) =>
+    new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json", ...cors } });
+
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (request.method !== "POST") return reply({ error: "POST only" }, 405);
+  if (origin && !ALLOWED_ORIGINS.has(origin)) return reply({ error: "Origin not allowed" }, 403);
+  if (!env.GEMINI_API_KEY) return reply({ error: "Chat not configured on server" }, 503);
+
+  if (Number(request.headers.get("Content-Length") || 0) > MAX_CHAT_BODY_BYTES) {
+    return reply({ error: "Request too large" }, 413);
+  }
+  if (env.TURSO_RL) {
+    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    const { success } = await env.TURSO_RL.limit({ key: `chat:${ip}` });
+    if (!success) return reply({ error: "Rate limit exceeded — slow down" }, 429);
+  }
+
+  let parsed: { messages?: OaMessage[]; temperature?: number; max_tokens?: number; model?: string };
+  try {
+    parsed = await request.json();
+  } catch {
+    return reply({ error: "Invalid JSON" }, 400);
+  }
+  if (!Array.isArray(parsed.messages) || parsed.messages.length === 0) {
+    return reply({ error: "Missing 'messages'" }, 400);
+  }
+
+  const model = typeof parsed.model === "string" && parsed.model.trim() ? parsed.model.trim() : GEMINI_MODEL;
+  const geminiBody = oaToGemini(
+    parsed.messages,
+    typeof parsed.temperature === "number" ? parsed.temperature : 0.3,
+    typeof parsed.max_tokens === "number" ? parsed.max_tokens : 1024,
+  );
+
+  let res: Response;
+  try {
+    res = await fetch(GEMINI_URL(model, env.GEMINI_API_KEY), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(geminiBody),
+    });
+  } catch (err) {
+    return reply({ error: `Gemini unreachable: ${err instanceof Error ? err.message : String(err)}` }, 502);
+  }
+
+  if (!res.ok) {
+    // Google's error bodies can echo request content — surface status only.
+    return reply({ error: `Gemini error ${res.status}` }, 502);
+  }
+
+  const data = (await res.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
+    promptFeedback?: { blockReason?: string };
+  };
+  if (data.promptFeedback?.blockReason) {
+    return reply({ error: `Blocked by safety filter (${data.promptFeedback.blockReason})` }, 502);
+  }
+  const text = (data.candidates?.[0]?.content?.parts ?? [])
+    .map((p) => p.text ?? "")
+    .join("")
+    .trim();
+
+  // OpenAI-shaped so src/lib/api.ts needs no special-casing.
+  return reply({ choices: [{ message: { role: "assistant", content: text } }] }, 200);
+}
+
 async function handleSpaFallback(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const indexUrl = new URL("/index.html", url.origin);
@@ -229,7 +368,16 @@ export default {
         if (origin && !ALLOWED_ORIGINS.has(origin)) {
           return jsonError("Origin not allowed", 403);
         }
+        // Per-IP rate limit on the DB-backed endpoints. Defence against
+        // scraping / cost-abuse now that the SQL allowlist (not the Origin
+        // header) is the real guard. No-ops until the binding is provisioned.
+        if (env.TURSO_RL) {
+          const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+          const { success } = await env.TURSO_RL.limit({ key: ip });
+          if (!success) return jsonError("Rate limit exceeded — slow down", 429);
+        }
       }
+      if (pathname === "/api/chat") return await handleChat(request, env);
       if (pathname === "/api/turso/health") return await handleTursoHealth(env);
       if (pathname === "/api/turso/execute") return await handleTursoExecute(request, env);
       if (pathname === "/api/turso/batch") return await handleTursoBatch(request, env);

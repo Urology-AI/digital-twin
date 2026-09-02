@@ -2,7 +2,7 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Loader2, Settings2, Wifi, WifiOff, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { setLlmConfig, testLlmEndpoint } from "@/lib/api";
+import { isAiParsingEnabled, setAiParsingEnabled, setLlmConfig, testLlmEndpoint } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type { ApiStatus } from "@/hooks/useApiStatus";
 
@@ -14,6 +14,7 @@ interface Props {
 
 export function AiSettingsModal({ status, onRecheck, onClose }: Props) {
   const [url, setUrl] = useState(() => localStorage.getItem("compass_llm_url") ?? "");
+  const [aiParse, setAiParse] = useState(() => isAiParsingEnabled());
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
 
@@ -36,6 +37,7 @@ export function AiSettingsModal({ status, onRecheck, onClose }: Props) {
 
   function handleSave() {
     setLlmConfig({ url, model: "", key: "" });
+    setAiParsingEnabled(aiParse);
     onRecheck();
     onClose();
   }
@@ -101,6 +103,33 @@ export function AiSettingsModal({ status, onRecheck, onClose }: Props) {
               placeholder="http://your-vllm-host:8000/v1/chat/completions"
               className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
             />
+          </div>
+
+          {/* AI note parsing — off by default, sends text off-device when on */}
+          <div className="space-y-2 rounded-lg border border-border bg-muted/30 px-4 py-3">
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={aiParse}
+                onChange={(e) => setAiParse(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-input accent-primary"
+              />
+              <span className="space-y-1">
+                <span className="block text-sm font-medium text-foreground">
+                  Use AI to parse clinical notes
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {aiParse ? (
+                    <><span className="font-semibold text-amber-500">On:</span> pasted note text is
+                    de-identified in your browser, then sent to <span className="font-semibold">Google
+                    Gemini</span> via the configured endpoint for field extraction.</>
+                  ) : (
+                    <><span className="font-semibold text-emerald-500">Off:</span> notes are parsed
+                    entirely offline in your browser. No note text leaves this device.</>
+                  )}
+                </span>
+              </span>
+            </label>
           </div>
 
           {testResult && (
