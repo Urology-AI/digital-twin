@@ -17,6 +17,21 @@ const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 const { submit, staple, dumpNotaryLog } = require("./notarize-lib.cjs");
 
+// `stapler staple` returns before the rewritten .dmg has settled on disk —
+// hashing it immediately yields a short read (observed: 1996 bytes short, so
+// latest-mac.yml carried a sha512/size for a file that never existed). Wait
+// for two identical size readings before hashing.
+function waitForStableSize(file, tries = 30) {
+  let last = -1;
+  for (let i = 0; i < tries; i++) {
+    const size = statSync(file).size;
+    if (size === last) return size;
+    last = size;
+    execFileSync("sleep", ["1"]);
+  }
+  throw new Error(`${path.basename(file)} kept changing size after stapling`);
+}
+
 function patchYml(ymlPath, dmgName, dmg) {
   if (!existsSync(ymlPath)) return;
   const sha512 = createHash("sha512").update(readFileSync(dmg)).digest("base64");
@@ -42,7 +57,15 @@ exports.default = async function notarizeArtifacts(context) {
     const id = submit(dmg);
     dumpNotaryLog(id);
     staple(dmg);
-    execFileSync("xcrun", ["stapler", "validate", dmg], { stdio: "inherit" });
+    waitForStableSize(dmg);
+    // Informational only: `stapler validate` reports failure for artifacts
+    // Gatekeeper accepts on macOS 15+. The release workflow's verify job gates
+    // on `spctl` + `codesign --test-requirement="=notarized"` instead.
+    try {
+      execFileSync("xcrun", ["stapler", "validate", dmg], { stdio: "inherit" });
+    } catch (e) {
+      console.log(`  • stapler validate ${name} reported a failure (informational): ${e.message}`);
+    }
 
     const blockmap = `${dmg}.blockmap`;
     if (existsSync(blockmap)) rmSync(blockmap);
