@@ -326,14 +326,6 @@ export default function App() {
         <span className="ml-auto text-[10px] text-muted-foreground/50">
           COMPASS · Tewari Lab · Mount Sinai · Research Use Only
         </span>
-        {!demo && !isOfflineBuild() && (
-          <a
-            href="/clinical/download"
-            className="rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 hover:bg-muted/70 hover:text-foreground transition-colors"
-          >
-            Desktop app
-          </a>
-        )}
         <button
           type="button"
           onClick={() => setReferenceOpen(true)}

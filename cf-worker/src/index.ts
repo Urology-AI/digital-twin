@@ -29,6 +29,7 @@
  * want to attribute a write to a specific clinician later.
  */
 import { createClient } from "@libsql/client/web";
+import { downloadPageHtml } from "./downloadPage";
 
 interface Env {
   TURSO_URL: string;
@@ -373,6 +374,25 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
   return reply({ choices: [{ message: { role: "assistant", content: text } }] }, 200);
 }
 
+// The download page for the desktop app. Served here rather than from the React
+// bundle so that editing it never triggers a rebuild of the signed apps — see
+// the header of downloadPage.ts.
+async function handleDownloadPage(env: Env): Promise<Response> {
+  if (!env.RELEASES_READ_PAT) return jsonError("Update feed not configured on server", 503);
+  const release = await latestRelease(env);
+  if (!release) return jsonError("Could not reach the release feed", 502);
+  const html = downloadPageHtml(release.tag_name.replace(/^v/, ""), release.published_at);
+  return withSecurityHeaders(
+    new Response(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        // Access-gated and version-bearing: never store it in a shared cache.
+        "Cache-Control": "no-store",
+      },
+    }),
+  );
+}
+
 async function handleSpaFallback(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const indexUrl = new URL("/index.html", url.origin);
@@ -514,6 +534,11 @@ export default {
       if (pathname === "/api/turso/health") return await handleTursoHealth(env);
       if (pathname === "/api/turso/execute") return await handleTursoExecute(request, env);
       if (pathname === "/api/turso/batch") return await handleTursoBatch(request, env);
+      // Before the SPA fallback: this path is a Worker-rendered page, not a
+      // client-side route.
+      if (pathname === "/clinical/download" || pathname === "/clinical/download/") {
+        return await handleDownloadPage(env);
+      }
       if (pathname.startsWith("/patient/") || pathname.startsWith("/clinical")) {
         return await handleSpaFallback(request);
       }
