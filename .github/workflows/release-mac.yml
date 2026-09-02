@@ -310,9 +310,12 @@ jobs:
             release/COMPASS-Digital-Twin-*-x64.exe.blockmap
             release/latest.yml
 
+  # A Windows failure must not hold back the macOS release, which has been
+  # shipping on its own for months: publish runs whenever build + verify pass,
+  # and simply includes whatever Windows artifacts exist.
   publish:
     needs: [build, verify, build-win]
-    if: ${{ !inputs.preflight }}
+    if: ${{ !inputs.preflight && always() && needs.build.result == 'success' && needs.verify.result == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
@@ -321,6 +324,7 @@ jobs:
           path: art
 
       - uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: release-win
           path: art
@@ -332,14 +336,30 @@ jobs:
           set -e
           VER="${{ needs.build.outputs.ver }}"
           gh release delete "v$VER" --repo Urology-AI/digital-twin-releases --yes --cleanup-tag 2>/dev/null || true
-          gh release create "v$VER" \
-            --repo Urology-AI/digital-twin-releases \
-            --title "$VER" --notes "Automated release. Signed, notarized, stapled." \
+          # Keep only what actually got built: nullglob handles the wildcard
+          # entries, and the -f test handles the literal ones (latest.yml has no
+          # wildcard, so nullglob alone would pass it through and gh would fail
+          # the whole release over a missing Windows manifest).
+          shopt -s nullglob
+          assets=()
+          for f in \
             art/COMPASS-Digital-Twin-*.dmg \
             art/COMPASS-Digital-Twin-*.zip \
             art/COMPASS-Digital-Twin-*.zip.blockmap \
+            art/latest-mac.yml \
             art/COMPASS-Digital-Twin-*.exe \
             art/COMPASS-Digital-Twin-*.exe.blockmap \
-            art/latest-mac.yml \
             art/latest.yml
-          echo "::notice::Published v$VER"
+          do
+            [ -f "$f" ] && assets+=("$f")
+          done
+          printf 'publishing: %s\n' "${assets[@]}"
+          case " ${assets[*]} " in
+            *.exe*) win="with the Windows installer" ;;
+            *)      win="macOS only — the Windows build did not produce an installer" ;;
+          esac
+          gh release create "v$VER" \
+            --repo Urology-AI/digital-twin-releases \
+            --title "$VER" --notes "Automated release. macOS signed, notarized, stapled; $win." \
+            "${assets[@]}"
+          echo "::notice::Published v$VER ($win)"
