@@ -18,12 +18,12 @@ extraResources:
     to: app-dist
 
 # electron-builder's built-in `notarize: true` submits to Apple but does not
-# staple the ticket into the bundle. notarize.cjs does both (notarytool
-# submit + stapler staple + validate) — it runs on the GitHub macOS runner,
-# where `stapler` reaches Apple's ticket service cleanly (a corporate
-# SSL-inspection proxy can make local stapling fail with "Could not validate
-# ticket" even when notarization itself is Accepted).
+# staple the ticket into the bundle, so the shipped app fails Gatekeeper
+# offline. We submit + staple directly:
+#   afterSign            → notarize + staple the .app (before it's packed)
+#   afterAllArtifactBuild → notarize + staple the finished .dmg
 afterSign: electron/notarize.cjs
+afterAllArtifactBuild: electron/notarize-artifacts.cjs
 
 mac:
   icon: electron/icon.icns

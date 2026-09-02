@@ -1,18 +1,18 @@
 // afterSign hook (with mac.notarize: false) — notarize the .app with Apple
-// and staple the ticket into the bundle.
+// and staple the ticket into the bundle *before* electron-builder packs it
+// into the .zip and .dmg. The stapled .app is what makes offline first-launch
+// and offline auto-update work.
 //
-// electron-builder's built-in notarize only submits, it never staples, so
-// the shipped app fails Gatekeeper offline. We do submit + staple here with
-// `notarytool` / `stapler` directly. This runs on the GitHub macOS runner;
-// `stapler` there reaches Apple's ticket service cleanly (running it behind a
-// corporate SSL-inspection proxy fails with "Could not validate ticket" even
-// when the notarization itself is Accepted).
+// electron-builder's built-in notarize only submits, it never staples, so the
+// shipped app fails Gatekeeper offline. We submit + staple here with
+// `notarytool` / `stapler` directly.
 //
-// Only the .app is stapled — never the .dmg (rewriting the compressed .dmg
-// afterwards corrupts the stapled .app inside it).
+// The .dmg gets its own submit + staple in notarize-artifacts.cjs
+// (afterAllArtifactBuild) — it can't be done here because the .dmg doesn't
+// exist yet at afterSign time.
 
+const { notarizeApp, staple, dumpNotaryLog } = require("./notarize-lib.cjs");
 const { execFileSync } = require("node:child_process");
-const { rmSync } = require("node:fs");
 const path = require("node:path");
 
 exports.default = async function notarize(context) {
@@ -26,25 +26,18 @@ exports.default = async function notarize(context) {
 
   const appName = context.packager.appInfo.productFilename;
   const appPath = path.join(context.appOutDir, `${appName}.app`);
-  const zipPath = path.join(context.appOutDir, `${appName}-notarize.zip`);
-  const run = (cmd, args) => execFileSync(cmd, args, { stdio: "inherit" });
 
   console.log(`  • notarizing ${appName}.app`);
-  run("ditto", ["-c", "-k", "--keepParent", appPath, zipPath]);
-  try {
-    run("xcrun", [
-      "notarytool", "submit", zipPath,
-      "--apple-id", APPLE_ID,
-      "--password", APPLE_APP_SPECIFIC_PASSWORD,
-      "--team-id", APPLE_TEAM_ID,
-      "--wait",
-    ]);
-  } finally {
-    rmSync(zipPath, { force: true });
-  }
+  const id = notarizeApp(appPath);
+  dumpNotaryLog(id);
+  staple(appPath);
 
-  run("xcrun", ["stapler", "staple", appPath]);
-  run("xcrun", ["stapler", "validate", appPath]);
-  run("codesign", ["--test-requirement==notarized", "--verify", "--verbose=1", appPath]);
+  // Offline-meaningful checks: these only pass from the embedded ticket.
+  execFileSync("xcrun", ["stapler", "validate", appPath], { stdio: "inherit" });
+  execFileSync(
+    "codesign",
+    ["--test-requirement==notarized", "--verify", "--verbose=1", appPath],
+    { stdio: "inherit" },
+  );
   console.log(`  • ${appName}.app notarized + stapled + verified`);
 };
