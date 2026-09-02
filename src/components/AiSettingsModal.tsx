@@ -81,7 +81,7 @@ export function AiSettingsModal({ status, onRecheck, onClose }: Props) {
                   ? "LLM endpoint is reachable"
                   : status === "checking"
                     ? "Testing connection"
-                    : "LLM endpoint not configured or unreachable"}
+                    : "No AI endpoint reachable — offline mode still works"}
               </p>
             </div>
             <span className={cn(
@@ -94,15 +94,24 @@ export function AiSettingsModal({ status, onRecheck, onClose }: Props) {
 
           {/* LLM Endpoint */}
           <div className="space-y-2">
-            <label htmlFor="llm-url" className="text-xs font-medium text-muted-foreground">vLLM Endpoint</label>
+            <label htmlFor="llm-url" className="text-xs font-medium text-muted-foreground">LLM endpoint</label>
             <input
               id="llm-url"
               type="url"
               value={url}
               onChange={(e) => { setUrl(e.target.value); setTestResult(null); }}
-              placeholder="http://your-vllm-host:8000/v1/chat/completions"
+              placeholder="Leave blank — uses hosted Google Gemini"
               className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-ring"
             />
+            <p className="text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Offline mode is the default</span> — models
+              run in your browser and no AI endpoint is needed. AI chat and note parsing use a hosted
+              <span className="font-semibold"> Google Gemini</span> proxy when the field is blank; enter a
+              URL to point at your own custom LLM (vLLM / OpenAI-compatible) instead.
+            </p>
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-300">
+              Do not enter PHI or patient identifiers anywhere in this tool.
+            </p>
           </div>
 
           {/* AI note parsing — off by default, sends text off-device when on */}
