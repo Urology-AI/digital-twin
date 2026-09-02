@@ -42,6 +42,17 @@ export function setAiParsingEnabled(on: boolean): void {
 // the upstream provider — URL or key — ever ships in this bundle.
 const DEFAULT_LLM_URL = "/api/chat";
 
+/** Sentinel stored in `compass_llm_url` to mean "no AI provider — offline only". */
+export const LLM_OFF = "off";
+
+export type LlmMode = "offline" | "hosted" | "custom";
+
+export function getLlmMode(): LlmMode {
+  const raw = localStorage.getItem(LS_URL)?.trim();
+  if (raw === LLM_OFF) return "offline";
+  return raw ? "custom" : "hosted";
+}
+
 function normalizeUrl(url: string): string {
   url = url.trim().replace(/\/$/, "");
   if (!url) return "";
@@ -53,9 +64,9 @@ function normalizeUrl(url: string): string {
 }
 
 export function getLlmUrl(): string {
-  return normalizeUrl(
-    localStorage.getItem(LS_URL) ?? import.meta.env.VITE_LLM_URL ?? DEFAULT_LLM_URL,
-  );
+  const raw = localStorage.getItem(LS_URL) ?? import.meta.env.VITE_LLM_URL ?? DEFAULT_LLM_URL;
+  if (raw.trim() === LLM_OFF) return "";
+  return normalizeUrl(raw);
 }
 
 export function getLlmModel(): string {
@@ -89,12 +100,16 @@ export interface TestLlmResponse {
   error?: string;
 }
 
-export async function testLlmEndpoint(rawUrl?: string): Promise<TestLlmResponse> {
+export async function testLlmEndpoint(
+  rawUrl?: string,
+  keyOverride?: string,
+  modelOverride?: string,
+): Promise<TestLlmResponse> {
   const url = rawUrl ? normalizeUrl(rawUrl) : getLlmUrl();
   if (!url) return { ok: false, error: "LLM endpoint not configured" };
 
-  const model = getLlmModel();
-  const key   = getLlmKey();
+  const model = modelOverride?.trim() || getLlmModel();
+  const key   = keyOverride?.trim()   || getLlmKey();
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (key) headers.Authorization = `Bearer ${key}`;
 
