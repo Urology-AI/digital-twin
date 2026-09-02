@@ -127,6 +127,11 @@ ipcMain.handle("updates:check", async () => {
   }
   try { await autoUpdater.checkForUpdates(); } catch (e) { send("error", { message: String(e && e.message ? e.message : e) }); }
 });
+// Restart into a downloaded update. The 'update-downloaded' dialog above offers
+// this too, but it is dismissable — the in-app badge is the way back to it.
+ipcMain.handle("updates:install", () => {
+  if (updaterReady) autoUpdater.quitAndInstall();
+});
 
 // A URL is "internal" only if its origin is exactly ours — a string prefix
 // test would accept "app://compass.evil.example".

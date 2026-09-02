@@ -5,6 +5,8 @@ import {
   FlaskConical,
   Info,
   Layers,
+  Lock,
+  LockOpen,
   MessageCircle,
   Moon,
   Redo2,
@@ -28,6 +30,63 @@ const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[]
   { id: "outcomes",     label: "Factors",     Icon: Layers },
   { id: "plan",         label: "Planning",    Icon: FlaskConical },
 ];
+
+/**
+ * One word next to the wordmark for which build you are in: Clinical with a
+ * signed-in Access session, Local in the offline desktop app, Demo on the
+ * public preview, and Restricted on the web with no session. The build
+ * version and the update control live in the footer (see BuildStatus).
+ */
+function StatusBadge({ signedIn, demo }: { signedIn: boolean; demo: boolean }) {
+  const chip =
+    "hidden shrink-0 cursor-default items-center gap-1 rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-wider sm:inline-flex";
+
+  if (isOfflineBuild()) {
+    return (
+      <span
+        title="Offline build — everything runs on this Mac. No login, no cloud, no data leaves the device."
+        className={cn(chip, "bg-amber-500/15 text-amber-600 dark:text-amber-400")}
+      >
+        Local
+      </span>
+    );
+  }
+
+  if (signedIn) {
+    return (
+      <span
+        title="Signed in through Cloudflare Access"
+        className={cn(chip, "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400")}
+      >
+        <Lock className="h-3 w-3" />
+        Clinical
+      </span>
+    );
+  }
+
+  if (demo) {
+    return (
+      <span
+        title="Public preview — sample cases only, nothing is saved"
+        className={cn(chip, "bg-muted text-muted-foreground")}
+      >
+        Demo
+      </span>
+    );
+  }
+
+  // No Access session: the open lock is about who you are, not how the page was
+  // served — the connection itself is still TLS.
+  return (
+    <span
+      title="Restricted — no Cloudflare Access session, so no patient data loads"
+      className={cn(chip, "bg-red-500/15 text-red-600 dark:text-red-400")}
+    >
+      <LockOpen className="h-3 w-3" />
+      Restricted
+    </span>
+  );
+}
 
 export function AppHeader() {
   const accessIdentity = useAccessIdentity();
@@ -64,14 +123,7 @@ export function AppHeader() {
         </span>
       </button>
 
-      {offline && (
-        <span
-          title="Offline build — everything runs locally on this Mac. No login, no cloud, no data leaves the device."
-          className="hidden shrink-0 cursor-default rounded bg-emerald-500/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-emerald-400 sm:inline"
-        >
-          Offline · runs locally
-        </span>
-      )}
+      <StatusBadge signedIn={!!accessIdentity} demo={demo} />
 
       {/* Divider */}
       <div className="hidden h-5 w-px shrink-0 bg-border/70 sm:block" />

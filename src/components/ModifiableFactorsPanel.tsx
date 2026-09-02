@@ -11,7 +11,6 @@ import type {
   SmokingStatus,
 } from "@/lib/compass/functionalOutcomes";
 import { computeBiologicalAge } from "@/lib/compass/biologicalAge";
-import { ageAdjustment } from "@/lib/compass/functionalOutcomes";
 import { cn } from "@/lib/utils";
 
 function SegPicker<T extends string>({
@@ -62,9 +61,9 @@ function BiologicalAgeReadout({
   onAge: (v: string) => void;
 }) {
   const ageInput = (
-    <div className="space-y-1.5">
+    <div className="flex items-center gap-2">
       <label className="text-xs font-semibold text-foreground" htmlFor="mf-age">
-        Age <span className="font-normal text-muted-foreground">(years)</span>
+        Age
       </label>
       <Input
         id="mf-age"
@@ -75,123 +74,40 @@ function BiologicalAgeReadout({
         placeholder="62"
         value={ageText}
         onChange={(e) => onAge(e.target.value)}
-        className="h-8 w-20 text-sm"
+        title="Not modifiable, but it sets the baseline every other factor moves from — the models read this number."
+        className="h-8 w-16 text-sm"
       />
-      <p className="text-[10px] leading-snug text-muted-foreground">
-        Not modifiable, but it sets the baseline every other factor moves from —
-        the models read this number.
-      </p>
     </div>
   );
 
-  if (!(factors.age > 0)) {
-    return (
-      <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
-        {ageInput}
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          Enter an age to see biological age.
-        </p>
-      </div>
-    );
-  }
+  if (!(factors.age > 0)) return ageInput;
 
   const bio = computeBiologicalAge(factors);
-  const chronoFactor = ageAdjustment(bio.chronological);
-  const bioFactor = ageAdjustment(bio.biological);
   const older = bio.offset > 0;
   const younger = bio.offset < 0;
 
   return (
-    <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        {ageInput}
-        <div className="text-right">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Biological age
-          </div>
-          <div className="flex items-baseline justify-end gap-2">
-            <span
-              className={cn(
-                "text-2xl font-bold tabular-nums",
-                older ? "text-amber-400" : younger ? "text-emerald-400" : "text-foreground",
-              )}
-            >
-              {bio.biological}
-            </span>
-            <span
-              className={cn(
-                "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                older
-                  ? "bg-amber-500/10 text-amber-400"
-                  : younger
-                    ? "bg-emerald-500/10 text-emerald-400"
-                    : "bg-muted text-muted-foreground",
-              )}
-            >
-              {older ? "+" : ""}
-              {bio.offset} yr
-            </span>
-          </div>
-          <div className="text-[11px] text-muted-foreground">
-            vs. {bio.chronological} chronological
-          </div>
-        </div>
-      </div>
-
-      {bio.potentialGain > 0 && (
-        <div className="mt-2 text-[11px] text-muted-foreground">
-          Optimising the levers below reaches{" "}
-          <span className="font-semibold text-emerald-400">{bio.bestAchievable}</span> — a{" "}
-          <span className="font-semibold text-emerald-400">{bio.potentialGain}-year</span> gain.
-        </div>
-      )}
-
-      {bio.contributions.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {bio.contributions.map((c) => (
-            <span
-              key={c.label}
-              className={cn(
-                "rounded px-1.5 py-0.5 text-[10px] font-medium",
-                c.years > 0 ? "bg-amber-500/10 text-amber-400" : "bg-emerald-500/10 text-emerald-400",
-              )}
-            >
-              {c.label} {c.years > 0 ? "+" : ""}
-              {c.years}
-            </span>
-          ))}
-        </div>
-      )}
-
-      <div className="mt-2 rounded border border-border/60 bg-background/40 px-2 py-1.5">
+    <div className="flex items-center gap-3" title="Per-factor breakdown is in Factor contributions">
+      {ageInput}
+      <div className="border-l border-border/60 pl-3">
         <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Effect in the model
+          Biological age
         </div>
-        <p className="mt-0.5 text-[11px] leading-snug text-foreground">
-          The potency curve&rsquo;s age factor is{" "}
-          <span className="font-semibold tabular-nums">{chronoFactor.toFixed(2)}</span> at{" "}
-          {bio.chronological}; at a biological age of {bio.biological} the same factor
-          would be{" "}
+        <div className="flex items-baseline gap-1.5">
           <span
             className={cn(
-              "font-semibold tabular-nums",
-              bioFactor < chronoFactor ? "text-amber-400" : "text-emerald-400",
+              "text-lg font-bold tabular-nums",
+              older ? "text-amber-400" : younger ? "text-emerald-400" : "text-foreground",
             )}
           >
-            {bioFactor.toFixed(2)}
+            {bio.biological}
           </span>
-          .
-        </p>
-        <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
-          Shown for counselling, not applied: the nomogram already charges BMI,
-          smoking, exercise, alcohol and comorbidity as direct recovery deltas, so
-          adding them again through age would double-count them.
-        </p>
+          <span className="text-[11px] text-muted-foreground">
+            {older ? "+" : ""}
+            {bio.offset} yr
+          </span>
+        </div>
       </div>
-      <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
-        Biological-age offset from modifiable factors — a counselling aid, sourced
-        per factor in Evidence &amp; sources.
-      </p>
     </div>
   );
 }
@@ -300,27 +216,34 @@ export function ModifiableFactorsPanel() {
   return (
     <Card className="border-border/70">
       <CardHeader className="border-b border-border/50 bg-gradient-to-br from-muted/40 to-transparent px-4 py-3 dark:from-muted/25">
-        <CardTitle className="text-base font-semibold text-foreground">
-          Modifiable Factors
-        </CardTitle>
-        <p className="text-[11px] text-muted-foreground">
-          Lifestyle and medical inputs that drive functional-outcome predictions
-        </p>
+        <div className="flex items-start gap-x-4">
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-base font-semibold text-foreground">
+              Modifiable Factors
+            </CardTitle>
+            <p className="text-[11px] text-muted-foreground">
+              Lifestyle and medical inputs that drive functional-outcome predictions
+            </p>
+          </div>
+          {/* Age sits to the right of the title: it is the baseline the levers
+              move from, not one of the levers itself. */}
+          <div className="shrink-0">
+            <BiologicalAgeReadout
+            ageText={age}
+            onAge={handleAge}
+            age={parseInt(age) || 0}
+            bmi={bmiNum}
+            smoking={smoking}
+            exercise={exercise}
+            alcohol={alcohol}
+            dm={dm}
+            htn={htn}
+              cad={cad}
+            />
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3 px-4 py-3">
-        <BiologicalAgeReadout
-          ageText={age}
-          onAge={handleAge}
-          age={parseInt(age) || 0}
-          bmi={bmiNum}
-          smoking={smoking}
-          exercise={exercise}
-          alcohol={alcohol}
-          dm={dm}
-          htn={htn}
-          cad={cad}
-        />
-
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Body & Lifestyle</h3>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

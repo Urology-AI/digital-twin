@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ControlsOverlay } from "@/components/ControlsOverlay";
 import { AppHeader } from "@/components/layout/AppHeader";
+import { BuildStatus } from "@/components/layout/BuildStatus";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
 import { OutcomesWorkspace } from "@/components/OutcomesWorkspace";
 import { SurgicalPlanWorkspace } from "@/components/SurgicalPlanWorkspace";
@@ -308,8 +309,10 @@ export default function App() {
       {!patientView && !presenterView && <MobileTabBar />}
 
       {/* Desktop-only footer */}
-      <footer className="hidden lg:flex h-7 shrink-0 items-center justify-end gap-3 border-t border-border/50 bg-card/60 px-4">
-        <span className="text-[10px] text-muted-foreground/50">
+      <footer className="hidden lg:flex h-7 shrink-0 items-center gap-3 border-t border-border/50 bg-card/60 px-4">
+        {/* Build + update control, left — the header chip carries auth state. */}
+        <BuildStatus />
+        <span className="ml-auto text-[10px] text-muted-foreground/50">
           COMPASS · Tewari Lab · Mount Sinai · Research Use Only
         </span>
         <button

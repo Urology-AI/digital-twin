@@ -1,5 +1,10 @@
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import type { HealerTier } from "@/lib/compass/functionalOutcomes";
+import { EvidenceInfo } from "@/components/EvidenceInfo";
+import {
+  FULL_RECOVERY_THRESHOLD,
+  HEALER_THRESHOLD,
+} from "@/lib/compass/planningEvidence";
 
 const TITLE: Record<HealerTier, string> = {
   super: "Super healer",
@@ -70,6 +75,11 @@ export function HealerBands({
         <div className="mb-2 flex items-baseline gap-2">
           <CardTitle className="text-base font-semibold">{TITLE[tier]}</CardTitle>
           <span className="text-xs text-muted-foreground">{CAPTION[tier]}</span>
+          <EvidenceInfo
+            className="ml-auto self-center"
+            title="Recovery phenotype"
+            entries={[HEALER_THRESHOLD, FULL_RECOVERY_THRESHOLD]}
+          />
         </div>
         <Bar bands={bands} />
       </CardContent>

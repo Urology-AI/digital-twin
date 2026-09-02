@@ -13,6 +13,8 @@ interface Window {
   desktop?: {
     version: () => Promise<string>;
     checkForUpdates: () => Promise<void>;
+    /** Absent in builds packaged before the in-app restart button. */
+    installUpdate?: () => Promise<void>;
     onUpdateEvent: (cb: (e: { type: string; version?: string; message?: string }) => void) => () => void;
   };
 }
