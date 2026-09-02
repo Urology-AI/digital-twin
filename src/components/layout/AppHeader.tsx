@@ -1,27 +1,22 @@
 import React from "react";
 import {
   Activity,
-  BookOpen,
   ClipboardList,
   FlaskConical,
   Info,
   Layers,
   MessageCircle,
-  Monitor,
   Moon,
-  Printer,
   Redo2,
-  Share2,
   Sun,
   Undo2,
-  UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore, type DesktopTab } from "@/store/uiStore";
-import { printReport } from "@/lib/compass/printReport";
 import { CasePicker } from "@/components/layout/CasePicker";
 import { AccessMenu } from "@/components/layout/AccessMenu";
+import { ToolsMenu } from "@/components/layout/ToolsMenu";
 import { cn } from "@/lib/utils";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { isDemoMode } from "@/lib/demoMode";
@@ -39,7 +34,6 @@ export function AppHeader() {
   const chatOpen = useUiStore((s) => s.chatOpen);
   const setChatOpen = useUiStore((s) => s.setChatOpen);
   const saveStatus = useUiStore((s) => s.saveStatus);
-  const setShareOpen = useUiStore((s) => s.setShareOpen);
 
   const dark = useUiStore((s) => s.dark);
   const setDark = useUiStore((s) => s.setDark);
@@ -47,10 +41,6 @@ export function AppHeader() {
   const setDesktopTab = useUiStore((s) => s.setDesktopTab);
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
   const setWelcomeOpen = useUiStore((s) => s.setWelcomeOpen);
-  const setCaseLogOpen = useUiStore((s) => s.setCaseLogOpen);
-  const setPatientView = useUiStore((s) => s.setPatientView);
-  const presenterView = useUiStore((s) => s.presenterView);
-  const setPresenterView = useUiStore((s) => s.setPresenterView);
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
   const undo = usePatientStore((s) => s.undo);
@@ -175,94 +165,21 @@ export function AppHeader() {
           <span className="hidden text-xs font-medium lg:inline">{dark ? "Light" : "Dark"}</span>
         </Button>
 
-        {!demo && (
+        {!demo ? (
+          <ToolsMenu />
+        ) : (
           <Button
             type="button"
             variant="ghost"
             size="sm"
-            className="h-8 gap-1.5 px-2 text-emerald-500 hover:text-emerald-400"
-            aria-label="Prospective case log"
-            title="Prospective case log"
-            onClick={() => setCaseLogOpen(true)}
+            className="hidden sm:inline-flex h-8 gap-1.5 px-2 text-muted-foreground hover:text-primary"
+            aria-label="About COMPASS"
+            onClick={() => setInfoOpen(true)}
           >
-            <BookOpen className="h-[15px] w-[15px]" />
-            <span className="hidden text-xs font-medium lg:inline">Case log</span>
+            <Info className="h-[15px] w-[15px]" />
+            <span className="hidden text-xs font-medium lg:inline">About</span>
           </Button>
         )}
-
-        {!demo && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 px-2 text-blue-400 hover:text-blue-300"
-            aria-label="Switch to patient summary"
-            title="Patient summary"
-            onClick={() => setPatientView(true)}
-          >
-            <UserRound className="h-[15px] w-[15px]" />
-            <span className="hidden text-xs font-medium lg:inline">Patient summary</span>
-          </Button>
-        )}
-
-        {!demo && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "h-8 gap-1.5 px-2",
-              presenterView ? "text-violet-300 bg-violet-500/15" : "text-violet-400 hover:text-violet-300",
-            )}
-            aria-label={presenterView ? "Exit overview mode" : "Open overview mode"}
-            title="Overview mode"
-            onClick={() => setPresenterView(!presenterView)}
-          >
-            <Monitor className="h-[15px] w-[15px]" />
-            <span className="hidden text-xs font-medium lg:inline">Overview</span>
-          </Button>
-        )}
-
-        {!demo && !offline && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-            aria-label="Share case"
-            title="Share case"
-            onClick={() => setShareOpen(true)}
-          >
-            <Share2 className="h-[15px] w-[15px]" />
-            <span className="hidden text-xs font-medium lg:inline">Share</span>
-          </Button>
-        )}
-
-        {!demo && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="hidden sm:inline-flex h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-            aria-label="Print report"
-            onClick={() => printReport()}
-          >
-            <Printer className="h-[15px] w-[15px]" />
-            <span className="hidden text-xs font-medium lg:inline">Print</span>
-          </Button>
-        )}
-
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="hidden sm:inline-flex h-8 gap-1.5 px-2 text-muted-foreground hover:text-primary"
-          aria-label="About COMPASS"
-          onClick={() => setInfoOpen(true)}
-        >
-          <Info className="h-[15px] w-[15px]" />
-          <span className="hidden text-xs font-medium lg:inline">About</span>
-        </Button>
 
         {/* Who's signed in via Cloudflare Access — click for "Sign out"
             (blank locally / on patient links / in the public preview) */}

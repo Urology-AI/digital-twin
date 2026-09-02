@@ -57,16 +57,18 @@ function send(type, extra) {
   mainWindow?.webContents.send("updates:event", { type, ...extra });
 }
 
+// True once setupAutoUpdate has wired the listeners and a usable feed.
+let updaterReady = false;
+
 function setupAutoUpdate() {
   // Fully usable offline; this only does anything when the machine happens to
   // be online. Pulls a newer signed build from the PRIVATE releases repo in
   // the background. The read-only token is written into the bundle at build
   // time (CI, from RELEASES_READ_PAT) — see electron/update-auth.example.json.
-  try {
-    const auth = require("./update-auth.json");
-    if (auth && auth.token) autoUpdater.addAuthHeader(`token ${auth.token}`);
-  } catch { /* no token bundled — updates just won't run */ }
 
+  // electron-updater logs to console by default; visible via Console.app or by
+  // launching the .app from a terminal. "Update check failed" in the UI now
+  // also carries the underlying message (see the 'error' handler below).
   autoUpdater.autoDownload = true;
   autoUpdater.on("checking-for-update", () => send("checking"));
   autoUpdater.on("update-available", (i) => send("available", { version: i.version }));
@@ -86,12 +88,37 @@ function setupAutoUpdate() {
       .then(({ response }) => { if (response === 0) autoUpdater.quitAndInstall(); });
   });
 
-  autoUpdater.checkForUpdates().catch(() => {});
+  // An unpacked/dev run has no feed — checkForUpdates() would throw a confusing
+  // error. Skip silently; a dev build is never the thing that needs updating.
+  if (!app.isPackaged) return;
+
+  // The read-only feed token is baked in at build time. Without it every
+  // request to the private releases repo 404s and surfaces as an opaque
+  // failure — say so plainly instead.
+  try {
+    const auth = require("./update-auth.json");
+    if (auth && auth.token) autoUpdater.addAuthHeader(`token ${auth.token}`);
+    else throw new Error("empty token");
+  } catch {
+    send("error", { message: "no update token in this build — reinstall from a CI release" });
+    return;
+  }
+
+  updaterReady = true;
+  autoUpdater.checkForUpdates().catch(() => { /* surfaced via the 'error' event */ });
 }
 
 ipcMain.handle("app:version", () => app.getVersion());
 ipcMain.handle("updates:check", async () => {
-  try { await autoUpdater.checkForUpdates(); } catch (e) { send("error", { message: String(e) }); }
+  if (!updaterReady) {
+    send("error", {
+      message: app.isPackaged
+        ? "updates unavailable in this build"
+        : "updates only run in an installed build",
+    });
+    return;
+  }
+  try { await autoUpdater.checkForUpdates(); } catch (e) { send("error", { message: String(e && e.message ? e.message : e) }); }
 });
 
 function createWindow() {
