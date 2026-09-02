@@ -64,6 +64,22 @@ jobs:
               || { echo "::error::$pat cannot read digital-twin-releases (HTTP $code)"; exit 1; }
           done
 
+          # The auto-updater doesn't read repo metadata — it lists releases and
+          # then downloads latest-mac.yml as an asset blob. Exercise that exact
+          # path with the read token that gets baked into the app, so a token
+          # that can see the repo but not its releases/assets fails here, not
+          # silently in the field as "Update check failed".
+          rel=$(curl -s -H "Authorization: Bearer $RELEASES_READ_PAT" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/Urology-AI/digital-twin-releases/releases/latest)
+          asset=$(echo "$rel" | python3 -c 'import json,sys;r=json.load(sys.stdin);print(next((a["url"] for a in r.get("assets",[]) if a["name"]=="latest-mac.yml"),""))')
+          [ -n "$asset" ] || { echo "::error::RELEASES_READ_PAT: no latest-mac.yml on the latest release ($(echo "$rel" | head -c 200))"; exit 1; }
+          code=$(curl -s -o /dev/null -w '%{http_code}' -L \
+            -H "Authorization: Bearer $RELEASES_READ_PAT" \
+            -H "Accept: application/octet-stream" "$asset")
+          [ "$code" = 200 ] && echo "→ RELEASES_READ_PAT can download the update feed OK" \
+            || { echo "::error::RELEASES_READ_PAT cannot download latest-mac.yml (HTTP $code)"; exit 1; }
+
       - name: Stop here if preflight-only
         if: ${{ inputs.preflight }}
         run: echo "Preflight passed. Re-run without preflight (or push a tag) to build." && exit 0

@@ -59,11 +59,11 @@ function mkRecord(over: {
 }
 
 /** MRI lesion row for a zone. */
-function mri(o: Partial<LesionRow> & { side: "L" | "R"; level: LesionRow["level"]; zone: string; pirads: number }): LesionRow {
+function mri(o: Partial<LesionRow> & { side: "L" | "R"; level: LesionRow["level"]; zone: string; pirads: number; primus?: number }): LesionRow {
   return {
     ...emptyLesion(`${o.side}-${o.level}-mri`),
     source: "MRI", side: o.side, level: o.level, zone: o.zone,
-    score: String(o.pirads), pirads: o.pirads,
+    score: String(o.pirads), pirads: o.pirads, primus: o.primus,
     mriSize: o.mriSize ?? 0, epe: o.epe ?? false, svi: o.svi ?? false,
   };
 }
@@ -159,6 +159,127 @@ export const DEMO_CASES: DemoCase[] = [
     lesionRows: [
       bx({ side: "L", level: "Mid", zone: "Posterior", gg: 2, corePct: 12 }),
       bx({ side: "R", level: "Mid", zone: "Posterior", gg: 2, corePct: 12 }),
+    ],
+  },
+  {
+    id: "ns-right-upgrade",
+    name: "Right nerve-sparing, upgraded",
+    blurb: "Bx GG2 (3+4) · PI-RADS 4 right mid-PZ → path GG3 (4+3), pT2 — unilateral NS",
+    record: mkRecord({
+      patient: { age: 59, psa: 6, bmi: 27, shim: 20, ipss: 7 },
+      prostate: { volume_cc: 45 },
+      biopsy: {
+        max_grade_group: 2, total_positive_cores: 3, max_core_involvement_pct: 35,
+        max_linear_extent_mm: 6, max_pct_pattern45: 15, has_pni: 1,
+        laterality: "right", gg_left: 0, gg_right: 2, cores_left: 0, cores_right: 3,
+      },
+      staging: { max_pirads: 4, max_primus: 4, lesion_size_cm: 1.2, adc_mean: 820 },
+    }),
+    lesionRows: [
+      mri({ side: "R", level: "Mid", zone: "Posterior", pirads: 4, primus: 4, mriSize: 12 }),
+      bx({ side: "R", level: "Mid", zone: "Posterior", gg: 2, corePct: 35, linear: 6, pni: true }),
+    ],
+  },
+  {
+    id: "anterior-occult",
+    name: "Anterior lesion, occult high-grade",
+    blurb: "Bx GG1 · PI-RADS 3 / PRIMUS 4 anterior → path GG4 (3+5), pT3 — imaging-led upgrade",
+    record: mkRecord({
+      patient: { age: 64, psa: 7.5, psa_density: 0.19, bmi: 28, shim: 17, ipss: 10 },
+      prostate: { volume_cc: 40 },
+      biopsy: {
+        max_grade_group: 1, total_positive_cores: 2, max_core_involvement_pct: 20,
+        max_linear_extent_mm: 4, laterality: "left", gg_left: 1, gg_right: 0,
+        cores_left: 2, cores_right: 0,
+      },
+      staging: { max_pirads: 3, max_primus: 4, lesion_size_cm: 1, adc_mean: 800 },
+    }),
+    lesionRows: [
+      mri({ side: "L", level: "Mid", zone: "Anterior", pirads: 3, primus: 4, mriSize: 10 }),
+      bx({ side: "L", level: "Mid", zone: "Anterior", gg: 1, corePct: 20, linear: 4 }),
+    ],
+  },
+  {
+    id: "apex-concordant",
+    name: "Apical GG2, concordant",
+    blurb: "Bx GG2 (3+4) · PI-RADS 4 right PL apex → path GG2 (3+4), pT2 — apical margin focus",
+    record: mkRecord({
+      patient: { age: 61, psa: 5.8, bmi: 26, shim: 21, ipss: 6 },
+      prostate: { volume_cc: 44 },
+      biopsy: {
+        max_grade_group: 2, total_positive_cores: 3, max_core_involvement_pct: 30,
+        max_linear_extent_mm: 5, max_pct_pattern45: 10, laterality: "right",
+        gg_left: 0, gg_right: 2, cores_left: 0, cores_right: 3,
+      },
+      staging: { max_pirads: 4, max_primus: 4, lesion_size_cm: 1.1, adc_mean: 830 },
+    }),
+    lesionRows: [
+      mri({ side: "R", level: "Apex", zone: "Posterolateral", pirads: 4, primus: 4, mriSize: 11 }),
+      bx({ side: "R", level: "Apex", zone: "Posterolateral", gg: 2, corePct: 30, linear: 5 }),
+    ],
+  },
+  {
+    id: "low-imaging-upgrade",
+    name: "Negative imaging, still upstaged",
+    blurb: "Bx GG1 · PI-RADS 2 / PRIMUS 3 → path GG2 (3+4), pT3 — occult upgrade",
+    record: mkRecord({
+      patient: { age: 66, psa: 6.5, bmi: 29, shim: 15, ipss: 12, htn: true },
+      prostate: { volume_cc: 50 },
+      biopsy: {
+        max_grade_group: 1, total_positive_cores: 3, max_core_involvement_pct: 15,
+        max_linear_extent_mm: 3, laterality: "bilateral", gg_left: 1, gg_right: 1,
+        cores_left: 2, cores_right: 1,
+      },
+      staging: { max_pirads: 2, max_primus: 3 },
+    }),
+    lesionRows: [
+      mri({ side: "L", level: "Mid", zone: "Posterior", pirads: 2, primus: 3 }),
+      bx({ side: "L", level: "Mid", zone: "Posterior", gg: 1, corePct: 15 }),
+      bx({ side: "R", level: "Mid", zone: "Posterior", gg: 1, corePct: 10 }),
+    ],
+  },
+  {
+    id: "pirads5-ece",
+    name: "PI-RADS 5, EPE+ GG4",
+    blurb: "Bx GG4 (4+4) · PI-RADS 5 / PRIMUS 5 · EPE+ → path GG4, pT3a (ECE+) — no NS right",
+    record: mkRecord({
+      patient: { age: 67, psa: 14, bmi: 28, shim: 16, ipss: 13, htn: true, statin: true },
+      prostate: { volume_cc: 40 },
+      biopsy: {
+        max_grade_group: 4, total_positive_cores: 6, max_core_involvement_pct: 65,
+        max_linear_extent_mm: 13, max_pct_pattern45: 85, has_cribriform: 1,
+        has_pni: 1, laterality: "bilateral", gg_left: 2, gg_right: 4,
+        cores_left: 2, cores_right: 4,
+      },
+      staging: { epe: true, max_pirads: 5, max_primus: 5, lesion_size_cm: 2, adc_mean: 650 },
+    }),
+    lesionRows: [
+      mri({ side: "R", level: "Base", zone: "Posterior", pirads: 5, primus: 5, mriSize: 20, epe: true }),
+      bx({ side: "R", level: "Base", zone: "Posterior", gg: 4, corePct: 65, linear: 13, cribriform: true, pni: true }),
+      bx({ side: "L", level: "Mid", zone: "Posterior", gg: 2, corePct: 25 }),
+    ],
+  },
+  {
+    id: "high-grade-focal-ns",
+    name: "GG5 with focal nerve-sparing",
+    blurb: "Bx GG5 (4+5) · PI-RADS 5 left mid-apex · focal EPE → path GG5, pT3a — contralateral focal NS",
+    record: mkRecord({
+      patient: {
+        age: 60, psa: 11, bmi: 25, shim: 22, ipss: 5,
+        smoking: "never", exercise: "active", pfmt: "intensive", pde5_plan: "daily",
+      },
+      prostate: { volume_cc: 42 },
+      biopsy: {
+        max_grade_group: 5, total_positive_cores: 5, max_core_involvement_pct: 60,
+        max_linear_extent_mm: 12, max_pct_pattern45: 70, has_pni: 1,
+        laterality: "left", gg_left: 5, gg_right: 1, cores_left: 4, cores_right: 1,
+      },
+      staging: { epe: true, max_pirads: 5, max_primus: 5, lesion_size_cm: 1.8, adc_mean: 690 },
+    }),
+    lesionRows: [
+      mri({ side: "L", level: "Mid", zone: "Posterolateral", pirads: 5, primus: 5, mriSize: 18, epe: true }),
+      mri({ side: "L", level: "Apex", zone: "Posterolateral", pirads: 5, primus: 5, mriSize: 9 }),
+      bx({ side: "L", level: "Mid", zone: "Posterolateral", gg: 5, corePct: 60, linear: 12, pni: true }),
     ],
   },
 ];

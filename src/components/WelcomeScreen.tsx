@@ -56,6 +56,9 @@ export function WelcomeScreen() {
   // clinician-only, behind Cloudflare Access at /clinical. "Take the Tour"
   // opens a frozen, read-only preview.
   const demo = isDemoMode();
+  // The offline macOS build has no tour (the frozen preview it opens is a
+  // web-only affordance); instead it points to the online tool via QR.
+  const offline = isOfflineBuild();
 
   return (
     <div
@@ -221,34 +224,38 @@ export function WelcomeScreen() {
               {demo ? "Clinician sign in" : "Enter Workspace"}
               {demo ? null : <ArrowRight className="h-4 w-4" aria-hidden />}
             </Button>
-            <Button
-              type="button"
-              size="lg"
-              variant="outline"
-              onClick={startTutorial}
-              className="gap-2 font-semibold transition-colors hover:border-primary/40 hover:bg-primary/5"
-              style={{
-                height: "clamp(2.5rem, 5.5vh, 3rem)",
-                paddingLeft: "clamp(1.5rem, 3.25vw, 2rem)",
-                paddingRight: "clamp(1.5rem, 3.25vw, 2rem)",
-                fontSize: "clamp(0.875rem, 1.5vw, 0.9375rem)",
-              }}
-            >
-              <BookOpen className="h-4 w-4" aria-hidden />
-              Take the Tour
-            </Button>
+            {!offline && (
+              <Button
+                type="button"
+                size="lg"
+                variant="outline"
+                onClick={startTutorial}
+                className="gap-2 font-semibold transition-colors hover:border-primary/40 hover:bg-primary/5"
+                style={{
+                  height: "clamp(2.5rem, 5.5vh, 3rem)",
+                  paddingLeft: "clamp(1.5rem, 3.25vw, 2rem)",
+                  paddingRight: "clamp(1.5rem, 3.25vw, 2rem)",
+                  fontSize: "clamp(0.875rem, 1.5vw, 0.9375rem)",
+                }}
+              >
+                <BookOpen className="h-4 w-4" aria-hidden />
+                Take the Tour
+              </Button>
+            )}
           </div>
-          <p
-            className="welcome-fade-up mt-2 text-center text-muted-foreground/60"
-            style={{ fontSize: "clamp(0.6875rem, 1.15vw, 0.75rem)", animationDelay: "380ms" }}
-          >
-            {demo
-              ? "The tour opens a preview with a sample case — nothing is saved. The full tool is for Mount Sinai clinicians."
-              : "New here? Take the tour first — it's a 2-minute walkthrough."}
-          </p>
+          {!offline && (
+            <p
+              className="welcome-fade-up mt-2 text-center text-muted-foreground/60"
+              style={{ fontSize: "clamp(0.6875rem, 1.15vw, 0.75rem)", animationDelay: "380ms" }}
+            >
+              {demo
+                ? "The tour opens a preview with a sample case — nothing is saved. The full tool is for Mount Sinai clinicians."
+                : "New here? Take the tour first — it's a 2-minute walkthrough."}
+            </p>
+          )}
 
-          {/* QR code — scan to open this app on a mobile device (web only) */}
-          {!isOfflineBuild() && (
+          {/* QR code — the online web version. Shown on every build: on the
+              offline macOS app it's the way to reach the tool from a phone. */}
           <div
             className="welcome-fade-up mt-[clamp(1.25rem,3vh,1.75rem)] flex flex-col items-center gap-2 rounded-lg border border-border/70 bg-card/80 p-3 shadow-sm backdrop-blur"
             style={{ animationDelay: "420ms" }}
@@ -269,10 +276,9 @@ export function WelcomeScreen() {
               className="text-muted-foreground/80 underline-offset-2 hover:text-foreground hover:underline"
               style={{ fontSize: "clamp(0.625rem, 1.05vw, 0.6875rem)" }}
             >
-              Scan to open · urology-ai.github.io/digital-twin
+              {offline ? "Online version · " : "Scan to open · "}urology-ai.github.io/digital-twin
             </a>
           </div>
-          )}
 
           <p
             className="welcome-fade-up mt-3 text-center text-muted-foreground/60"

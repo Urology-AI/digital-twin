@@ -17,7 +17,7 @@ function VersionFooter() {
         : e.type === "available" ? `Downloading ${e.version}…`
         : e.type === "downloaded" ? `Update ${e.version} ready — restart to apply`
         : e.type === "none" ? "Up to date"
-        : e.type === "error" ? "Update check failed" : null,
+        : e.type === "error" ? `Update check failed${e.message ? `: ${e.message}` : ""}` : null,
       );
     });
   }, [desktop]);

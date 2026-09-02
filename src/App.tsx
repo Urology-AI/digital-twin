@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ControlsOverlay } from "@/components/ControlsOverlay";
@@ -44,23 +44,6 @@ import { isOfflineBuild } from "@/lib/offlineBuild";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { cn } from "@/lib/utils";
 
-/**
- * Public preview: the Input wizard (the base case definition) stays visible
- * so the layout reads right, but can't be operated. `inert` removes the
- * subtree from pointer, focus and a11y interaction without changing layout.
- * Set imperatively because React 18 mishandles a JSX `inert` prop.
- * Factors and Planning stay interactive — nothing there persists anyway.
- */
-function useInert(on: boolean) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    if (on) el.setAttribute("inert", "");
-    else el.removeAttribute("inert");
-  }, [on]);
-  return ref;
-}
 
 function DimOverlay() {
   const patients = usePatientStore((s) => s.patients);
@@ -176,7 +159,6 @@ export default function App() {
   const patientView3DOpen = useUiStore((s) => s.patientView3DOpen);
   const setPatientView3DOpen = useUiStore((s) => s.setPatientView3DOpen);
   const demo = isDemoMode();
-  const inputInertRef = useInert(demo);
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
@@ -253,13 +235,11 @@ export default function App() {
           )}
         </div>
 
-        {/* ── Input tab (frozen in the public preview) ─────────────────── */}
+        {/* ── Input tab ───────────────────────────────────────────────── */}
         <div
-          ref={inputInertRef}
           className={cn(
             "absolute inset-0 z-10 overflow-hidden bg-background",
             !patientView && !presenterView && desktopTab === "input" ? "flex flex-col" : "hidden",
-            demo && "[&_:is(input,select,textarea)]:opacity-70",
           )}
         >
           <ZoneInputWizard />
