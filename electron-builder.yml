@@ -17,6 +17,14 @@ extraResources:
   - from: dist
     to: app-dist
 
+# electron-builder's built-in `notarize: true` submits to Apple but does not
+# staple the ticket into the bundle. notarize.cjs does both (notarytool
+# submit + stapler staple + validate) — it runs on the GitHub macOS runner,
+# where `stapler` reaches Apple's ticket service cleanly (a corporate
+# SSL-inspection proxy can make local stapling fail with "Could not validate
+# ticket" even when notarization itself is Accepted).
+afterSign: electron/notarize.cjs
+
 mac:
   icon: electron/icon.icns
   category: public.app-category.medical
@@ -30,11 +38,10 @@ mac:
   gatekeeperAssess: false
   entitlements: electron/entitlements.mac.plist
   entitlementsInherit: electron/entitlements.mac.plist
-  # Signing identity is picked up from the keychain, or from CSC_LINK /
-  # CSC_KEY_PASSWORD env vars in CI. Notarization (submit + staple the .app)
-  # is electron-builder 26's built-in step — needs APPLE_ID,
-  # APPLE_APP_SPECIFIC_PASSWORD and APPLE_TEAM_ID in the environment.
-  notarize: true
+  # Signing identity: keychain, or CSC_LINK / CSC_KEY_PASSWORD in CI.
+  # Notarization + stapling is done by the afterSign hook (notarize.cjs),
+  # not the built-in step.
+  notarize: false
 
 dmg:
   title: ${productName} ${version}
