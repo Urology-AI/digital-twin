@@ -208,20 +208,30 @@ function getCont(L: number, R: number): number[] {
   return CONT.VERY_HIGH;
 }
 
+/**
+ * Age adjustment factor applied to the potency curve. Exported so the
+ * biological-age readout can show what the same patient's factor would be at
+ * their biological age — the model itself is always called with chronological
+ * age (see BIOLOGICAL_AGE in planningEvidence.ts).
+ */
+export function ageAdjustment(age: number): number {
+  return (
+    age <= 50 ? 1.10 :
+    age <= 55 ? 1.10 - (age - 50) * 0.01 :
+    age <= 60 ? 1.05 - (age - 55) * 0.01 :
+    age <= 65 ? 1.00 - (age - 60) * 0.01 :
+    age <= 70 ? 0.95 - (age - 65) * 0.02 :
+    0.85
+  );
+}
+
 export function computeFunctionalOutcomes(inputs: FunctionalInputs): FunctionalOutcomesResult {
   const { nsL, nsR, age, shim, ipss, bmi, pfmt, exercise, smoking, pde5, alcohol, dm, htn, cad } = inputs;
 
   const pd = getPot(nsL, nsR);
   const cd = getCont(nsL, nsR);
 
-  // Age adjustment factor
-  const aA =
-    age <= 50 ? 1.10 :
-    age <= 55 ? 1.10 - (age - 50) * 0.01 :
-    age <= 60 ? 1.05 - (age - 55) * 0.01 :
-    age <= 65 ? 1.00 - (age - 60) * 0.01 :
-    age <= 70 ? 0.95 - (age - 65) * 0.02 :
-    0.85;
+  const aA = ageAdjustment(age);
 
   // SHIM adjustment factor
   const sA =

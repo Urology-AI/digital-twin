@@ -11,6 +11,7 @@ import type {
   SmokingStatus,
 } from "@/lib/compass/functionalOutcomes";
 import { computeBiologicalAge } from "@/lib/compass/biologicalAge";
+import { ageAdjustment } from "@/lib/compass/functionalOutcomes";
 import { BIOLOGICAL_AGE } from "@/lib/compass/planningEvidence";
 import { cn } from "@/lib/utils";
 
@@ -54,35 +55,62 @@ function SegPicker<T extends string>({
  * prediction model still runs on chronological age (see BIOLOGICAL_AGE).
  */
 function BiologicalAgeReadout({
-  age,
-  bmi,
-  smoking,
-  exercise,
-  alcohol,
-  dm,
-  htn,
-  cad,
-}: Parameters<typeof computeBiologicalAge>[0]) {
-  if (!(age > 0)) {
+  ageText,
+  onAge,
+  ...factors
+}: Parameters<typeof computeBiologicalAge>[0] & {
+  ageText: string;
+  onAge: (v: string) => void;
+}) {
+  const ageInput = (
+    <div className="space-y-1.5">
+      <label className="text-xs font-semibold text-foreground" htmlFor="mf-age">
+        Age <span className="font-normal text-muted-foreground">(years)</span>
+      </label>
+      <Input
+        id="mf-age"
+        type="number"
+        min={30}
+        max={95}
+        inputMode="numeric"
+        placeholder="62"
+        value={ageText}
+        onChange={(e) => onAge(e.target.value)}
+        className="h-8 w-20 text-sm"
+      />
+      <p className="text-[10px] leading-snug text-muted-foreground">
+        Not modifiable, but it sets the baseline every other factor moves from —
+        the models read this number.
+      </p>
+    </div>
+  );
+
+  if (!(factors.age > 0)) {
     return (
-      <div className="rounded-lg border border-dashed border-border/70 px-3 py-2 text-[11px] text-muted-foreground">
-        Enter the patient&rsquo;s age in Clinical Input to see biological age.
+      <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
+        {ageInput}
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Enter an age to see biological age.
+        </p>
       </div>
     );
   }
 
-  const bio = computeBiologicalAge({ age, bmi, smoking, exercise, alcohol, dm, htn, cad });
+  const bio = computeBiologicalAge(factors);
+  const chronoFactor = ageAdjustment(bio.chronological);
+  const bioFactor = ageAdjustment(bio.biological);
   const older = bio.offset > 0;
   const younger = bio.offset < 0;
 
   return (
     <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
-      <div className="flex items-baseline justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        {ageInput}
+        <div className="text-right">
           <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
             Biological age
           </div>
-          <div className="flex items-baseline gap-2">
+          <div className="flex items-baseline justify-end gap-2">
             <span
               className={cn(
                 "text-2xl font-bold tabular-nums",
@@ -91,24 +119,24 @@ function BiologicalAgeReadout({
             >
               {bio.biological}
             </span>
-            <span className="text-[11px] text-muted-foreground">
-              vs. {bio.chronological} chronological
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+                older
+                  ? "bg-amber-500/10 text-amber-400"
+                  : younger
+                    ? "bg-emerald-500/10 text-emerald-400"
+                    : "bg-muted text-muted-foreground",
+              )}
+            >
+              {older ? "+" : ""}
+              {bio.offset} yr
             </span>
           </div>
+          <div className="text-[11px] text-muted-foreground">
+            vs. {bio.chronological} chronological
+          </div>
         </div>
-        <span
-          className={cn(
-            "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-            older
-              ? "bg-amber-500/10 text-amber-400"
-              : younger
-                ? "bg-emerald-500/10 text-emerald-400"
-                : "bg-muted text-muted-foreground",
-          )}
-        >
-          {older ? "+" : ""}
-          {bio.offset} yr
-        </span>
       </div>
 
       {bio.potentialGain > 0 && (
@@ -136,9 +164,33 @@ function BiologicalAgeReadout({
         </div>
       )}
 
+      <div className="mt-2 rounded border border-border/60 bg-background/40 px-2 py-1.5">
+        <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+          Effect in the model
+        </div>
+        <p className="mt-0.5 text-[11px] leading-snug text-foreground">
+          The potency curve&rsquo;s age factor is{" "}
+          <span className="font-semibold tabular-nums">{chronoFactor.toFixed(2)}</span> at{" "}
+          {bio.chronological}; at a biological age of {bio.biological} the same factor
+          would be{" "}
+          <span
+            className={cn(
+              "font-semibold tabular-nums",
+              bioFactor < chronoFactor ? "text-amber-400" : "text-emerald-400",
+            )}
+          >
+            {bioFactor.toFixed(2)}
+          </span>
+          .
+        </p>
+        <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+          Shown for counselling, not applied: the nomogram already charges BMI,
+          smoking, exercise, alcohol and comorbidity as direct recovery deltas, so
+          adding them again through age would double-count them.
+        </p>
+      </div>
       <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
-        {BIOLOGICAL_AGE.label} — provisional, counselling aid only. Predictions use
-        chronological age.
+        {BIOLOGICAL_AGE.label} — provisional, counselling aid only.
       </p>
     </div>
   );
@@ -152,6 +204,7 @@ export function ModifiableFactorsPanel() {
 
   const entry = patients.find((p) => p.id === activeId);
 
+  const [age, setAge] = useState("");
   const [bmi, setBmi] = useState("");
   const [shim, setShim] = useState("");
   const [ipss, setIpss] = useState("");
@@ -170,6 +223,7 @@ export function ModifiableFactorsPanel() {
   useEffect(() => {
     if (!entry) return;
     const rec = entry.record;
+    setAge(rec.patient.age != null && rec.patient.age > 0 ? String(rec.patient.age) : "");
     setBmi(rec.patient.bmi != null && rec.patient.bmi > 0 ? String(rec.patient.bmi) : "");
     setShim(rec.patient.shim != null ? String(rec.patient.shim) : "");
     setIpss(rec.patient.ipss != null ? String(rec.patient.ipss) : "");
@@ -185,6 +239,7 @@ export function ModifiableFactorsPanel() {
     setCad(rec.patient.cad ?? false);
   }, [
     entry?.id,
+    entry?.record.patient.age,
     entry?.record.patient.bmi,
     entry?.record.patient.shim,
     entry?.record.patient.ipss,
@@ -199,6 +254,11 @@ export function ModifiableFactorsPanel() {
     entry?.record.patient.cad,
   ]);
 
+  const handleAge = (v: string) => {
+    setAge(v);
+    const n = parseInt(v);
+    updateClinicalForm({ age: n > 0 && !isNaN(n) ? n : undefined });
+  };
   const handleBmi = (v: string) => {
     setBmi(v);
     const n = parseFloat(v);
@@ -249,7 +309,9 @@ export function ModifiableFactorsPanel() {
       </CardHeader>
       <CardContent className="space-y-3 px-4 py-3">
         <BiologicalAgeReadout
-          age={entry.record.patient.age ?? 0}
+          ageText={age}
+          onAge={handleAge}
+          age={parseInt(age) || 0}
           bmi={bmiNum}
           smoking={smoking}
           exercise={exercise}
