@@ -141,6 +141,16 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
+      # Stapling rewrites the .dmg, so the sha512/size electron-builder recorded
+      # for it are stale. notarize-artifacts.cjs tries to patch them, but
+      # electron-builder writes latest-mac.yml AFTER that hook runs, so the
+      # patch silently found no file and v1.0.21 shipped a manifest 1984 bytes
+      # out of date for the .dmg. Do it here, where both definitely exist.
+      # (The .zip entry — the one auto-update actually consumes — is untouched.)
+      - name: Patch latest-mac.yml with the stapled .dmg hash
+        if: ${{ !inputs.preflight }}
+        run: node electron/patch-dmg-hash.cjs release
+
       - name: Upload release artifacts
         if: ${{ !inputs.preflight }}
         uses: actions/upload-artifact@v4
@@ -226,7 +236,28 @@ jobs:
           xcrun stapler validate "$DMG" || true
           echo "::endgroup::"
 
-          echo "→ v$VER: the .dmg and the .app inside it and in the .zip are signed and notarized (offline-verified on a cold runner)"
+          # latest-mac.yml must describe the artifacts we actually ship. This
+          # is the gate that would have caught v1.0.21's stale .dmg entry.
+          echo "::group::latest-mac.yml matches the artifacts"
+          YML="art/latest-mac.yml"
+          check_entry() {
+            local file="$1" name; name=$(basename "$file")
+            local want_sha want_size got_sha got_size
+            want_sha=$(grep -A2 "url: $name\$" "$YML" | sed -n 's/^ *sha512: //p' | head -1)
+            want_size=$(grep -A2 "url: $name\$" "$YML" | sed -n 's/^ *size: //p' | head -1)
+            got_sha=$(shasum -a 512 "$file" | awk '{print $1}' | xxd -r -p | base64)
+            got_size=$(stat -f%z "$file")
+            if [ "$want_sha" != "$got_sha" ] || [ "$want_size" != "$got_size" ]; then
+              echo "::error::latest-mac.yml disagrees with $name (yml: $want_size bytes, actual: $got_size)"
+              exit 1
+            fi
+            echo "  ✓ $name matches latest-mac.yml ($got_size bytes)"
+          }
+          check_entry "$DMG"
+          check_entry "$ZIP"
+          echo "::endgroup::"
+
+          echo "→ v$VER: the .dmg and the .app inside it and in the .zip are signed and notarized (offline-verified on a cold runner), and latest-mac.yml matches both artifacts"
 
   publish:
     needs: [build, verify]
