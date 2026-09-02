@@ -73,7 +73,7 @@ export function CasePicker({ sampleOnly = false }: { sampleOnly?: boolean }) {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
       const n = Number(e.key);
-      if (n >= 1 && n <= DEMO_CASES.length) {
+      if (n >= 1 && n <= Math.min(9, DEMO_CASES.length)) {
         loadDemoCase(DEMO_CASES[n - 1]!);
         setOpen(false);
       }
@@ -145,7 +145,14 @@ export function CasePicker({ sampleOnly = false }: { sampleOnly?: boolean }) {
                     loaded && "bg-primary/[0.07]",
                   )}
                 >
-                  <kbd className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-border bg-muted text-[10px] font-bold text-muted-foreground">
+                  <kbd
+                    className={cn(
+                      "mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] font-bold",
+                      i < 9
+                        ? "border-border bg-muted text-muted-foreground"
+                        : "border-transparent text-transparent",
+                    )}
+                  >
                     {i + 1}
                   </kbd>
                   <span className="min-w-0 flex-1">
