@@ -751,6 +751,13 @@ export function createProstateScene(
   const glbSVRight: Mesh[] = [];
   let glbLoaded = false;
 
+  // Latest data handed to updateZones, replayed once the GLB finishes loading so
+  // a scene rebuilt mid-load (e.g. switching cases) is not left painted with the
+  // zones captured when the scene was created.
+  let lastZones = zones;
+  let lastOverlay = overlay;
+  let lastOpts = { heatmapVisible: false, lesionsOnly: false };
+
   // Load the real anatomical GLB asynchronously; procedural mesh stays visible
   // as a placeholder until the GLB is ready (or permanently if the file is absent).
   const glbLoader = new GLTFLoader();
@@ -886,10 +893,6 @@ export function createProstateScene(
         });
       }
 
-      // Paint initial tissue colours onto the GLB prostate and SVs.
-      paintGlbProstate(glbProstateMeshes, zones, overlay, dims, false, false);
-      paintGlbSV(glbSVLeft, glbSVRight, zones, overlay, false);
-
       // Swap procedural anatomy for the GLB.  Floating heatmap tiles are
       // replaced by vertex colours; zone boundary outlines remain visible.
       model.remove(prostateMesh);
@@ -903,11 +906,62 @@ export function createProstateScene(
 
       model.add(gltf.scene);
       glbLoaded = true;
+      applyZones(lastZones, lastOverlay, lastOpts);
       onGlbLoad?.();
     },
     undefined,
     undefined,
   );
+
+  function applyZones(
+    z: ThreeZoneRuntime[],
+    ov: OverlayType,
+    opts: { heatmapVisible: boolean; lesionsOnly: boolean },
+  ) {
+    if (glbLoaded) {
+      // GLB mode: paint vertex colours on the real prostate surface and SVs.
+      paintGlbProstate(
+        glbProstateMeshes,
+        z,
+        ov,
+        dims,
+        opts.heatmapVisible,
+        opts.lesionsOnly,
+      );
+      paintGlbSV(glbSVLeft, glbSVRight, z, ov, opts.heatmapVisible);
+      // Rebuild boundary lines so zone outlines reflect updated data.
+      buildZones(z, ov);
+      for (const mesh of zoneMeshes) {
+        const zn = mesh.userData.zone as ThreeZoneRuntime;
+        const val =
+          ov === "cancer" ? zn.cancer : ov === "ece" ? zn.ece : ov === "svi" ? zn.svi : ov === "plan" ? (zn.planGrade - 1) / 2 : zn.psm;
+        mesh.visible = opts.lesionsOnly ? (val ?? 0) >= 0.15 : true;
+      }
+      // Zone faces replaced by vertex colours; outlines shown when heatmap active.
+      heatmapGroup.visible = false;
+      boundaryGroup.visible = false;
+    } else {
+      buildZones(z, ov);
+      for (const mesh of zoneMeshes) {
+        const zn = mesh.userData.zone as ThreeZoneRuntime;
+        const val =
+          ov === "cancer"
+            ? zn.cancer
+            : ov === "ece"
+              ? zn.ece
+              : ov === "svi"
+                ? zn.svi
+                : ov === "plan"
+                  ? (zn.planGrade - 1) / 2
+                  : zn.psm;
+        (mesh.material as MeshBasicMaterial).color.copy(
+          overlayColor(val ?? 0.02, ov),
+        );
+        mesh.visible = opts.lesionsOnly ? (val ?? 0) >= 0.15 : true;
+      }
+      heatmapGroup.visible = opts.heatmapVisible;
+    }
+  }
 
   const dispose = () => {
     renderer.dispose();
@@ -935,49 +989,10 @@ export function createProstateScene(
       scene.background = new Color(hex);
     },
     updateZones: (z, ov, opts) => {
-      if (glbLoaded) {
-        // GLB mode: paint vertex colours on the real prostate surface and SVs.
-        paintGlbProstate(
-          glbProstateMeshes,
-          z,
-          ov,
-          dims,
-          opts.heatmapVisible,
-          opts.lesionsOnly,
-        );
-        paintGlbSV(glbSVLeft, glbSVRight, z, ov, opts.heatmapVisible);
-        // Rebuild boundary lines so zone outlines reflect updated data.
-        buildZones(z, ov);
-        for (const mesh of zoneMeshes) {
-          const zn = mesh.userData.zone as ThreeZoneRuntime;
-          const val =
-            ov === "cancer" ? zn.cancer : ov === "ece" ? zn.ece : ov === "svi" ? zn.svi : ov === "plan" ? (zn.planGrade - 1) / 2 : zn.psm;
-          mesh.visible = opts.lesionsOnly ? (val ?? 0) >= 0.15 : true;
-        }
-        // Zone faces replaced by vertex colours; outlines shown when heatmap active.
-        heatmapGroup.visible = false;
-        boundaryGroup.visible = false;
-      } else {
-        buildZones(z, ov);
-        for (const mesh of zoneMeshes) {
-          const zn = mesh.userData.zone as ThreeZoneRuntime;
-          const val =
-            ov === "cancer"
-              ? zn.cancer
-              : ov === "ece"
-                ? zn.ece
-                : ov === "svi"
-                  ? zn.svi
-                  : ov === "plan"
-                    ? (zn.planGrade - 1) / 2
-                    : zn.psm;
-          (mesh.material as MeshBasicMaterial).color.copy(
-            overlayColor(val ?? 0.02, ov),
-          );
-          mesh.visible = opts.lesionsOnly ? (val ?? 0) >= 0.15 : true;
-        }
-        heatmapGroup.visible = opts.heatmapVisible;
-      }
+      lastZones = z;
+      lastOverlay = ov;
+      lastOpts = opts;
+      applyZones(z, ov, opts);
     },
   };
 }
