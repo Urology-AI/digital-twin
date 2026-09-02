@@ -13,7 +13,12 @@ const { autoUpdater } = require("electron-updater");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
 
-const DIST = path.join(__dirname, "..", "dist");
+// In the packaged app the web build ships as a plain resource directory
+// (electron-builder `extraResources`), NOT inside app.asar — unpacking a big
+// asset tree from the asar breaks notarization stapling on macOS 15+.
+const DIST = app.isPackaged
+  ? path.join(process.resourcesPath, "app-dist")
+  : path.join(__dirname, "..", "dist");
 const ORIGIN = "app://compass";
 
 let mainWindow = null;

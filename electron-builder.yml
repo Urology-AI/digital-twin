@@ -8,12 +8,14 @@ directories:
 
 files:
   - electron/**/*
-  - dist/**/*
   - package.json
 
-# The renderer is fully offline; nothing is fetched at runtime.
-asarUnpack:
-  - dist/**/*
+# The web build ships as a plain resource directory, not inside app.asar.
+# (Unpacking a large asset tree from the asar via asarUnpack leaves an
+# app.asar.unpacked/ that breaks notarization stapling on macOS 15+.)
+extraResources:
+  - from: dist
+    to: app-dist
 
 mac:
   icon: electron/icon.icns
