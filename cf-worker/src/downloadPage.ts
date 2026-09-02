@@ -112,15 +112,6 @@ export function downloadPageHtml(
     margin: 2rem 0 0;
   }
   .warn strong { color: #ffcf70; }
-  .notice {
-    border: 1px solid rgba(255,255,255,0.09);
-    background: rgba(255,255,255,0.025);
-    border-radius: 0.5rem;
-    padding: 1rem 1.15rem;
-    font-size: 0.8125rem;
-    color: #8b9dad;
-    margin-top: 2.5rem;
-  }
 </style>
 </head>
 <body>
@@ -162,21 +153,10 @@ export function downloadPageHtml(
   </p>
 
   <p class="warn">
-    <strong>Do not enter PHI.</strong> COMPASS holds no patient identifiers by design —
-    no names, MRNs, dates of birth or dates of service. Identify cases by study ID only.
-  </p>
-
-  <p class="warn">
-    <strong>Do not redistribute.</strong> These installers, this link and the source are for
-    named Mount Sinai staff under IRB STUDY-14-00050. Do not forward the app, share the link,
-    copy it to personal machines or pass it outside the study team — the app is unreleased
-    research software and carries no clinical clearance.
-  </p>
-
-  <p class="notice">
-    For Mount Sinai clinical and research staff. Research tool only — not a medical device,
-    not FDA cleared, and no substitute for clinical judgment. Use is governed by
-    IRB STUDY-14-00050.
+    <strong>Before you install.</strong> For named Mount Sinai study staff only — do not
+    forward the app or this link outside the team. Do not enter PHI: COMPASS holds no patient
+    identifiers by design, so identify cases by study ID. Research tool only — not a medical
+    device, not FDA cleared, and no substitute for clinical judgment. IRB STUDY-14-00050.
   </p>
 </div>
 <script>
