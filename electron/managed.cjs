@@ -14,9 +14,19 @@
 
 const { execFile } = require("node:child_process");
 
-// Which organisation counts as "managed by Sinai". Matched case-insensitively
-// against the org/tenant/domain strings the OS reports.
-// TODO(sinai-it): confirm the exact Azure AD tenant name and macOS MDM org.
+// Which organisation counts as "managed by Sinai".
+//
+// The strongest identifier readable without root on both platforms is the
+// Microsoft Entra (Azure AD) *tenant id* the device is registered to — a
+// stable GUID, unlike display names. Fill it in and the badge can say "Sinai
+// device" rather than a generic "Managed".
+// TODO(sinai-it): confirm this GUID. It is the tenant read off an enrolled
+// Sinai-issued Mac (Intune / Entra) during development, not a value from IT —
+// verify it in the Entra admin centre, or with `dsregcmd /status` on a
+// known-good Sinai PC, before relying on the "Sinai device" badge.
+const SINAI_TENANT_IDS = ["77e89d61-570f-43b0-b9e4-634f462e34b8"];
+
+// Fallback for names the OS does report (Windows TenantName / AD domain).
 const SINAI_MARKERS = ["mount sinai", "mountsinai", "mssm", "sinai"];
 
 function run(cmd, args) {
@@ -32,6 +42,19 @@ function matchesSinai(text) {
   return SINAI_MARKERS.some((m) => t.includes(m));
 }
 
+// The Entra tenant this Mac is workplace-joined to. `profiles show -type
+// enrollment` would say it too, but that needs root; Company Portal records the
+// tenant id in its own (user-readable) preferences.
+async function macTenantId() {
+  const out = await run("defaults", [
+    "read",
+    "com.microsoft.CompanyPortalMac",
+    "wpj-registration-seq-num-per-tenant-dictionary",
+  ]);
+  const m = /"?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"?\s*=/i.exec(out);
+  return m ? m[1].toLowerCase() : null;
+}
+
 async function macEnrollment() {
   const status = await run("/usr/bin/profiles", ["status", "-type", "enrollment"]);
   // "MDM enrollment: Yes (User Approved)" / "No"
@@ -40,9 +63,11 @@ async function macEnrollment() {
   if (!enrolled) {
     return { managed: false, org: null, detail: "No MDM enrollment found on this Mac." };
   }
-  // Organisation name, when the enrollment profile is readable.
-  const profiles = await run("/usr/bin/profiles", ["-L"]);
-  const org = matchesSinai(profiles) || matchesSinai(status) ? "Mount Sinai" : null;
+  const tenant = await macTenantId();
+  const org =
+    (tenant && SINAI_TENANT_IDS.includes(tenant)) || matchesSinai(status)
+      ? "Mount Sinai"
+      : null;
   return {
     managed: true,
     org,
@@ -58,13 +83,15 @@ async function winEnrollment() {
   };
   const aad = /^\s*YES$/i.test(value("AzureAdJoined"));
   const domain = /^\s*YES$/i.test(value("DomainJoined"));
-  const tenant = value("TenantName") || value("DomainName");
+  const tenantName = value("TenantName") || value("DomainName");
+  const tenantId = value("TenantId").toLowerCase();
   if (!aad && !domain) {
     return { managed: false, org: null, detail: "This PC is not domain- or Entra-joined." };
   }
+  const sinai = SINAI_TENANT_IDS.includes(tenantId) || matchesSinai(tenantName);
   return {
     managed: true,
-    org: matchesSinai(tenant) ? "Mount Sinai" : tenant || null,
+    org: sinai ? "Mount Sinai" : tenantName || null,
     detail: aad ? "Joined to Microsoft Entra ID." : "Joined to an Active Directory domain.",
   };
 }
