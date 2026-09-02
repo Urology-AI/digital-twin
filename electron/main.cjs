@@ -12,6 +12,7 @@ const { app, BrowserWindow, shell, protocol, net, ipcMain, dialog } = require("e
 const { autoUpdater } = require("electron-updater");
 const path = require("node:path");
 const { pathToFileURL } = require("node:url");
+const { deviceEnrollment } = require("./managed.cjs");
 
 // In the packaged app the web build ships as a plain resource directory
 // (electron-builder `extraResources`), NOT inside app.asar — unpacking a big
@@ -116,6 +117,9 @@ function setupAutoUpdate() {
 }
 
 ipcMain.handle("app:version", () => app.getVersion());
+// Advisory device-management check — see electron/managed.cjs for why it is
+// only ever advisory.
+ipcMain.handle("device:enrollment", () => deviceEnrollment());
 ipcMain.handle("updates:check", async () => {
   if (!updaterReady) {
     send("error", {

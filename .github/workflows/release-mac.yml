@@ -1,4 +1,4 @@
-name: Release macOS app
+name: Release desktop apps
 
 # Triggered by a `vX.Y.Z` tag — pushed by hand, by `npm version patch`, or
 # automatically by auto-release.yml on every merge to main that touches app
@@ -259,14 +259,70 @@ jobs:
 
           echo "→ v$VER: the .dmg and the .app inside it and in the .zip are signed and notarized (offline-verified on a cold runner), and latest-mac.yml matches both artifacts"
 
+  # Windows installer. Signed when WIN_CSC_LINK / WIN_CSC_KEY_PASSWORD are set
+  # (base64 .pfx + its password, an OV/EV code-signing certificate); without
+  # them electron-builder still produces a working .exe, but SmartScreen warns
+  # every downloader — so treat an unsigned Windows release as a stopgap.
+  # There is no Windows equivalent of notarization, hence no verify job.
+  build-win:
+    if: ${{ !inputs.preflight }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then v="${GITHUB_REF_NAME#v}"; else v="$(node -p 'require("./package.json").version')"; fi
+          echo "v=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Build (and sign, if a certificate is configured)
+        shell: bash
+        run: npm run dist:win -- --publish never -c.extraMetadata.version=${{ steps.ver.outputs.v }}
+        env:
+          VITE_APP_VERSION: ${{ steps.ver.outputs.v }}
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+      - name: Report signing state
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.WIN_CSC_LINK }}" ]; then
+            echo "::warning::WIN_CSC_LINK is not set — this installer is UNSIGNED and will trip SmartScreen."
+          else
+            echo "Installer signed with the configured certificate."
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-win
+          if-no-files-found: error
+          path: |
+            release/COMPASS-Digital-Twin-*-x64.exe
+            release/COMPASS-Digital-Twin-*-x64.exe.blockmap
+            release/latest.yml
+
   publish:
-    needs: [build, verify]
+    needs: [build, verify, build-win]
     if: ${{ !inputs.preflight }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: release-mac
+          path: art
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-win
           path: art
 
       - name: Publish to the private releases repo
@@ -282,5 +338,8 @@ jobs:
             art/COMPASS-Digital-Twin-*.dmg \
             art/COMPASS-Digital-Twin-*.zip \
             art/COMPASS-Digital-Twin-*.zip.blockmap \
-            art/latest-mac.yml
+            art/COMPASS-Digital-Twin-*.exe \
+            art/COMPASS-Digital-Twin-*.exe.blockmap \
+            art/latest-mac.yml \
+            art/latest.yml
           echo "::notice::Published v$VER"

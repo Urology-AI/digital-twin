@@ -398,7 +398,8 @@ const RELEASES_REPO = "Urology-AI/digital-twin-releases";
 // Only these names are ever proxied. Without an allowlist this route would be
 // an open proxy for any asset on any release, and path traversal in the name
 // would let a caller reach other GitHub API paths entirely.
-const ASSET_NAME = /^(latest-mac\.yml|COMPASS-Digital-Twin-\d+\.\d+\.\d+-arm64\.(?:dmg|zip|zip\.blockmap))$/;
+const ASSET_NAME =
+  /^(latest-mac\.yml|latest\.yml|COMPASS-Digital-Twin-\d+\.\d+\.\d+-(?:arm64\.(?:dmg|zip|zip\.blockmap)|x64\.exe(?:\.blockmap)?))$/;
 
 interface GhAsset { name: string; url: string; size: number }
 interface GhRelease { tag_name: string; published_at: string; assets: GhAsset[] }

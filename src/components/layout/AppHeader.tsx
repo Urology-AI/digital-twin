@@ -23,6 +23,7 @@ import { ToolsMenu } from "@/components/layout/ToolsMenu";
 import { cn } from "@/lib/utils";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { isDemoMode } from "@/lib/demoMode";
+import { useDeviceEnrollment } from "@/hooks/useDeviceEnrollment";
 import { isOfflineBuild } from "@/lib/offlineBuild";
 
 const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[] = [
@@ -31,6 +32,31 @@ const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[]
   { id: "outcomes",     label: "Factors",     Icon: Layers },
   { id: "plan",         label: "Planning",    Icon: FlaskConical },
 ];
+
+/**
+ * Desktop only: whether this machine is enrolled in Sinai device management.
+ * Advisory — the machine reports on itself, so it is display, not a gate
+ * (see electron/managed.cjs). Silent until the check comes back, and on
+ * builds packaged before it existed.
+ */
+function ManagedBadge({ chip }: { chip: string }) {
+  const enrollment = useDeviceEnrollment();
+  if (!enrollment) return null;
+  const sinai = enrollment.managed && enrollment.org !== null;
+  return (
+    <span
+      title={`${enrollment.detail}${enrollment.org ? ` Organisation: ${enrollment.org}.` : ""} Informational only.`}
+      className={cn(
+        chip,
+        sinai
+          ? "bg-sky-500/15 text-sky-600 dark:text-sky-400"
+          : "bg-muted text-muted-foreground",
+      )}
+    >
+      {sinai ? "Sinai device" : enrollment.managed ? "Managed" : "Unmanaged"}
+    </span>
+  );
+}
 
 /**
  * One word next to the wordmark for which build you are in: Clinical with a
@@ -44,12 +70,15 @@ function StatusBadge({ signedIn, demo }: { signedIn: boolean; demo: boolean }) {
 
   if (isOfflineBuild()) {
     return (
-      <span
-        title="Offline build — everything runs on this Mac. No login, no cloud, no data leaves the device."
-        className={cn(chip, "bg-amber-500/15 text-amber-600 dark:text-amber-400")}
-      >
-        Local
-      </span>
+      <>
+        <span
+          title="Offline build — everything runs on this device. No login, no cloud, no data leaves the machine."
+          className={cn(chip, "bg-amber-500/15 text-amber-600 dark:text-amber-400")}
+        >
+          Local
+        </span>
+        <ManagedBadge chip={chip} />
+      </>
     );
   }
 

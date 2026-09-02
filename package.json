@@ -16,7 +16,8 @@
     "test:watch": "vitest",
     "build:offline": "VITE_OFFLINE=1 vite build",
     "electron": "npm run build:offline && electron .",
-    "dist:mac": "npm run build:offline && electron-builder --mac"
+    "dist:mac": "npm run build:offline && electron-builder --mac",
+    "dist:win": "npm run build:offline && electron-builder --win"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
