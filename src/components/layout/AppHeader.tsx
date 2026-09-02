@@ -210,7 +210,7 @@ export function AppHeader() {
             )}
           />
           <span className="hidden text-[10px] font-medium sm:inline">
-            {saveStatus === "saving" ? "Saving" : "Saved"}
+            {saveStatus === "saving" ? "Saving…" : "Saved locally"}
           </span>
         </div>
         )}
