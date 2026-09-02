@@ -373,3 +373,30 @@ export const MODIFIABLE_BCR = ev(
     "systematic review / meta-analysis, Cancer Prev Res 2011). Low-confidence; " +
     "shown as a caveated estimate only.",
 );
+
+export const BIOLOGICAL_AGE = ev(
+  {
+    bmi: { underweight: 1, normal: 0, overweight: 1.5, obese: 4 },
+    smoking: { never: 0, former: 2, current: 6 },
+    exercise: { sedentary: 3, light: 1, moderate: 0, active: -3 },
+    alcohol: { none: -0.5, moderate: 0, heavy: 3 },
+    dm: 4,
+    htn: 2,
+    cad: 5,
+    /** offset is clamped to this window around chronological age */
+    clamp: { min: -10, max: 20 },
+  },
+  "provisional",
+  "Biological-age offset from modifiable factors",
+  "No Mount Sinai / Tewari-group biological-age paper exists, so this is not an " +
+    "institutional model. The framing follows the urologic-oncology frailty-age " +
+    "literature — Frailty Deficit Score biological age vs. expected life age in " +
+    "urological cancers (Cancers 2022, PMC9776733) and the 5-item frailty index " +
+    "for morbidity after RP (Shahait et al., J Endourol 2021) — with " +
+    "year-equivalents taken as expert priors from the cardiometabolic ageing " +
+    "literature (Levine phenotypic age; Framingham heart age; smoking and " +
+    "physical-activity life-expectancy studies). NOT fitted on COMPASS data and " +
+    "NOT a validated biological-age assay: a counselling aid that re-expresses " +
+    "the modifiable-factor burden in years. Chronological age remains the " +
+    "parameter every prediction model uses.",
+);

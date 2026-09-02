@@ -10,6 +10,8 @@ import type {
   PfmtLevel,
   SmokingStatus,
 } from "@/lib/compass/functionalOutcomes";
+import { computeBiologicalAge } from "@/lib/compass/biologicalAge";
+import { BIOLOGICAL_AGE } from "@/lib/compass/planningEvidence";
 import { cn } from "@/lib/utils";
 
 function SegPicker<T extends string>({
@@ -43,6 +45,101 @@ function SegPicker<T extends string>({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Modifiable-factor burden re-expressed in years. Display only — every
+ * prediction model still runs on chronological age (see BIOLOGICAL_AGE).
+ */
+function BiologicalAgeReadout({
+  age,
+  bmi,
+  smoking,
+  exercise,
+  alcohol,
+  dm,
+  htn,
+  cad,
+}: Parameters<typeof computeBiologicalAge>[0]) {
+  if (!(age > 0)) {
+    return (
+      <div className="rounded-lg border border-dashed border-border/70 px-3 py-2 text-[11px] text-muted-foreground">
+        Enter the patient&rsquo;s age in Clinical Input to see biological age.
+      </div>
+    );
+  }
+
+  const bio = computeBiologicalAge({ age, bmi, smoking, exercise, alcohol, dm, htn, cad });
+  const older = bio.offset > 0;
+  const younger = bio.offset < 0;
+
+  return (
+    <div className="rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <div>
+          <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+            Biological age
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span
+              className={cn(
+                "text-2xl font-bold tabular-nums",
+                older ? "text-amber-400" : younger ? "text-emerald-400" : "text-foreground",
+              )}
+            >
+              {bio.biological}
+            </span>
+            <span className="text-[11px] text-muted-foreground">
+              vs. {bio.chronological} chronological
+            </span>
+          </div>
+        </div>
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[11px] font-semibold",
+            older
+              ? "bg-amber-500/10 text-amber-400"
+              : younger
+                ? "bg-emerald-500/10 text-emerald-400"
+                : "bg-muted text-muted-foreground",
+          )}
+        >
+          {older ? "+" : ""}
+          {bio.offset} yr
+        </span>
+      </div>
+
+      {bio.potentialGain > 0 && (
+        <div className="mt-2 text-[11px] text-muted-foreground">
+          Optimising the levers below reaches{" "}
+          <span className="font-semibold text-emerald-400">{bio.bestAchievable}</span> — a{" "}
+          <span className="font-semibold text-emerald-400">{bio.potentialGain}-year</span> gain.
+        </div>
+      )}
+
+      {bio.contributions.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {bio.contributions.map((c) => (
+            <span
+              key={c.label}
+              className={cn(
+                "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                c.years > 0 ? "bg-amber-500/10 text-amber-400" : "bg-emerald-500/10 text-emerald-400",
+              )}
+            >
+              {c.label} {c.years > 0 ? "+" : ""}
+              {c.years}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <p className="mt-2 text-[10px] leading-snug text-muted-foreground">
+        {BIOLOGICAL_AGE.label} — provisional, counselling aid only. Predictions use
+        chronological age.
+      </p>
     </div>
   );
 }
@@ -151,6 +248,17 @@ export function ModifiableFactorsPanel() {
         </p>
       </CardHeader>
       <CardContent className="space-y-3 px-4 py-3">
+        <BiologicalAgeReadout
+          age={entry.record.patient.age ?? 0}
+          bmi={bmiNum}
+          smoking={smoking}
+          exercise={exercise}
+          alcohol={alcohol}
+          dm={dm}
+          htn={htn}
+          cad={cad}
+        />
+
         <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Body & Lifestyle</h3>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
