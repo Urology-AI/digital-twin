@@ -381,7 +381,11 @@ async function handleDownloadPage(env: Env): Promise<Response> {
   if (!env.RELEASES_READ_PAT) return jsonError("Update feed not configured on server", 503);
   const release = await latestRelease(env);
   if (!release) return jsonError("Could not reach the release feed", 502);
-  const html = downloadPageHtml(release.tag_name.replace(/^v/, ""), release.published_at);
+  const html = downloadPageHtml(
+    release.tag_name.replace(/^v/, ""),
+    release.published_at,
+    release.assets.map((a) => a.name),
+  );
   return withSecurityHeaders(
     new Response(html, {
       headers: {

@@ -23,8 +23,19 @@ function safeVersion(v: string): string {
   return v.replace(/[^\w.-]/g, "");
 }
 
-export function downloadPageHtml(version: string, releasedAt: string | null): string {
+export function downloadPageHtml(
+  version: string,
+  releasedAt: string | null,
+  /** Asset names present on the release — a platform with no asset is not offered. */
+  assetNames: string[] = [],
+): string {
   const v = safeVersion(version);
+  const macFile = `COMPASS-Digital-Twin-${v}-arm64.dmg`;
+  const winFile = `COMPASS-Digital-Twin-${v}-x64.exe`;
+  // Until a Windows release is actually published, the button would 404 — the
+  // asset proxy can only serve what is on the release.
+  const hasMac = assetNames.includes(macFile);
+  const hasWin = assetNames.includes(winFile);
   const released = releasedAt
     ? new Date(releasedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
     : null;
@@ -90,6 +101,16 @@ export function downloadPageHtml(version: string, releasedAt: string | null): st
     border-radius: 0.25rem;
   }
   strong { color: #e6edf3; }
+  .warn {
+    border: 1px solid rgba(245,158,11,0.32);
+    background: rgba(245,158,11,0.10);
+    border-radius: 0.5rem;
+    padding: 0.9rem 1.15rem;
+    font-size: 0.8125rem;
+    color: #f0b849;
+    margin: 2rem 0 0;
+  }
+  .warn strong { color: #ffcf70; }
   .notice {
     border: 1px solid rgba(255,255,255,0.09);
     background: rgba(255,255,255,0.025);
@@ -112,18 +133,20 @@ export function downloadPageHtml(version: string, releasedAt: string | null): st
   </p>
 
   <div class="card">
-    <div class="row">
-      <a class="btn" id="mac" href="/api/updates/COMPASS-Digital-Twin-${v}-arm64.dmg" download>
+    ${hasMac ? `<div class="row">
+      <a class="btn" id="mac" href="/api/updates/${macFile}" download>
         Download for macOS — v${v}
       </a>
       <p class="note">macOS 12 or later, Apple Silicon (M1 and newer). Signed and notarized by Apple.</p>
-    </div>
-    <div class="row">
-      <a class="btn" id="win" href="/api/updates/COMPASS-Digital-Twin-${v}-x64.exe" download>
+    </div>` : ""}
+    ${hasWin ? `<div class="row">
+      <a class="btn" id="win" href="/api/updates/${winFile}" download>
         Download for Windows — v${v}
       </a>
-      <p class="note">Windows 10 or later, 64-bit. Code-signed installer, per-user install.</p>
-    </div>
+      <p class="note">Windows 10 or later, 64-bit. Per-user install, no admin rights needed.</p>
+    </div>` : `<div class="row">
+      <p class="note" style="margin:0">A Windows build is not published for this release yet.</p>
+    </div>`}
     ${released ? `<p class="meta">Version ${v}, released ${released}. The app updates itself after install.</p>` : ""}
   </div>
 
@@ -135,6 +158,18 @@ export function downloadPageHtml(version: string, releasedAt: string | null): st
   <p>
     There is no sign-in: the app works with no network. On first launch it checks whether the
     machine is Mount Sinai&ndash;managed and says so in the header.
+  </p>
+
+  <p class="warn">
+    <strong>Do not enter PHI.</strong> COMPASS holds no patient identifiers by design —
+    no names, MRNs, dates of birth or dates of service. Identify cases by study ID only.
+  </p>
+
+  <p class="warn">
+    <strong>Do not redistribute.</strong> These installers, this link and the source are for
+    named Mount Sinai staff under IRB STUDY-14-00050. Do not forward the app, share the link,
+    copy it to personal machines or pass it outside the study team — the app is unreleased
+    research software and carries no clinical clearance.
   </p>
 
   <p class="notice">
