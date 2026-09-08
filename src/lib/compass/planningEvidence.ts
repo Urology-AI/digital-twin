@@ -574,9 +574,41 @@ export const BIOLOGICAL_AGE_DIET = ev(
     "of calories from animal fat with plant-based fat (HR 0.84, 0.76-0.93) or " +
     "5% of calories from saturated fat with monounsaturated fat (HR 0.80, " +
     "0.70-0.91) was associated with lower all-cause mortality. No association " +
-    "with prostate-cancer-specific mortality — this is a general-health/" +
-    "counseling factor, not an oncologic or functional-recovery one, and is " +
-    "not wired into the potency/continence or BCR models for that reason.",
+    "with prostate-cancer-specific mortality, so this term stays out of the BCR " +
+    "model. Function-specific reinforcement, mirroring how smoking is handled " +
+    "above: in the same HPFS cohort, higher diet quality was associated with " +
+    "lower incident erectile dysfunction (Bauer SR et al., JAMA Netw Open " +
+    "2020;3(11):e2021701) — that is the evidence behind the separate " +
+    "DIET_FUNCTIONAL_DELTA potency term, and as with smoking the year-" +
+    "equivalent here is the counselling figure, not the same quantity again.",
+);
+
+/**
+ * pp added to the potency timeline by dietary pattern. Continence is left at 0
+ * — no diet-quality → post-prostatectomy continence evidence exists.
+ */
+export const DIET_FUNCTIONAL_DELTA = ev(
+  { favorable: 3, average: 0, high_saturated_fat: -3 },
+  "provisional",
+  "Diet → erectile-function recovery",
+  "Bauer SR, Breyer BN, Stampfer MJ, et al. Association of Diet With Erectile " +
+    "Dysfunction Among Men in the Health Professionals Follow-Up Study. JAMA " +
+    "Netw Open. 2020;3(11):e2021701 (N=21,469, 1998-2014). Highest vs. lowest " +
+    "diet quality and incident erectile dysfunction: Mediterranean score HR " +
+    "0.78 (95% CI 0.66-0.92) under age 60, 0.82 (0.76-0.89) at 60-69; " +
+    "AHEI-2010 quintile 5 vs. 1 HR 0.78 (0.63-0.97) and 0.78 (0.69-0.87) " +
+    "across the same bands. The protective components are the ones worth " +
+    "counselling: vegetables, fruit and nuts, legumes, fish, and a higher " +
+    "polyunsaturated-to-saturated fat ratio, against red and processed meat at " +
+    "the top intake quintile (HR 1.17, 1.09-1.25). Consistent in direction " +
+    "with the fat-substitution findings in the prostate-cancer cohort above " +
+    "(Zhang et al. 2026). Provisional because that cohort measured INCIDENT " +
+    "erectile dysfunction in the general male population, not recovery after " +
+    "radical prostatectomy: the +/-3 pp spread is a conservative translation " +
+    "of a ~20% relative-risk reduction onto this model's 12-month potency " +
+    "rates, deliberately smaller than the smoking (-8 pp) and diabetes (-8 pp) " +
+    "terms it sits beside. No post-prostatectomy dietary trial with usable " +
+    "effect sizes exists to calibrate against.",
 );
 
 export const BIOLOGICAL_AGE_EXERCISE = ev(
@@ -606,4 +638,209 @@ export const BIOLOGICAL_AGE_COMORBID = ev(
     "associated with about 6 years of life expectancy lost, and prior myocardial " +
     "infarction more. Held below those totals here because comorbidities " +
     "co-occur and the table sums them; hypertension is the mildest of the three.",
+);
+
+/* ================================================================== */
+/* Modifiable-factor deltas — per-factor grounding                     */
+/*                                                                     */
+/* The pp values themselves live in `MF` in functionalOutcomes.ts and  */
+/* came with the ported nomogram. The entries below say what published */
+/* evidence stands behind each one — and, where the literature does    */
+/* NOT support the coded magnitude, say that instead of implying it    */
+/* does. Nothing here changes a coefficient.                           */
+/* ================================================================== */
+
+export const MF_AGE_SHIM = ev(
+  { note: "age and SHIM multipliers on the potency timeline" },
+  "literature",
+  "Modifiable factor — age & baseline erectile function",
+  "Briganti A, Gallina A, Suardi N, et al. Predicting erectile function " +
+    "recovery after bilateral nerve-sparing radical prostatectomy: a proposal " +
+    "of a novel preoperative risk stratification. J Sex Med. 2010;7(7):2521-31 " +
+    "(N=435). Age, preoperative IIEF and the Charlson comorbidity index " +
+    "stratify erectile-function recovery, which is the structure this model's " +
+    "age and SHIM multipliers reproduce. Recovery rates fall steeply across " +
+    "age bands and with lower baseline function, matching the direction of the " +
+    "×1.10 (age ≤50) to ×0.85 (age 65-70) and SHIM 12-16 ×0.85-0.92 factors.",
+);
+
+export const MF_BMI_FUNCTION = ev(
+  { pot: -8, cont: -5, threshold: 30 },
+  "literature",
+  "Modifiable factor — obesity",
+  "Wei Y, Wu YP, Lin MY, et al. Impact of obesity on long-term urinary " +
+    "incontinence after radical prostatectomy: a meta-analysis. Biomed Res " +
+    "Int. 2018;2018:8279523 — obesity raised incontinence risk at 12 months " +
+    "after robot-assisted RP (OR 2.43, 95% CI 1.21-4.88) and at 24 months (OR " +
+    "2.00, 1.57-2.56). High-volume RARP series report 12-month continence 88% " +
+    "in normal-weight vs. 85% in obese men, and 36-month erectile function 56% " +
+    "vs. 49% — roughly 3 pp and 7 pp, close to the -5 pp continence and -8 pp " +
+    "potency charged here.",
+);
+
+export const MF_PFMT = ev(
+  { pot: 6, cont: 10, level: "intensive" },
+  "provisional",
+  "Modifiable factor — pelvic floor muscle training",
+  "Geng E, Yin S, Yang Y, et al. The effect of perioperative pelvic floor " +
+    "muscle exercise on urinary incontinence after radical prostatectomy: a " +
+    "meta-analysis. Int Braz J Urol. 2023;49(4):441-451 (15 RCTs, N=2,178): " +
+    "incontinence odds ratios 0.26 (95% CI 0.15-0.46) at 1 month, 0.30 " +
+    "(0.11-0.80) at 3 months, 0.20 (0.07-0.56) at 6 months, and 0.85 " +
+    "(0.48-1.51, P=0.58) at 12 months. Yu K, Bu F, Jian T, et al. (Front " +
+    "Oncol. 2024;13:1307434, network meta-analysis, 42 RCTs, N=4,256) found " +
+    "modalities separating at 6 months but not at 12. Trial-level absolute " +
+    "differences: Filocamo MT, Li Marzi V, Del Popolo G, et al. (Eur Urol. " +
+    "2005;48(5):734-8) 96% vs 65% continent at 6 months and 89% vs 67% " +
+    "pad-free at 12 months; Manassero F, Traversi C, Ales V, et al. (Neurourol " +
+    "Urodyn. 2007;26(7):985-9) 60% vs 40% continent at 6 months. Certainty is " +
+    "low throughout: Johnson EE, Mamoulakis C, Stoniute A, Omar MI, Sinha S. " +
+    "Conservative interventions for managing urinary incontinence after " +
+    "prostate surgery. Cochrane Database Syst Rev. 2023;(4):CD014799.",
+);
+
+export const MF_EXERCISE_FUNCTION = ev(
+  { pot: 4, cont: 3, level: "active" },
+  "literature",
+  "Modifiable factor — physical activity",
+  "Gerbild H, Larsen CM, Graugaard C, Areskoug Josefsson K. Physical activity " +
+    "to improve erectile function: a systematic review of intervention " +
+    "studies. Sex Med. 2018;6(2):75-89. Roughly 160 minutes per week of " +
+    "moderate aerobic activity over 6 months improved patient-reported " +
+    "erectile function (IIEF / IIEF-5) in men whose ED was driven by physical " +
+    "inactivity, obesity, hypertension, metabolic syndrome or cardiovascular " +
+    "disease. Trials were in general-ED populations, not post-prostatectomy " +
+    "recovery, so this supports the direction and rough size of the +4 pp " +
+    "rather than calibrating it.",
+);
+
+export const MF_PDE5_REHAB = ev(
+  { pot: 8, regimen: "daily" },
+  "literature",
+  "Modifiable factor — PDE5 inhibitor regimen",
+  "Montorsi F, Brock G, Stolzenburg JU, et al. Effects of tadalafil treatment " +
+    "on erectile function recovery following bilateral nerve-sparing radical " +
+    "prostatectomy: a randomised placebo-controlled study (REACTT). Eur Urol. " +
+    "2014;65(3):587-96. Tadalafil 5 mg once daily beat placebo on drug-" +
+    "assisted erectile function (IIEF-EF P=0.016; SEP-3 P=0.019) and reduced " +
+    "penile length loss (LS mean difference 4.1 mm, 95% CI 0.4-7.8, P=0.032), " +
+    "while on-demand dosing did not — which is why daily is scored above PRN " +
+    "here. Unassisted erectile function was not improved after withdrawal, " +
+    "which matches how this model defines its endpoint: potency here is " +
+    "PDE5-ASSISTED function (models/surgicalPlanning.json, healer_threshold), " +
+    "so a drug-assisted effect is the right quantity to add.",
+);
+
+export const MF_SMOKING_FUNCTION = ev(
+  { pot: -8, cont: -2, level: "current" },
+  "literature",
+  "Modifiable factor — smoking (functional recovery)",
+  "Three independent post-prostatectomy sources agree on the potency penalty " +
+    "and disagree with the continence one. (1) Visscher J, Bonevski B, " +
+    "O'Callaghan M. BJU Int. 2025;136(4):647-656 (N=2,676): ever-smokers " +
+    "scored 11 points lower on the EPIC-26 sexual domain across 24 months " +
+    "(95% CI -15.0 to -7.0) — on a 0-100 scale that brackets the -8 pp used " +
+    "here — while urinary incontinence scores were similar. (2) Visscher et " +
+    "al., Prostate Cancer Prostatic Dis. 2024 (systematic review, 9 studies): " +
+    "erectile function OR 0.73 (95% CI 0.56-0.95); urinary incontinence OR " +
+    "1.20 (0.75-1.91), not significant; cessation improved the EPIC-26 sexual " +
+    "domain by 6.6 points on average (P=0.03), up to 12.5 points at 18-24 " +
+    "months — which is what the never/former/current ladder encodes. " +
+    "(3) Zhang C et al., Urology 2025;207:155-161 (PIE, N=286): worse sexual " +
+    "recovery at 5 weeks (P=0.022), 6 months (P=0.004) and 12 months " +
+    "(P=0.002), with no urinary difference. The -8 pp potency term is well " +
+    "supported; the -2 pp continence term is contradicted by all three.",
+);
+
+export const MF_ALCOHOL_FUNCTION = ev(
+  { pot: -10, cont: -2, level: "heavy", meaning: "dependence-level intake" },
+  "literature",
+  "Modifiable factor — alcohol",
+  "The -10 pp applies to dependence-level drinking, not to the 'more than " +
+    "21 drinks per week' band used in population epidemiology — the two are " +
+    "different exposures and only the first is charged here. In men with " +
+    "alcohol dependence, Arackal BS, Benegal V (Indian J Psychiatry " +
+    "2007;49(2):109-112, N=100) found 72% with at least one sexual " +
+    "dysfunction and 33.3% with erectile dysfunction, with a significant " +
+    "dose-response (F=10.54, P=0.002) in which the amount consumed was the " +
+    "strongest predictor. The mechanisms bear directly on nerve-sparing " +
+    "recovery: alcoholic peripheral neuropathy damages the same nerves the " +
+    "NS grade is protecting, gonadotropin suppression drives hypogonadism, " +
+    "and chronic intake reduces nitric-oxide-mediated vasodilation and " +
+    "damages vessels. For comparison, at lower intake there is no measurable " +
+    "penalty — Wang X et al. (Int J Impot Res 2018, 24 studies, N=154,295) " +
+    "report OR 0.99 (95% CI 0.80-1.22) above 21 drinks/week and OR 0.71 " +
+    "(0.59-0.86) for light-to-moderate intake, and Zhang C et al. (Urology " +
+    "2025;207:155-161, PIE) found no association between drinking FREQUENCY " +
+    "and 12-month function after prostatectomy. Those cohorts measured " +
+    "frequency and volume bands, never dependence, which is why they do not " +
+    "constrain this term. The -2 pp continence penalty rests on a different " +
+    "mechanism again: alcohol suppresses vasopressin, so it acts as a " +
+    "diuretic, and the concentrated urine that follows irritates the bladder " +
+    "— higher voided volumes and urgency mean more leak episodes and more " +
+    "pads for the same sphincteric competence. Bradley CS, Erickson BA, " +
+    "Messersmith EE, et al. (J Urol 2017;198:1010-20, LURN systematic " +
+    "review, 110 articles of which 26 on alcohol) found associations between " +
+    "alcohol and lower urinary tract symptoms but graded the evidence low " +
+    "(59% level 4), and the signal is weaker than for caffeine. Note this is " +
+    "a symptom-burden effect, not a recovery effect: the post-prostatectomy " +
+    "cohorts above scored pad-free status at 12 months, which is sphincteric " +
+    "recovery, and would not detect fluid-load-driven leakage in a man whose " +
+    "sphincter has recovered. That is why their null does not refute this " +
+    "term — the two are measuring different things.",
+);
+
+export const MF_COMORBID_FUNCTION = ev(
+  { dm: { pot: -8, cont: -3 }, htn: { pot: -3, cont: -1 }, cad: { pot: -5, cont: -1 } },
+  "literature",
+  "Modifiable factor — comorbidities (functional recovery)",
+  "Rabbani F, Schiff J, Piecuch M, et al. Factors predicting preservation of " +
+    "erectile function in men undergoing open radical retropubic " +
+    "prostatectomy. J Urol. 2009;181(4):1817-22 (N=1,110, single surgeon): on " +
+    "multivariable analysis age, absence of diabetes, and neurovascular-bundle " +
+    "preservation were the independent predictors of preserved erectile " +
+    "function — which is why diabetes carries the largest comorbidity penalty " +
+    "here. Comorbidity burden also enters the Briganti risk stratification " +
+    "(J Sex Med 2010) through the Charlson index. The split across diabetes, " +
+    "hypertension and coronary disease is an expert ordering, not a fitted " +
+    "decomposition.",
+);
+
+export const MF_IPSS_CONTINENCE = ev(
+  { thresholds: [7, 14, 19], cont: [0, -3, -6, -10] },
+  "literature",
+  "Modifiable factor — baseline voiding symptoms (IPSS)",
+  "Kimura N, Yamada Y, Hakozaki Y, et al. Long-term transition of urinary " +
+    "status after robot-assisted radical prostatectomy. J Robot Surg. " +
+    "2026;20:198 (N=243, median follow-up 65.5 months). A preoperative IPSS " +
+    "storage subscore above 7 was independently associated with lower odds of " +
+    "reaching pad-free status (HR 0.50, 95% CI 0.32-0.78) and of reaching " +
+    "1 pad/day (HR 0.60, 0.41-0.87) — the only factor significant for both. " +
+    "This supports charging baseline voiding symptoms against continence and " +
+    "supports the first cut at IPSS 7; the -3/-6/-10 pp ladder above that is " +
+    "the nomogram's own banding.",
+);
+
+/** What the alcohol and activity bands on the Factors tab actually mean. */
+export const INTAKE_ACTIVITY_BANDS = ev(
+  {
+    alcohol: { moderate: "≤2 drinks/day", heavy: ">4/day or >14/week" },
+    exercise: { light: "<150 min/wk", moderate: "150–300 min/wk", active: ">300 min/wk" },
+  },
+  "literature",
+  "Alcohol & activity band definitions",
+  "Alcohol: 'moderate' follows the Dietary Guidelines for Americans " +
+    "(2020-2025) — up to 2 drinks per day for men; 'heavy' follows the NIAAA " +
+    "definition of heavy alcohol use — more than 4 drinks on any day or more " +
+    "than 14 per week, the threshold above which risk of alcohol use disorder " +
+    "rises sharply. Physical activity: bands follow the WHO 2020 guidelines on " +
+    "physical activity and sedentary behaviour (Bull FC, Al-Ansari SS, Biddle " +
+    "S, et al. Br J Sports Med. 2020;54(24):1451-1462), which recommend " +
+    "150-300 minutes of moderate-intensity or 75-150 minutes of " +
+    "vigorous-intensity aerobic activity per week plus muscle strengthening on " +
+    "2 or more days. 'Moderate' here means meeting that recommendation and " +
+    "'active' means exceeding it — note the 160 min/week that Gerbild et al. " +
+    "found sufficient to improve erectile function sits just inside the " +
+    "'moderate' band, so the erectile benefit starts at the guideline, not " +
+    "above it.",
 );
