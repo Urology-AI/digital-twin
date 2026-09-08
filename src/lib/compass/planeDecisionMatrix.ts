@@ -15,6 +15,7 @@
  */
 import { PIPS_EPE_CUTS } from "@/lib/compass/planningEvidence";
 import type { HostilityTier } from "@/lib/compass/planeHostility";
+import type { ClinicalState } from "@/types/patient";
 
 export type EpeTier = "low" | "intermediate" | "high";
 
@@ -23,7 +24,7 @@ export function epeTier(p: number): EpeTier {
   return p >= cuts.high ? "high" : p >= cuts.intermediate ? "intermediate" : "low";
 }
 
-export type DecisionCode = "maximal" | "preserve-hostile-protocol" | "wider-plane" | "graded-frozen-section";
+export type DecisionCode = "maximal" | "preserve-hostile-protocol" | "wider-plane" | "graded-frozen-section" | "defer";
 
 export interface DecisionMatrixResult {
   code: DecisionCode;
@@ -71,5 +72,38 @@ export function planeDecisionMatrix(epe: EpeTier, hostility: HostilityTier): Dec
     escalate: false,
     hostileProtocol: false,
     rationale: "Low EPE probability, plane not hostile — maximal anatomically appropriate nerve sparing.",
+  };
+}
+
+/**
+ * Hard-stop / review gates (`PIPS_GATES` in planningEvidence.ts) — checked
+ * before, and separately from, the EPE x hostility matrix above. These are
+ * whole-patient facts, not points, so they are never folded into either
+ * axis's score.
+ */
+export interface PipsGates {
+  activeInfection: boolean;
+  imagingDiscordant: boolean;
+  mriArtifact: boolean;
+  keyDataMissing: boolean;
+}
+
+export function checkPipsGates(S: ClinicalState): PipsGates {
+  return {
+    activeInfection: !!S.flag_active_infection,
+    imagingDiscordant: !!S.flag_imaging_discordant,
+    mriArtifact: !!S.flag_mri_artifact,
+    keyDataMissing: !!S.flag_key_data_missing,
+  };
+}
+
+/** Overrides a side's decision when the active-infection gate is tripped — surgery is deferred, not scored. */
+export function applyDeferGate(decision: DecisionMatrixResult, gates: PipsGates): DecisionMatrixResult {
+  if (!gates.activeInfection) return decision;
+  return {
+    code: "defer",
+    escalate: false,
+    hostileProtocol: false,
+    rationale: "Active infection (bacterial prostatitis, abscess, fistula, sepsis, or a positive culture with symptoms) — treat/drain and re-image at 6-12 weeks before elective surgery; this side has not been scored.",
   };
 }

@@ -262,6 +262,83 @@ describe("predictPlaneHostility (PIPS-H)", () => {
     expect(left.score).toBe(right.score); // symmetric history factor, no side-specific MRI difference
     expect(left.score).toBeGreaterThan(baseline.score);
   });
+
+  it("side-specific fat stranding raises only the affected side", () => {
+    const S = defaultClinicalState();
+    S.mri_fat_stranding_l = 2;
+    expect(predictPlaneHostility(S, "left").score).toBeGreaterThan(predictPlaneHostility(S, "right").score);
+  });
+
+  it("prior ipsilateral focal ablation raises this side more than a whole-gland ablation raises the contralateral side", () => {
+    const S = defaultClinicalState();
+    S.prior_focal_ablation_l = 1; // ipsilateral focal (IRE/laser/PDT)
+    const ipsi = predictPlaneHostility(S, "left");
+    const contra = predictPlaneHostility(S, "right");
+    expect(ipsi.score).toBeGreaterThan(contra.score);
+    // the untouched side still moves up slightly — "contralateral focal only"
+    const baseline = predictPlaneHostility(defaultClinicalState(), "right");
+    expect(contra.score).toBeGreaterThan(baseline.score);
+  });
+
+  it("whole-gland ablation (HIFU/cryo) scores higher than focal ablation on the same side", () => {
+    const focal = defaultClinicalState();
+    focal.prior_focal_ablation_l = 1;
+    const wholeGland = defaultClinicalState();
+    wholeGland.prior_focal_ablation_l = 2;
+    expect(predictPlaneHostility(wholeGland, "left").score).toBeGreaterThan(predictPlaneHostility(focal, "left").score);
+  });
+
+  it("prior pelvic surgery, penile-prosthesis reservoir, catheter exposure, recent/complicated biopsy, and a high systemic inflammatory index each raise hostility on both sides", () => {
+    const baseline = predictPlaneHostility(defaultClinicalState(), "left").score;
+    const cases: Partial<ReturnType<typeof defaultClinicalState>>[] = [
+      { prior_pelvic_surgery: "rectal_denonvilliers" },
+      { penile_prosthesis_reservoir: "prior_infection_or_revision" },
+      { catheter_prolonged_or_traumatic: true },
+      { biopsy_recent_or_complicated: true },
+      { crp: 5 },
+      { nlr: 5 },
+    ];
+    for (const patch of cases) {
+      const S = { ...defaultClinicalState(), ...patch };
+      expect(predictPlaneHostility(S, "left").score).toBeGreaterThan(baseline);
+    }
+  });
+});
+
+describe("PIPS gates", () => {
+  it("active infection defers both sides regardless of EPE/hostility", () => {
+    const S = defaultClinicalState();
+    S.flag_active_infection = true;
+    const infl = predictInflammationRisk(S);
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl, 0.4, 0.4);
+    expect(plan.left.decisionCode).toBe("defer");
+    expect(plan.right.decisionCode).toBe("defer");
+    expect(plan.gates.activeInfection).toBe(true);
+    // the per-side rationale must say so too, not just the plan-level banner
+    expect(plan.left.gradeRationale).toMatch(/active infection/i);
+    expect(plan.right.gradeRationale).toMatch(/active infection/i);
+  });
+
+  it("without the active-infection flag, the plan is scored normally", () => {
+    const S = defaultClinicalState();
+    const infl = predictInflammationRisk(S);
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl, 0.02, 0.02);
+    expect(plan.left.decisionCode).not.toBe("defer");
+    expect(plan.gates.activeInfection).toBe(false);
+  });
+
+  it("surfaces imaging-discordant, MRI-artifact, and missing-data flags on the plan without changing the decision code", () => {
+    const S = defaultClinicalState();
+    S.flag_imaging_discordant = true;
+    S.flag_mri_artifact = true;
+    S.flag_key_data_missing = true;
+    const infl = predictInflammationRisk(S);
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl, 0.02, 0.02);
+    expect(plan.gates.imagingDiscordant).toBe(true);
+    expect(plan.gates.mriArtifact).toBe(true);
+    expect(plan.gates.keyDataMissing).toBe(true);
+    expect(plan.left.decisionCode).toBe("maximal");
+  });
 });
 
 describe("buildSurgicalPlan", () => {

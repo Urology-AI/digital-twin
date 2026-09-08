@@ -245,6 +245,13 @@ export const INFLAMMATION_WEIGHTS = ev(
     mri_inflammation_present: 1.0,
     mri_fat_stranding: 0.4,
     intraop_per_grade: 1.0,
+    prior_pelvic_surgery_bladder: 0.6,
+    prior_pelvic_surgery_denonvilliers: 0.9,
+    reservoir_present: 0.3,
+    reservoir_infected: 0.6,
+    catheter_prolonged: 0.3,
+    biopsy_recent_or_complicated: 0.3,
+    systemic_inflammatory_index_high: 0.3,
   },
   "provisional",
   "Periprostatic-inflammation risk weights",
@@ -252,8 +259,13 @@ export const INFLAMMATION_WEIGHTS = ev(
     "robotic RP (BJU Int 2008). Individual risk factors: prior BPH surgery and " +
     "pelvic RT (Mandel P et al., salvage RP series), IBD / diverticular pelvic " +
     "inflammation, obesity / periprostatic-fat inflammation, post-biopsy change. " +
-    "BPH-procedure sub-weights ranked by dissection burden. Expert priors " +
-    "pending fitting against whole-mount inflammation grade.",
+    "BPH-procedure sub-weights ranked by dissection burden. Prior pelvic " +
+    "surgery, penile-prosthesis reservoir, catheter exposure, recent/" +
+    "complicated biopsy, and systemic inflammatory index (hs-CRP > 3 mg/L or " +
+    "NLR > 3) are from the PIPS development framework's history and " +
+    "biomarker-framework domains (periprostatic-inflammation and plane-score " +
+    "research protocol, 2026). Expert priors pending fitting against whole-" +
+    "mount inflammation grade.",
 );
 
 export const INFLAMMATION_CUTS = ev(
@@ -281,18 +293,26 @@ export const PLANE_HOSTILITY_MRI_WEIGHTS = ev(
     nvbPlanePerLevel: 0.5, // 0 visible .. 2 obliterated/tethered
     postTreatmentDistortionPerLevel: 0.4, // 0 none .. 2 reaches posterolateral/NVB
     nonmassInflammatorySignalPerLevel: 0.35, // 0 none .. 2 diffuse
+    fatStrandingPerLevel: 0.3, // 0 none .. 2 marked, this side
+    focalAblationIpsilateral: 0.5, // ipsilateral focal (IRE/laser/PDT), this side
+    focalAblationIpsilateralWholeGland: 1.0, // ipsilateral or whole-gland HIFU/cryo, this side
+    focalAblationContralateral: 0.25, // any ablation on the OTHER side (added once, per side)
   },
   "provisional",
   "PIPS-H MRI plane-phenotype weights",
   "Candidate MRI fibrosis/plane features — capsule-fat interface loss, NVB " +
     "corridor fibrosis/tethering, post-treatment distortion reaching the " +
-    "posterolateral capsule, non-mass-like inflammatory signal — from the PIPS " +
-    "development framework's MRI-phenotype domain (periprostatic-inflammation " +
-    "and plane-score research protocol, 2026), itself built on periprostatic " +
-    "adipose inflammation associated with high-grade disease (Gucalp A et al., " +
-    "Prostate Cancer Prostatic Dis 2017) and periprostatic-fat fibrosis as a " +
-    "cancer-aggressiveness marker (Jin Y et al., Cancers 2026). Expert priors " +
-    "pending a video-validated Plane Difficulty Index and whole-mount fitting.",
+    "posterolateral capsule, non-mass-like inflammatory signal, side-specific " +
+    "fat stranding, and prior ipsilateral/contralateral focal or whole-gland " +
+    "ablative therapy (IRE/laser/PDT/HIFU/cryo) — from the PIPS development " +
+    "framework's MRI-phenotype and treatment-history domains (periprostatic-" +
+    "inflammation and plane-score research protocol, 2026), itself built on " +
+    "periprostatic adipose inflammation associated with high-grade disease " +
+    "(Gucalp A et al., Prostate Cancer Prostatic Dis 2017), periprostatic-fat " +
+    "fibrosis as a cancer-aggressiveness marker (Jin Y et al., Cancers 2026), " +
+    "and salvage RP after focal ablative therapy (systematic review, Cancers " +
+    "2023). Expert priors pending a video-validated Plane Difficulty Index " +
+    "and whole-mount fitting.",
 );
 
 /** PIPS-style 4-tier hostility cutpoints (probability of a difficult plane). */
@@ -349,6 +369,36 @@ export const PIPS_DECISION_MATRIX = ev(
     "Prostatic Dis 2024), post-biopsy prostatitis (Türk H et al., Int Braz J " +
     "Urol 2018), and prior focal/ablative therapy (systematic review, salvage " +
     "RP after focal ablative therapy, Cancers 2023) — feed PIPS-H, never PIPS-EPE.",
+);
+
+/**
+ * Hard-stop / review gates — not points, and not folded into the H or EPE
+ * score. The PIPS framework treats active infection and imaging discordance
+ * as categorically different from a risk factor: "discordance should not be
+ * hidden inside an average probability." Checked before the decision matrix
+ * is even shown.
+ */
+export const PIPS_GATES = ev(
+  {
+    activeInfection: "defer",
+    imagingDiscordant: "review",
+    mriArtifact: "confidence",
+    keyDataMissing: "confidence",
+  },
+  "literature",
+  "PIPS gates — infection, discordance, artifact",
+  "Active bacterial prostatitis, abscess, fistula, sepsis, or a positive " +
+    "culture with symptoms should trigger evaluation/treatment or " +
+    "postponement rather than contribute numerical points to an elective " +
+    "surgical score (post-biopsy sepsis/abscess course: Türk H et al., Int " +
+    "Braz J Urol 2018). Discordance between MRI, PSMA-PET, biopsy, and " +
+    "micro-ultrasound should force multidisciplinary review rather than be " +
+    "averaged away. Hip-hardware/motion artifact and missing key data (no MRI " +
+    "plane read, no baseline IIEF, or prior operative reports unavailable) " +
+    "each downgrade confidence in both MRI-derived axes rather than silently " +
+    "biasing the score. From the PIPS development framework's confidence-and-" +
+    "discordance-output section (periprostatic-inflammation and plane-score " +
+    "research protocol, 2026).",
 );
 
 /* ================================================================== */

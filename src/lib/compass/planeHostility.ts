@@ -43,21 +43,44 @@ export function predictPlaneHostility(S: ClinicalState, side: "left" | "right"):
   };
 
   const sfx = side === "left" ? "_l" : "_r";
-  const capsuleInterface = (S as unknown as Record<string, number>)[`mri_capsule_interface${sfx}`] ?? 0;
-  const nvbPlane = (S as unknown as Record<string, number>)[`mri_nvb_plane${sfx}`] ?? 0;
-  const postTreatment = (S as unknown as Record<string, number>)[`mri_post_treatment_distortion${sfx}`] ?? 0;
-  const nonmassSignal = (S as unknown as Record<string, number>)[`mri_nonmass_inflammatory_signal${sfx}`] ?? 0;
+  const otherSfx = side === "left" ? "_r" : "_l";
+  const field = (name: string, s: string) => (S as unknown as Record<string, number>)[`${name}${s}`] ?? 0;
+  const capsuleInterface = field("mri_capsule_interface", sfx);
+  const nvbPlane = field("mri_nvb_plane", sfx);
+  const postTreatment = field("mri_post_treatment_distortion", sfx);
+  const nonmassSignal = field("mri_nonmass_inflammatory_signal", sfx);
+  const fatStranding = field("mri_fat_stranding", sfx);
+  const ownAblation = field("prior_focal_ablation", sfx);
+  const otherAblation = field("prior_focal_ablation", otherSfx);
 
   add(capsuleInterface, W.capsuleInterfacePerLevel, `Capsule–fat interface, grade ${capsuleInterface}/3`);
   add(nvbPlane, W.nvbPlanePerLevel, `NVB corridor plane, grade ${nvbPlane}/2`);
   add(postTreatment, W.postTreatmentDistortionPerLevel, `Post-treatment distortion, grade ${postTreatment}/2`);
   add(nonmassSignal, W.nonmassInflammatorySignalPerLevel, `Non-mass inflammatory signal, grade ${nonmassSignal}/2`);
+  add(fatStranding, W.fatStrandingPerLevel, `Fat stranding, grade ${fatStranding}/2`);
 
-  const mriPoints =
+  let mriPoints =
     capsuleInterface * W.capsuleInterfacePerLevel +
     nvbPlane * W.nvbPlanePerLevel +
     postTreatment * W.postTreatmentDistortionPerLevel +
-    nonmassSignal * W.nonmassInflammatorySignalPerLevel;
+    nonmassSignal * W.nonmassInflammatorySignalPerLevel +
+    fatStranding * W.fatStrandingPerLevel;
+
+  // Prior focal/whole-gland ablation: ipsilateral counts by severity; any
+  // ablation on the other side adds a smaller "contralateral" bump (the PIPS
+  // calculator's own simplification — the near side is more affected, but a
+  // whole-gland ablative course leaves some mark on both).
+  if (ownAblation === 1) {
+    contributors.push({ label: "Prior ipsilateral focal ablation (IRE/laser/PDT)", points: W.focalAblationIpsilateral });
+    mriPoints += W.focalAblationIpsilateral;
+  } else if (ownAblation >= 2) {
+    contributors.push({ label: "Prior ipsilateral/whole-gland ablation (HIFU/cryo)", points: W.focalAblationIpsilateralWholeGland });
+    mriPoints += W.focalAblationIpsilateralWholeGland;
+  }
+  if (otherAblation > 0) {
+    contributors.push({ label: "Prior contralateral focal/ablative therapy", points: W.focalAblationContralateral });
+    mriPoints += W.focalAblationContralateral;
+  }
 
   const logit = INFLAMMATION_WEIGHTS.value.intercept + historyPoints + mriPoints;
   const score = clamp(sigmoid(logit), 0.02, 0.98);

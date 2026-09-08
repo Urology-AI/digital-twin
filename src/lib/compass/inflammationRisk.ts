@@ -93,6 +93,29 @@ export function preopHistoryPoints(S: ClinicalState): { points: number; contribu
     W.mri_inflammation_present,
   );
   add(S.mri_periprostatic_fat_stranding, "MRI: periprostatic fat stranding", W.mri_fat_stranding);
+  add(
+    S.prior_pelvic_surgery === "bladder_fracture_urethroplasty",
+    "Prior bladder surgery, pelvic fracture, or urethroplasty",
+    W.prior_pelvic_surgery_bladder,
+  );
+  add(
+    S.prior_pelvic_surgery === "rectal_denonvilliers",
+    "Prior rectal/LAR/APR surgery at Denonvilliers",
+    W.prior_pelvic_surgery_denonvilliers,
+  );
+  add(S.penile_prosthesis_reservoir === "present", "Penile prosthesis reservoir in Retzius", W.reservoir_present);
+  add(
+    S.penile_prosthesis_reservoir === "prior_infection_or_revision",
+    "Penile prosthesis reservoir — prior infection/revision",
+    W.reservoir_infected,
+  );
+  add(S.catheter_prolonged_or_traumatic, "Prolonged/traumatic catheterization", W.catheter_prolonged);
+  add(S.biopsy_recent_or_complicated, "Recent or complicated biopsy", W.biopsy_recent_or_complicated);
+  add(
+    (S.crp !== null && S.crp > 3) || (S.nlr !== null && S.nlr > 3),
+    "Systemic inflammatory index (hs-CRP > 3 or NLR > 3)",
+    W.systemic_inflammatory_index_high,
+  );
 
   const points = contributors.reduce((s, c) => s + c.points, 0);
   return { points, contributors };

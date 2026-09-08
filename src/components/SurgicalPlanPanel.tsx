@@ -370,12 +370,14 @@ function SideCard({
         <span
           className={cn(
             "rounded-full px-2.5 py-0.5 text-xs font-bold",
-            meta.tone === "emerald" && "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
-            meta.tone === "amber" && "bg-amber-500/15 text-amber-600 dark:text-amber-400",
-            meta.tone === "red" && "bg-red-500/15 text-red-600 dark:text-red-400",
+            plan.decisionCode === "defer"
+              ? "bg-red-500/15 text-red-600 dark:text-red-400"
+              : meta.tone === "emerald" && "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
+            plan.decisionCode !== "defer" && meta.tone === "amber" && "bg-amber-500/15 text-amber-600 dark:text-amber-400",
+            plan.decisionCode !== "defer" && meta.tone === "red" && "bg-red-500/15 text-red-600 dark:text-red-400",
           )}
         >
-          {plan.plane}
+          {plan.decisionCode === "defer" ? "DEFER" : plan.plane}
         </span>
       </div>
 
@@ -608,6 +610,55 @@ export function SurgicalPlanPanel() {
         <h2 className="text-lg font-semibold">Operative plan</h2>
         <p className="text-xs text-muted-foreground">Advisory · research use only.</p>
       </div>
+
+      {plan.gates.activeInfection && (
+        <div className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <div className="font-semibold">Defer surgery — active infection</div>
+            <p className="mt-0.5 text-xs leading-snug">
+              Bacterial prostatitis, abscess, fistula, sepsis, or a positive culture with symptoms — treat/drain and
+              re-image at 6–12 weeks before elective prostatectomy. Neither side has been scored below.
+            </p>
+          </div>
+        </div>
+      )}
+      {plan.gates.imagingDiscordant && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <div className="font-semibold">Imaging discordant — multidisciplinary review</div>
+            <p className="mt-0.5 text-xs leading-snug">
+              MRI, PSMA-PET, biopsy, and/or micro-ultrasound disagree on side or extent. Resolve by review before
+              finalizing the plane; the numbers below should not be trusted at face value until then.
+            </p>
+          </div>
+        </div>
+      )}
+      {plan.gates.mriArtifact && (
+        <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <div className="font-semibold text-foreground">Reduced confidence — MRI artifact</div>
+            <p className="mt-0.5 text-xs leading-snug">
+              MRI degraded by hip hardware or motion. Confidence in both PIPS-EPE and PIPS-H is lower than usual;
+              consider micro-ultrasound or PSMA-PET as a substitute local-staging input.
+            </p>
+          </div>
+        </div>
+      )}
+      {plan.gates.keyDataMissing && (
+        <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
+          <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <div className="font-semibold text-foreground">Reduced confidence — key data missing</div>
+            <p className="mt-0.5 text-xs leading-snug">
+              No MRI plane read, no baseline IIEF, or prior operative reports unavailable. Obtain them before
+              finalizing the plan.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* ── Impact ─────────────────────────────────────────────── */}
       <Card>

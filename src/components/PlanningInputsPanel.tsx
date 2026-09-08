@@ -99,7 +99,8 @@ export function PlanningInputsPanel() {
         "prior_pelvic_radiation", "radiation_proctitis", "urinary_retention", "recurrent_uti",
         "treated_prostatitis", "biopsy_shows_inflammation", "crohns", "ulcerative_colitis",
         "diverticulitis", "pelvic_abscess", "hernia_mesh", "rectal_fistula",
-        "mri_periprostatic_fat_stranding",
+        "mri_periprostatic_fat_stranding", "catheter_prolonged_or_traumatic",
+        "biopsy_recent_or_complicated",
       ] as BoolKey[]
     ).filter((k) => S[k]).length +
     (S.mri_periprostatic_inflammation !== "none" ? 1 : 0) +
@@ -107,7 +108,10 @@ export function PlanningInputsPanel() {
     (S.age > 70 ? 1 : 0) +
     (S.vol > 80 ? 1 : 0) +
     (S.bmi > 30 ? 1 : 0) +
-    (S.ipss > 19 ? 1 : 0);
+    (S.ipss > 19 ? 1 : 0) +
+    (S.prior_pelvic_surgery !== "none" ? 1 : 0) +
+    (S.penile_prosthesis_reservoir !== "none" ? 1 : 0) +
+    ((S.crp !== null && S.crp > 3) || (S.nlr !== null && S.nlr > 3) ? 1 : 0);
 
   const bmiCat =
     S.bmi >= 30 ? "Obese" : S.bmi >= 25 ? "Overweight" : S.bmi > 0 ? "Normal" : null;
@@ -221,6 +225,9 @@ export function PlanningInputsPanel() {
               className="h-8 w-16 text-sm"
             />
           </div>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <Toggle k="biopsy_recent_or_complicated" label="Transrectal complication, or <6 wk before surgery" />
+          </div>
         </Group>
 
         <Group title="Pelvic conditions">
@@ -233,6 +240,77 @@ export function PlanningInputsPanel() {
             <Toggle k="pelvic_abscess" label="Pelvic abscess" />
             <Toggle k="hernia_mesh" label="Hernia mesh" />
             <Toggle k="rectal_fistula" label="Rectal fistula" />
+            <Toggle k="catheter_prolonged_or_traumatic" label="Prolonged/traumatic catheter" />
+          </div>
+          <div className="space-y-1 pt-1">
+            <span className="text-xs font-semibold text-foreground">Prior pelvic surgery</span>
+            <Seg
+              value={S.prior_pelvic_surgery}
+              onChange={(v) => updateClinicalForm({ prior_pelvic_surgery: v })}
+              options={[
+                { label: "None", value: "none" },
+                { label: "Bladder/fracture/urethroplasty", value: "bladder_fracture_urethroplasty" },
+                { label: "Rectal @ Denonvilliers", value: "rectal_denonvilliers" },
+              ]}
+            />
+          </div>
+          <div className="space-y-1 pt-1">
+            <span className="text-xs font-semibold text-foreground">Penile prosthesis reservoir</span>
+            <Seg
+              value={S.penile_prosthesis_reservoir}
+              onChange={(v) => updateClinicalForm({ penile_prosthesis_reservoir: v })}
+              options={[
+                { label: "None", value: "none" },
+                { label: "Present", value: "present" },
+                { label: "Prior infection/revision", value: "prior_infection_or_revision" },
+              ]}
+            />
+          </div>
+        </Group>
+
+        <Group title="Systemic inflammatory markers">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-foreground">
+                hs-CRP <span className="font-normal text-muted-foreground">(mg/L)</span>
+              </label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.1}
+                value={S.crp ?? ""}
+                onChange={(e) => {
+                  const n = parseFloat(e.target.value);
+                  updateClinicalForm({ crp: isNaN(n) ? null : n });
+                }}
+                className="h-8 w-20 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-foreground">NLR</label>
+              <Input
+                type="number"
+                min={0}
+                max={20}
+                step={0.1}
+                value={S.nlr ?? ""}
+                onChange={(e) => {
+                  const n = parseFloat(e.target.value);
+                  updateClinicalForm({ nlr: isNaN(n) ? null : n });
+                }}
+                className="h-8 w-20 text-sm"
+              />
+            </div>
+          </div>
+        </Group>
+
+        <Group title="Gates — checked before the plan is scored">
+          <div className="grid grid-cols-1 gap-2">
+            <Toggle k="flag_active_infection" label="Active infection (prostatitis, abscess, fistula, sepsis, or positive culture with symptoms) — defers surgery" />
+            <Toggle k="flag_imaging_discordant" label="Imaging discordant (MRI/PSMA/biopsy/micro-US disagree) — forces review" />
+            <Toggle k="flag_mri_artifact" label="MRI degraded by hip hardware or motion — downgrades confidence" />
+            <Toggle k="flag_key_data_missing" label="Key data missing (no MRI plane read, no baseline IIEF, or prior operative reports unavailable)" />
           </div>
         </Group>
 
@@ -302,6 +380,30 @@ export function PlanningInputsPanel() {
               { label: "None", value: 0 },
               { label: "Focal", value: 1 },
               { label: "Diffuse", value: 2 },
+            ]}
+          />
+          <SidePhenotypeRow
+            label="Fat stranding / fibrotic bands"
+            leftKey="mri_fat_stranding_l"
+            rightKey="mri_fat_stranding_r"
+            S={S}
+            onChange={updateClinicalForm}
+            options={[
+              { label: "None", value: 0 },
+              { label: "Mild", value: 1 },
+              { label: "Marked", value: 2 },
+            ]}
+          />
+          <SidePhenotypeRow
+            label="Prior focal/whole-gland ablation"
+            leftKey="prior_focal_ablation_l"
+            rightKey="prior_focal_ablation_r"
+            S={S}
+            onChange={updateClinicalForm}
+            options={[
+              { label: "None", value: 0 },
+              { label: "Focal (IRE/laser/PDT)", value: 1 },
+              { label: "Whole-gland (HIFU/cryo)", value: 2 },
             ]}
           />
         </Group>

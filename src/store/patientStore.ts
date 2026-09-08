@@ -365,6 +365,9 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
         "crohns", "ulcerative_colitis", "diverticulitis", "pelvic_abscess",
         "hernia_mesh", "rectal_fistula", "radiation_proctitis",
         "mri_periprostatic_fat_stranding",
+        "catheter_prolonged_or_traumatic", "biopsy_recent_or_complicated",
+        "flag_active_infection", "flag_imaging_discordant", "flag_mri_artifact",
+        "flag_key_data_missing",
       ];
       for (const k of hSet) {
         const v = (patch as Record<string, unknown>)[k];
@@ -373,6 +376,10 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       if (patch.biopsy_sessions !== undefined) H.biopsy_sessions = patch.biopsy_sessions;
       if (patch.mri_periprostatic_inflammation !== undefined)
         H.mri_periprostatic_inflammation = patch.mri_periprostatic_inflammation;
+      if (patch.prior_pelvic_surgery !== undefined) H.prior_pelvic_surgery = patch.prior_pelvic_surgery;
+      if (patch.penile_prosthesis_reservoir !== undefined) H.penile_prosthesis_reservoir = patch.penile_prosthesis_reservoir;
+      if (patch.crp !== undefined) H.crp = patch.crp;
+      if (patch.nlr !== undefined) H.nlr = patch.nlr;
       if (patch.intraop_inflammation_l !== undefined)
         H.intraop_inflammation_l = patch.intraop_inflammation_l || null;
       if (patch.intraop_inflammation_r !== undefined)
@@ -382,6 +389,8 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
         "mri_nvb_plane_l", "mri_nvb_plane_r",
         "mri_post_treatment_distortion_l", "mri_post_treatment_distortion_r",
         "mri_nonmass_inflammatory_signal_l", "mri_nonmass_inflammatory_signal_r",
+        "mri_fat_stranding_l", "mri_fat_stranding_r",
+        "prior_focal_ablation_l", "prior_focal_ablation_r",
       ];
       for (const k of hNumSet) {
         const v = (patch as Record<string, number | undefined>)[k];

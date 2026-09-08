@@ -346,7 +346,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     title: "Does a previous prostate biopsy-related acute bacterial prostatitis affect the results of radical prostatectomy?",
     source: "Int Braz J Urol. 2018;44(2):240-247. PMID 29219284.",
     group: "external",
-    usedFor: ["PIPS EPE x hostility decision matrix", "Periprostatic-inflammation risk weights"],
+    usedFor: ["PIPS EPE x hostility decision matrix", "Periprostatic-inflammation risk weights", "PIPS gates — infection, discordance, artifact"],
     verified: true,
   },
   {
@@ -622,7 +622,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     title: "Salvage radical prostatectomy after primary focal ablative therapy: a systematic review and meta-analysis.",
     source: "Cancers (Basel). 2023;15(10):2727. PMC10216462.",
     group: "external",
-    usedFor: ["PIPS EPE x hostility decision matrix"],
+    usedFor: ["PIPS EPE x hostility decision matrix", "PIPS-H MRI plane-phenotype weights"],
     verified: true,
   },
 ];
