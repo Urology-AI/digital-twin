@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultClinicalState } from "@/types/patient";
 import { predictInflammationRisk } from "@/lib/compass/inflammationRisk";
+import { predictPlaneHostility } from "@/lib/compass/planeHostility";
 import { buildSurgicalPlan } from "@/lib/compass/surgicalPlan";
 import { bcrByPlan } from "@/lib/compass/bcrByPlan";
 import { computeFunctionalOutcomes } from "@/lib/compass/functionalOutcomes";
@@ -123,21 +124,70 @@ describe("predictInflammationRisk", () => {
   });
 });
 
+describe("predictPlaneHostility (PIPS-H)", () => {
+  it("is low for a clean history and normal MRI plane phenotype on both sides", () => {
+    const S = defaultClinicalState();
+    expect(predictPlaneHostility(S, "left").tier).toBe("low");
+    expect(predictPlaneHostility(S, "right").tier).toBe("low");
+  });
+
+  it("is genuinely side-specific — a left-only MRI finding does not move the right side", () => {
+    const S = defaultClinicalState();
+    S.mri_capsule_interface_l = 3;
+    S.mri_nvb_plane_l = 2;
+    S.mri_post_treatment_distortion_l = 2;
+    const left = predictPlaneHostility(S, "left");
+    const right = predictPlaneHostility(S, "right");
+    expect(left.tier).toMatch(/high|very-high/);
+    expect(right.tier).toBe("low");
+    expect(left.score).toBeGreaterThan(right.score);
+  });
+
+  it("shares whole-patient history terms with predictInflammationRisk — both sides move together on a symmetric risk factor", () => {
+    const S = defaultClinicalState();
+    S.prior_pelvic_radiation = true;
+    S.diverticulitis = true;
+    const left = predictPlaneHostility(S, "left");
+    const right = predictPlaneHostility(S, "right");
+    const baseline = predictPlaneHostility(defaultClinicalState(), "left");
+    expect(left.score).toBe(right.score); // symmetric history factor, no side-specific MRI difference
+    expect(left.score).toBeGreaterThan(baseline.score);
+  });
+});
+
 describe("buildSurgicalPlan", () => {
   it("recommends a bilateral hood for low-risk bilateral disease", () => {
     const S = defaultClinicalState();
     const infl = predictInflammationRisk(S);
-    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl);
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl, 0.02, 0.02);
     expect(plan.hood.value).toBe("bilateral");
     expect(plan.bladderNeckPreservation.value).toBe(true);
   });
 
-  it("escalates NS grade when inflammation risk is high", () => {
+  it("does NOT escalate a hostile-but-EPE-low side — uses the hostile-plane protocol instead", () => {
+    // PIPS-style behaviour: a hostile plane on a side with low oncologic risk
+    // gets a protocol note, not a wider excision (replaces the old
+    // NS_GRADE_ESCALATION rule, which escalated on inflammation tier alone).
     const S = defaultClinicalState();
-    S.intraop_inflammation_l = 3;
+    S.mri_capsule_interface_l = 3;
+    S.mri_nvb_plane_l = 2;
+    S.mri_post_treatment_distortion_l = 2;
     const infl = predictInflammationRisk(S);
-    const plan = buildSurgicalPlan(S, nsDetail(2), nsDetail(1), 0.02, 0.02, infl);
+    const plan = buildSurgicalPlan(S, nsDetail(2), nsDetail(1), 0.02, 0.02, infl, 0.02, 0.02);
+    expect(plan.left.hostilityTier).toMatch(/high|very-high/);
+    expect(plan.left.epeTier).toBe("low");
+    expect(plan.left.nsGrade).toBe(2); // unchanged — no escalation
+    expect(plan.left.hostileProtocol).toBe(true);
+    expect(plan.left.decisionCode).toBe("preserve-hostile-protocol");
+  });
+
+  it("escalates NS grade when EPE probability itself is high, regardless of hostility", () => {
+    const S = defaultClinicalState();
+    const infl = predictInflammationRisk(S);
+    const plan = buildSurgicalPlan(S, nsDetail(2), nsDetail(1), 0.02, 0.02, infl, 0.4, 0.02);
+    expect(plan.left.epeTier).toBe("high");
     expect(plan.left.nsGrade).toBe(3);
+    expect(plan.left.decisionCode).toBe("wider-plane");
   });
 
   it("flags hydrodissection in the intermediate posterolateral-ECE band", () => {
@@ -150,6 +200,8 @@ describe("buildSurgicalPlan", () => {
       0.02,
       0.02,
       infl,
+      0.02,
+      0.02,
     );
     expect(plan.left.hydrodissection.value).toBe(true);
   });
@@ -158,7 +210,7 @@ describe("buildSurgicalPlan", () => {
     const S = defaultClinicalState();
     S.median_lobe_grade = 3;
     const infl = predictInflammationRisk(S);
-    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl);
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl, 0.02, 0.02);
     expect(plan.bladderNeckPreservation.value).toBe(false);
     expect(plan.hood.value).toBe("none");
   });
@@ -167,7 +219,7 @@ describe("buildSurgicalPlan", () => {
     const S = defaultClinicalState();
     S.plan_ns_override_r = 3;
     const infl = predictInflammationRisk(S);
-    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl);
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl, 0.02, 0.02);
     expect(plan.right.nsGrade).toBe(3);
     expect(plan.right.overridden).toBe(true);
   });

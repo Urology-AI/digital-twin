@@ -29,14 +29,22 @@ export interface InflammationRisk {
   intraopDriven: boolean;
 }
 
-export function predictInflammationRisk(S: ClinicalState): InflammationRisk {
+/**
+ * Whole-patient history/systemic risk factors shared by both the patient-
+ * level inflammation-risk score below and the side-specific PIPS-H plane-
+ * hostility score (`planeHostility.ts`) — these are asymmetric in effect but
+ * not asymmetric in the record (a prior pelvic radiation course, for
+ * instance, is one fact about the patient, applied identically to both
+ * sides' hostility estimates; only the MRI plane phenotype in
+ * `planeHostility.ts` is genuinely side-specific).
+ */
+export function preopHistoryPoints(S: ClinicalState): { points: number; contributors: { label: string; points: number }[] } {
   const W = INFLAMMATION_WEIGHTS.value;
   const contributors: { label: string; points: number }[] = [];
   const add = (cond: boolean, label: string, points: number) => {
     if (cond && points !== 0) contributors.push({ label, points });
   };
 
-  // ── Pre-operative risk factors ──────────────────────────────────────────
   add(S.age > 70, "Age > 70", W.age_gt_70);
   add(S.vol > 80, "Prostate volume > 80 cc", W.volume_gt_80);
   add(S.vol > 100, "Prostate volume > 100 cc", W.volume_gt_100);
@@ -86,7 +94,13 @@ export function predictInflammationRisk(S: ClinicalState): InflammationRisk {
   );
   add(S.mri_periprostatic_fat_stranding, "MRI: periprostatic fat stranding", W.mri_fat_stranding);
 
-  const riskPoints = contributors.reduce((s, c) => s + c.points, 0);
+  const points = contributors.reduce((s, c) => s + c.points, 0);
+  return { points, contributors };
+}
+
+export function predictInflammationRisk(S: ClinicalState): InflammationRisk {
+  const W = INFLAMMATION_WEIGHTS.value;
+  const { points: riskPoints, contributors } = preopHistoryPoints(S);
   const riskLogit = W.intercept + riskPoints;
 
   // ── Intra-operative observation ────────────────────────────────────────

@@ -111,6 +111,7 @@ export function clinicalStateFromRecord(
   if (pat.exercise) S.exercise = pat.exercise;
   if (pat.pfmt) S.pfmt = pat.pfmt;
   if (pat.alcohol) S.alcohol = pat.alcohol;
+  if (pat.diet) S.diet = pat.diet;
   if (pat.pde5_plan) S.pde5 = pat.pde5_plan;
   else if (pat.pde5 === true) S.pde5 = "daily";
   S.laterality = bx.laterality || "bilateral";
@@ -235,6 +236,16 @@ export function clinicalStateFromRecord(
       S.intraop_inflammation_l = h.intraop_inflammation_l;
     if (h.intraop_inflammation_r !== null && h.intraop_inflammation_r !== undefined)
       S.intraop_inflammation_r = h.intraop_inflammation_r;
+    const num = (v: number | null | undefined, fallback: number) =>
+      v !== null && v !== undefined ? v : fallback;
+    S.mri_capsule_interface_l = num(h.mri_capsule_interface_l, S.mri_capsule_interface_l);
+    S.mri_capsule_interface_r = num(h.mri_capsule_interface_r, S.mri_capsule_interface_r);
+    S.mri_nvb_plane_l = num(h.mri_nvb_plane_l, S.mri_nvb_plane_l);
+    S.mri_nvb_plane_r = num(h.mri_nvb_plane_r, S.mri_nvb_plane_r);
+    S.mri_post_treatment_distortion_l = num(h.mri_post_treatment_distortion_l, S.mri_post_treatment_distortion_l);
+    S.mri_post_treatment_distortion_r = num(h.mri_post_treatment_distortion_r, S.mri_post_treatment_distortion_r);
+    S.mri_nonmass_inflammatory_signal_l = num(h.mri_nonmass_inflammatory_signal_l, S.mri_nonmass_inflammatory_signal_l);
+    S.mri_nonmass_inflammatory_signal_r = num(h.mri_nonmass_inflammatory_signal_r, S.mri_nonmass_inflammatory_signal_r);
   }
 
   const pl = P.plan;

@@ -70,6 +70,14 @@ export interface SidePlan {
   hydrodissection: PlanRec<boolean>;
   svPreservation: PlanRec<boolean>;
   cautions: string[];
+  /** PIPS-EPE tier used by the decision matrix (oncologic axis, independent of hostility) */
+  epeTier: "low" | "intermediate" | "high";
+  /** PIPS-H — side-specific plane-hostility probability, independent of EPE */
+  hostilityScore: number;
+  hostilityTier: "low" | "intermediate" | "high" | "very-high";
+  /** true when a hostile plane calls for the operative protocol note without widening the plane */
+  hostileProtocol: boolean;
+  decisionCode: "maximal" | "preserve-hostile-protocol" | "wider-plane" | "graded-frozen-section";
 }
 
 export interface SurgicalPlan {

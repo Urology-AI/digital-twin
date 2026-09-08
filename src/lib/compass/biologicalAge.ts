@@ -10,6 +10,7 @@ import {
   BIOLOGICAL_AGE_ALCOHOL,
   BIOLOGICAL_AGE_BMI,
   BIOLOGICAL_AGE_COMORBID,
+  BIOLOGICAL_AGE_DIET,
   BIOLOGICAL_AGE_EXERCISE,
   BIOLOGICAL_AGE_FRAMING,
   BIOLOGICAL_AGE_SMOKING,
@@ -20,11 +21,15 @@ import type {
   SmokingStatus,
 } from "@/lib/compass/functionalOutcomes";
 
+/** Postdiagnosis dietary fat pattern — see BIOLOGICAL_AGE_DIET. General-mortality counseling only. */
+export type DietPattern = "favorable" | "average" | "high_saturated_fat";
+
 const W = {
   bmi: BIOLOGICAL_AGE_BMI.value,
   smoking: BIOLOGICAL_AGE_SMOKING.value,
   exercise: BIOLOGICAL_AGE_EXERCISE.value,
   alcohol: BIOLOGICAL_AGE_ALCOHOL.value,
+  diet: BIOLOGICAL_AGE_DIET.value,
   ...BIOLOGICAL_AGE_COMORBID.value,
   clamp: BIOLOGICAL_AGE_FRAMING.value.clamp,
 };
@@ -35,6 +40,7 @@ export interface BiologicalAgeInputs {
   smoking: SmokingStatus;
   exercise: ExerciseLevel;
   alcohol: AlcoholLevel;
+  diet: DietPattern;
   dm: boolean;
   htn: boolean;
   cad: boolean;
@@ -96,6 +102,11 @@ export function computeBiologicalAge(i: BiologicalAgeInputs): BiologicalAgeResul
       label: "Alcohol",
       years: W.alcohol[i.alcohol],
       recoverable: W.alcohol[i.alcohol] - W.alcohol.none,
+    },
+    {
+      label: "Diet",
+      years: W.diet[i.diet],
+      recoverable: W.diet[i.diet] - W.diet.favorable,
     },
     { label: "Diabetes", years: i.dm ? W.dm : 0, recoverable: 0 },
     { label: "Hypertension", years: i.htn ? W.htn : 0, recoverable: 0 },
