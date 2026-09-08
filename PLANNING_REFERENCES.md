@@ -5,10 +5,19 @@ Bibliography for the effect sizes and decision rules in
 `src/lib/compass/planningReferences.ts`; the app shows it under
 **Evidence & sources → Full references** on the Planning and Outcomes tabs.
 
-> ⚠️ **Not yet verified.** Author/year handles were compiled from working
-> knowledge. Every entry needs checking against PubMed / the DOI, and the
-> numeric effect sizes need to be either taken from the primary paper or
-> re-fitted on the COMPASS cohort, before any clinical framing.
+> ⚠️ **Verification is partial.** Entries carry a `verified` flag in
+> `planningReferences.ts`. The **Modifiable-factor grounding** section below was
+> checked against the journal record or PubMed, and its effect sizes are quoted
+> from the primary papers. The two sections above it were compiled from working
+> knowledge and still need checking against PubMed / the DOI, and their numeric
+> effect sizes still need to be taken from the primary paper or re-fitted on the
+> COMPASS cohort, before any clinical framing.
+>
+> Separately: a cited paper does **not** mean the coefficient was fitted. The
+> functional-outcome nomogram is marked `provisional` in
+> `models/surgicalPlanning.json` — "not yet a formally published fitted model".
+> The citations say what evidence stands behind a value, not that the value was
+> derived from it.
 
 ## Mount Sinai / Tewari group
 
@@ -42,3 +51,32 @@ Bibliography for the effect sizes and decision rules in
 | mandel2016 | Mandel P, Steuber T, Ahyai S, et al. Salvage radical prostatectomy for recurrent prostate cancer: verification of EAU guideline criteria. *BJU Int.* 2016;117(1):55-61. | Inflammation-risk weights (prior pelvic radiation) |
 | ball2015 | Ball MW, et al. Extent of extraprostatic extension and biochemical recurrence after radical prostatectomy. *Urology* 2015 *(verify)*. | Zonal ECE distribution |
 | ficarra2012 | Ficarra V, Novara G, Ahlering TE, et al. Systematic review and meta-analysis of studies reporting potency rates after robot-assisted radical prostatectomy. *Eur Urol.* 2012;62(3):418-30. | Functional-outcome nomogram (recovery trajectory) |
+
+## Modifiable-factor grounding
+
+One paper per lever in the `MF` table (`src/lib/compass/functionalOutcomes.ts`).
+Checked against the journal record or PubMed; effect sizes quoted from the
+primary paper. `src/test/surgicalPlanning.test.ts` fails if a coefficient and
+its evidence entry drift apart.
+
+| Key | Citation | Used for |
+|---|---|---|
+| briganti2010ef | Briganti A, Gallina A, Suardi N, et al. Predicting erectile function recovery after bilateral nerve sparing radical prostatectomy: a proposal of a novel preoperative risk stratification. *J Sex Med.* 2010;7(7):2521-31 (N=435). | Age & baseline erectile function; comorbidities |
+| wei2018obesity | Wei Y, Wu YP, Lin MY, et al. Impact of obesity on long-term urinary incontinence after radical prostatectomy: a meta-analysis. *Biomed Res Int.* 2018;2018:8279523. | Obesity |
+| geng2023pfme | Geng E, Yin S, Yang Y, et al. The effect of perioperative pelvic floor muscle exercise on urinary incontinence after radical prostatectomy: a meta-analysis. *Int Braz J Urol.* 2023;49(4):441-451 (15 RCTs, N=2,178). | Pelvic floor muscle training |
+| yu2024pfmtnma | Yu K, Bu F, Jian T, et al. Urinary incontinence rehabilitation after radical prostatectomy: a systematic review and network meta-analysis. *Front Oncol.* 2024;13:1307434 (42 RCTs, N=4,256). | Pelvic floor muscle training |
+| gerbild2018pa | Gerbild H, Larsen CM, Graugaard C, Areskoug Josefsson K. Physical activity to improve erectile function: a systematic review of intervention studies. *Sex Med.* 2018;6(2):75-89. | Physical activity |
+| montorsi2014reactt | Montorsi F, Brock G, Stolzenburg JU, et al. Effects of tadalafil treatment on erectile function recovery following bilateral nerve-sparing radical prostatectomy (REACTT). *Eur Urol.* 2014;65(3):587-96. | PDE5 inhibitor regimen |
+| visscher2025smoking | Visscher J, Bonevski B, O'Callaghan M. The association of smoking with urinary and sexual function recovery following radical prostatectomy. *BJU Int.* 2025;136(4):647-656 (N=2,676). | Smoking (functional recovery) |
+| visscher2024smokingmeta | Visscher J, et al. The association of smoking with urinary and sexual function recovery following radical prostatectomy for localized prostate cancer: a systematic review and meta-analysis. *Prostate Cancer Prostatic Dis.* 2024 (9 studies). | Smoking (functional recovery) |
+| zhang2025pie | Zhang C, Harper A, Imm KR, et al. Impact of age, marital status, smoking, and alcohol consumption on urinary and sexual function in prostate cancer patients treated with radical prostatectomy. *Urology.* 2025;207:155-161 (PIE study). | Smoking; alcohol |
+| arackal2007alcohol | Arackal BS, Benegal V. Prevalence of sexual dysfunction in male subjects with alcohol dependence. *Indian J Psychiatry.* 2007;49(2):109-112 (N=100). | Alcohol |
+| wang2018alcohol | Wang X, Zhang Y, Wang X, et al. Alcohol intake and risk of erectile dysfunction: a dose-response meta-analysis of observational studies. *Int J Impot Res.* 2018 (24 studies, N=154,295). | Alcohol |
+| bradley2017luts | Bradley CS, Erickson BA, Messersmith EE, et al. Evidence of the impact of diet, fluid intake, caffeine, alcohol and tobacco on lower urinary tract symptoms: a systematic review. *J Urol.* 2017;198(5):1010-20 (LURN). | Alcohol → continence |
+| bauer2020diet | Bauer SR, Breyer BN, Stampfer MJ, et al. Association of diet with erectile dysfunction among men in the Health Professionals Follow-up Study. *JAMA Netw Open.* 2020;3(11):e2021701 (N=21,469). | Diet → erectile-function recovery |
+| zhang2026diet | Zhang Y, Shanahan MR, Guard HE, et al. Dietary fat intake and mortality among patients with nonmetastatic prostate cancer. *JAMA Netw Open.* 2026;9(9):e2630693. | Biological age — diet years |
+| rabbani2009ef | Rabbani F, Schiff J, Piecuch M, et al. Factors predicting preservation of erectile function in men undergoing open radical retropubic prostatectomy. *J Urol.* 2009;181(4):1817-22 (N=1,110). | Comorbidities |
+| kimura2026ipss | Kimura N, Yamada Y, Hakozaki Y, et al. Long-term transition of urinary status after robot-assisted radical prostatectomy. *J Robot Surg.* 2026;20:198 (N=243). | Baseline voiding symptoms (IPSS) |
+| ficarra2012continence | Ficarra V, Novara G, Rosen RC, et al. Systematic review and meta-analysis of studies reporting urinary continence recovery after robot-assisted radical prostatectomy. *Eur Urol.* 2012;62(3):405-17. | Functional-outcome nomogram (recovery trajectory) |
+| bull2020who | Bull FC, Al-Ansari SS, Biddle S, et al. World Health Organization 2020 guidelines on physical activity and sedentary behaviour. *Br J Sports Med.* 2020;54(24):1451-1462. | Activity band definitions |
+| niaaa2023levels | NIAAA, *Understanding alcohol drinking patterns*; with the Dietary Guidelines for Americans 2020-2025 definition of moderate drinking. | Alcohol band definitions |

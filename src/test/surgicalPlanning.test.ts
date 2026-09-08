@@ -7,6 +7,12 @@ import { bcrByPlan } from "@/lib/compass/bcrByPlan";
 import { computeFunctionalOutcomes } from "@/lib/compass/functionalOutcomes";
 import { EVIDENCE_REGISTRY } from "@/lib/compass/planningEvidence";
 import type { NsSideDetail } from "@/types/prediction";
+import type { FunctionalInputs } from "@/lib/compass/functionalOutcomes";
+
+type BreakdownProbe = Pick<
+  FunctionalInputs,
+  "bmi" | "pfmt" | "exercise" | "pde5" | "smoking" | "alcohol" | "dm" | "htn" | "cad" | "ipss"
+> & { diet: NonNullable<FunctionalInputs["diet"]> };
 
 describe("planning evidence registry", () => {
   it("every constant group has a source and a real citation", () => {
@@ -26,6 +32,82 @@ describe("planning evidence registry", () => {
   });
 });
 
+describe("evidence entries must not drift from the coefficients they document", () => {
+  // The MF table in functionalOutcomes.ts is the source of truth at runtime;
+  // the MF_* evidence entries repeat those numbers so the citation shown in the
+  // UI names the value actually being applied. Read the effective pp back out
+  // through the public breakdown so a change to either side fails here.
+  const base: BreakdownProbe = {
+    bmi: 24, pfmt: "none", exercise: "light", pde5: "none", smoking: "never",
+    alcohol: "moderate", diet: "average", dm: false, htn: false, cad: false, ipss: 5,
+  };
+
+  const effect = async (over: Partial<BreakdownProbe>, label: string) => {
+    const { modifiableFactorBreakdown } = await import("@/lib/compass/functionalOutcomes");
+    const row = modifiableFactorBreakdown({ ...base, ...over }).find((r) => r.label === label);
+    expect(row, `no breakdown row for ${label}`).toBeDefined();
+    return { pot: row!.pot, cont: row!.cont };
+  };
+
+  it("obesity entry matches the applied deltas", async () => {
+    const { MF_BMI_FUNCTION } = await import("@/lib/compass/planningEvidence");
+    const v = MF_BMI_FUNCTION.value;
+    expect(await effect({ bmi: v.threshold + 2 }, "BMI")).toEqual({ pot: v.pot, cont: v.cont });
+  });
+
+  it("PFMT entry matches the applied deltas", async () => {
+    const { MF_PFMT } = await import("@/lib/compass/planningEvidence");
+    const v = MF_PFMT.value;
+    expect(await effect({ pfmt: "intensive" }, "Pelvic floor training")).toEqual({
+      pot: v.pot,
+      cont: v.cont,
+    });
+  });
+
+  it("physical-activity entry matches the applied deltas", async () => {
+    const { MF_EXERCISE_FUNCTION } = await import("@/lib/compass/planningEvidence");
+    const v = MF_EXERCISE_FUNCTION.value;
+    expect(await effect({ exercise: "active" }, "Exercise")).toEqual({ pot: v.pot, cont: v.cont });
+  });
+
+  it("PDE5 entry matches the applied delta", async () => {
+    const { MF_PDE5_REHAB } = await import("@/lib/compass/planningEvidence");
+    expect((await effect({ pde5: "daily" }, "PDE5 inhibitor")).pot).toBe(MF_PDE5_REHAB.value.pot);
+  });
+
+  it("smoking entry matches the applied deltas", async () => {
+    const { MF_SMOKING_FUNCTION } = await import("@/lib/compass/planningEvidence");
+    const v = MF_SMOKING_FUNCTION.value;
+    expect(await effect({ smoking: "current" }, "Smoking")).toEqual({ pot: v.pot, cont: v.cont });
+  });
+
+  it("alcohol entry matches the applied deltas", async () => {
+    const { MF_ALCOHOL_FUNCTION } = await import("@/lib/compass/planningEvidence");
+    const v = MF_ALCOHOL_FUNCTION.value;
+    expect(await effect({ alcohol: "heavy" }, "Alcohol")).toEqual({ pot: v.pot, cont: v.cont });
+  });
+
+  it("comorbidity entry matches the applied deltas", async () => {
+    const { MF_COMORBID_FUNCTION } = await import("@/lib/compass/planningEvidence");
+    const v = MF_COMORBID_FUNCTION.value;
+    expect(await effect({ dm: true }, "Diabetes")).toEqual(v.dm);
+    expect(await effect({ htn: true }, "Hypertension")).toEqual(v.htn);
+    expect(await effect({ cad: true }, "Coronary disease")).toEqual(v.cad);
+  });
+
+  it("IPSS entry matches the applied ladder in every scored band", async () => {
+    const { MF_IPSS_CONTINENCE } = await import("@/lib/compass/planningEvidence");
+    const { thresholds, cont } = MF_IPSS_CONTINENCE.value;
+    // cont[0] is the 0-pp band at or below the first threshold; that row is
+    // correctly absent from the breakdown, so probe just above each threshold.
+    const probes = [thresholds[0]! + 1, thresholds[1]! + 1, thresholds[2]! + 1];
+    for (let i = 0; i < probes.length; i++) {
+      const row = await effect({ ipss: probes[i]! }, "Voiding symptoms (IPSS)");
+      expect(row.cont, `IPSS ${probes[i]}`).toBe(cont[i + 1]!);
+    }
+  });
+});
+
 describe("planning references", () => {
   it("every reference has authors, title, source and a usedFor list", async () => {
     const { PLANNING_REFERENCES } = await import("@/lib/compass/planningReferences");
@@ -35,6 +117,33 @@ describe("planning references", () => {
       expect(r.title.length).toBeGreaterThan(10);
       expect(r.source).toMatch(/\b(19|20)\d\d\b/);
       expect(r.usedFor.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("every modifiable factor in the outcome model is grounded in a named paper", async () => {
+    const { EVIDENCE_REGISTRY } = await import("@/lib/compass/planningEvidence");
+    const { PLANNING_REFERENCES } = await import("@/lib/compass/planningReferences");
+    // one entry per lever the Factors tab exposes — add a factor, add its evidence
+    const factors = [
+      "age & baseline erectile function",
+      "obesity",
+      "pelvic floor muscle training",
+      "physical activity",
+      "PDE5 inhibitor regimen",
+      "smoking (functional recovery)",
+      "alcohol",
+      "comorbidities (functional recovery)",
+      "baseline voiding symptoms (IPSS)",
+    ];
+    for (const f of factors) {
+      const label = `Modifiable factor — ${f}`;
+      const entry = EVIDENCE_REGISTRY.find((e) => e.label === label);
+      expect(entry, `no evidence entry for ${label}`).toBeDefined();
+      expect(entry!.citation).toMatch(/\b(19|20)\d\d\b/); // names a year
+      expect(
+        PLANNING_REFERENCES.some((r) => r.usedFor.includes(label)),
+        `no bibliography entry cites ${label}`,
+      ).toBe(true);
     }
   });
 

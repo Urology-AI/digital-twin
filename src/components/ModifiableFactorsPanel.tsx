@@ -11,7 +11,7 @@ import type {
   SmokingStatus,
 } from "@/lib/compass/functionalOutcomes";
 import { computeBiologicalAge, type DietPattern } from "@/lib/compass/biologicalAge";
-import { RefLinks } from "@/components/RefLinks";
+import { EvidenceInfo } from "@/components/EvidenceInfo";
 import { cn } from "@/lib/utils";
 
 function SegPicker<T extends string>({
@@ -19,21 +19,15 @@ function SegPicker<T extends string>({
   options,
   value,
   onChange,
-  sources,
 }: {
   label: string;
-  options: { label: string; value: T }[];
+  options: { label: string; value: T; hint?: string }[];
   value: T;
   onChange: (v: T) => void;
-  /** RefLinks tags — the `label` of the planningEvidence.ts entry(ies) backing this factor */
-  sources?: string[];
 }) {
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-xs font-semibold text-foreground">{label}</div>
-        {sources && <RefLinks tags={sources} />}
-      </div>
+      <div className="text-xs font-semibold text-foreground">{label}</div>
       <div className="flex overflow-hidden rounded-md border border-border divide-x divide-border">
         {options.map((opt) => (
           <button
@@ -48,6 +42,16 @@ function SegPicker<T extends string>({
             )}
           >
             {opt.label}
+            {opt.hint && (
+              <span
+                className={cn(
+                  "block text-[9px] font-normal leading-tight",
+                  value === opt.value ? "text-primary-foreground/70" : "text-muted-foreground/60",
+                )}
+              >
+                {opt.hint}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -118,6 +122,33 @@ function BiologicalAgeReadout({
     </div>
   );
 }
+
+/** Everything cited by one section, gathered behind that section's single ⓘ. */
+const BODY_LIFESTYLE_SOURCES = [
+  "Alcohol & activity band definitions",
+  "Modifiable factor — obesity",
+  "Modifiable factor — age & baseline erectile function",
+  "Modifiable factor — baseline voiding symptoms (IPSS)",
+  "Modifiable factor — pelvic floor muscle training",
+  "Modifiable factor — physical activity",
+  "Modifiable factor — smoking (functional recovery)",
+  "Biological age — BMI years",
+  "Biological age — physical activity years",
+  "Biological age — smoking years",
+  "Functional-outcome nomogram",
+];
+
+const MEDICAL_SOURCES = [
+  "Alcohol & activity band definitions",
+  "Modifiable factor — PDE5 inhibitor regimen",
+  "Modifiable factor — alcohol",
+  "Modifiable factor — comorbidities (functional recovery)",
+  "Biological age — alcohol years",
+  "Biological age — diet years",
+  "Diet → erectile-function recovery",
+  "Biological age — comorbidity years",
+  "Functional-outcome nomogram",
+];
 
 export function ModifiableFactorsPanel() {
   const patients = usePatientStore((s) => s.patients);
@@ -256,16 +287,16 @@ export function ModifiableFactorsPanel() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3 px-4 py-3">
-        <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Body & Lifestyle</h3>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Body & Lifestyle</h3>
+          <EvidenceInfo title="Body & lifestyle factors" tags={BODY_LIFESTYLE_SOURCES} />
+        </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-semibold text-foreground" htmlFor="mf-bmi">
-                BMI <span className="font-normal text-muted-foreground">(kg/m²)</span>
-              </label>
-              <RefLinks tags={["Biological age — BMI years"]} />
-            </div>
+            <label className="text-xs font-semibold text-foreground" htmlFor="mf-bmi">
+              BMI <span className="font-normal text-muted-foreground">(kg/m²)</span>
+            </label>
             <div className="flex items-center gap-2">
               <Input
                 id="mf-bmi"
@@ -299,12 +330,9 @@ export function ModifiableFactorsPanel() {
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-semibold text-foreground" htmlFor="mf-shim">
-                SHIM <span className="font-normal text-muted-foreground">(0–25)</span>
-              </label>
-              <RefLinks tags={["Functional-outcome nomogram"]} />
-            </div>
+            <label className="text-xs font-semibold text-foreground" htmlFor="mf-shim">
+              SHIM <span className="font-normal text-muted-foreground">(0–25)</span>
+            </label>
             <Input
               id="mf-shim"
               type="number"
@@ -319,12 +347,9 @@ export function ModifiableFactorsPanel() {
           </div>
 
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-semibold text-foreground" htmlFor="mf-ipss">
-                IPSS <span className="font-normal text-muted-foreground">(0–35)</span>
-              </label>
-              <RefLinks tags={["Functional-outcome nomogram"]} />
-            </div>
+            <label className="text-xs font-semibold text-foreground" htmlFor="mf-ipss">
+              IPSS <span className="font-normal text-muted-foreground">(0–35)</span>
+            </label>
             <Input
               id="mf-ipss"
               type="number"
@@ -349,19 +374,17 @@ export function ModifiableFactorsPanel() {
           ]}
           value={pfmt}
           onChange={handlePfmt}
-          sources={["Functional-outcome nomogram"]}
         />
         <SegPicker<ExerciseLevel>
           label="Exercise Level"
           options={[
-            { label: "Sedentary", value: "sedentary" },
-            { label: "Light", value: "light" },
-            { label: "Moderate", value: "moderate" },
-            { label: "Active", value: "active" },
+            { label: "Sedentary", value: "sedentary", hint: "little / none" },
+            { label: "Light", value: "light", hint: "under 150 min/wk" },
+            { label: "Moderate", value: "moderate", hint: "150–300 min/wk" },
+            { label: "Active", value: "active", hint: "300+ min/wk" },
           ]}
           value={exercise}
           onChange={handleExercise}
-          sources={["Biological age — physical activity years"]}
         />
         <SegPicker<SmokingStatus>
           label="Smoking Status"
@@ -372,11 +395,13 @@ export function ModifiableFactorsPanel() {
           ]}
           value={smoking}
           onChange={handleSmoking}
-          sources={["Biological age — smoking years"]}
         />
 
         <div className="space-y-3 border-t border-border/60 pt-3">
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Medical Factors</h3>
+          <div className="flex items-center gap-1.5">
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Medical Factors</h3>
+            <EvidenceInfo title="Medical factors" tags={MEDICAL_SOURCES} />
+          </div>
 
           <SegPicker<Pde5Regimen>
             label="PDE5 Inhibitor Plan"
@@ -387,36 +412,30 @@ export function ModifiableFactorsPanel() {
             ]}
             value={pde5}
             onChange={handlePde5}
-            sources={["Functional-outcome nomogram"]}
           />
           <SegPicker<AlcoholLevel>
             label="Alcohol Usage"
             options={[
-              { label: "None", value: "none" },
-              { label: "Moderate", value: "moderate" },
-              { label: "Heavy", value: "heavy" },
+              { label: "None", value: "none", hint: "non-drinker" },
+              { label: "Moderate", value: "moderate", hint: "up to 2/day" },
+              { label: "Heavy", value: "heavy", hint: ">4/day or >14/wk" },
             ]}
             value={alcohol}
             onChange={handleAlcohol}
-            sources={["Biological age — alcohol years"]}
           />
           <SegPicker<DietPattern>
-            label="Dietary Fat Pattern"
+            label="Dietary Pattern"
             options={[
-              { label: "Favorable (plant/mono-unsat.)", value: "favorable" },
+              { label: "Lean protein & healthy fats", value: "favorable" },
               { label: "Average", value: "average" },
-              { label: "High saturated fat", value: "high_saturated_fat" },
+              { label: "High red meat / sat. fat", value: "high_saturated_fat" },
             ]}
             value={diet}
             onChange={handleDiet}
-            sources={["Biological age — diet years"]}
           />
 
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-semibold text-foreground">Comorbidities</div>
-              <RefLinks tags={["Biological age — comorbidity years"]} />
-            </div>
+            <div className="text-xs font-semibold text-foreground">Comorbidities</div>
             <div className="flex gap-2">
               {(
                 [

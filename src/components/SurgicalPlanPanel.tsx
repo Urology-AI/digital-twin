@@ -8,7 +8,7 @@ import {
   lesionsFromRows,
 } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
-import { RefLinks } from "@/components/RefLinks";
+import { EvidenceInfo } from "@/components/EvidenceInfo";
 import {
   computeFunctionalOutcomes,
   type AlcoholLevel,
@@ -70,6 +70,40 @@ const NS_META: Record<number, { name: string; tone: string }> = {
   2: { name: "Interfascial", tone: "amber" },
   3: { name: "Extrafascial", tone: "red" },
 };
+
+/** Everything cited by one card, gathered behind that card's single ⓘ. */
+const SIDE_SOURCES = [
+  "NS grade model",
+  "Fascial-plane nomenclature",
+  "Fascial-plane nomenclature & athermal technique",
+  "PIPS-EPE tier cutpoints",
+  "PIPS-H MRI plane-phenotype weights",
+  "PIPS EPE x hostility decision matrix",
+  "Per-zone NS-grade ECE thresholds",
+  "Zone dissection-alert thresholds",
+  "Zone dissection-alert thresholds (NVB course)",
+  "Zone dissection-alert thresholds (PSMA-at-base ECE rate)",
+  "Zonal ECE distribution",
+  "Hydrodissection",
+  "Seminal-vesicle tip-sparing candidacy",
+];
+
+const IMPACT_SOURCES = [
+  "Functional-outcome nomogram",
+  "Functional-outcome nomogram (recovery trajectory)",
+  "Plan functional deltas",
+  "Plan effect on positive-margin rate",
+  "BCR event-timing fractions",
+  "Obesity → BCR risk",
+];
+
+const ANTERIOR_SOURCES = ["Anterior hood candidacy", "Bladder-neck preservation candidacy"];
+
+const INFLAMMATION_SOURCES = [
+  "Inflammation-risk framing",
+  "Inflammation-risk weights (prior pelvic radiation)",
+  "Inflammation → grade escalation",
+];
 
 function SectionTitle({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
@@ -143,7 +177,6 @@ function TriToggle({
   detail,
   value,
   onChange,
-  sources,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -152,7 +185,6 @@ function TriToggle({
   detail: string;
   value: boolean | null;
   onChange: (v: boolean | null) => void;
-  /** planningReferences.ts `usedFor` tags for this feature */
   sources?: string[];
 }) {
   const opts: { v: boolean | null; l: string }[] = [
@@ -199,7 +231,6 @@ function TriToggle({
             </div>
           </div>
           <p className="mt-1 text-xs leading-snug text-muted-foreground">{detail}</p>
-          {sources && <RefLinks tags={sources} className="mt-1.5" />}
         </div>
       </div>
     </div>
@@ -332,7 +363,10 @@ function SideCard({
           meta.tone === "red" && "bg-red-500/[0.07]",
         )}
       >
-        <span className="text-sm font-semibold">{label} side</span>
+        <span className="flex items-center gap-1.5 text-sm font-semibold">
+          {label} side
+          <EvidenceInfo title={`${label} side — plan`} tags={SIDE_SOURCES} />
+        </span>
         <span
           className={cn(
             "rounded-full px-2.5 py-0.5 text-xs font-bold",
@@ -372,14 +406,6 @@ function SideCard({
             ]}
           />
           <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{plan.gradeRationale}</p>
-          <RefLinks
-            tags={[
-              "NS grade model",
-              "Fascial-plane nomenclature",
-              "Fascial-plane nomenclature & athermal technique",
-            ]}
-            className="mt-1.5"
-          />
         </div>
 
         <div>
@@ -411,10 +437,6 @@ function SideCard({
               wider excision here.
             </div>
           )}
-          <RefLinks
-            tags={["PIPS-EPE tier cutpoints", "PIPS-H MRI plane-phenotype weights", "PIPS EPE x hostility decision matrix"]}
-            className="mt-1.5"
-          />
         </div>
 
         <div>
@@ -437,16 +459,6 @@ function SideCard({
               );
             })}
           </div>
-          <RefLinks
-            tags={[
-              "Per-zone NS-grade ECE thresholds",
-              "Zone dissection-alert thresholds",
-              "Zone dissection-alert thresholds (NVB course)",
-              "Zone dissection-alert thresholds (PSMA-at-base ECE rate)",
-              "Zonal ECE distribution",
-            ]}
-            className="mt-1.5"
-          />
         </div>
 
         <div className="space-y-2">
@@ -457,7 +469,6 @@ function SideCard({
             resolved={plan.hydrodissection.value}
             value={hydroOverride}
             onChange={onHydro}
-            sources={["Hydrodissection"]}
           />
           <TriToggle
             icon={<ShieldCheck className="h-4 w-4" />}
@@ -466,7 +477,6 @@ function SideCard({
             resolved={plan.svPreservation.value}
             value={svOverride}
             onChange={onSv}
-            sources={["Seminal-vesicle tip-sparing candidacy"]}
           />
         </div>
 
@@ -603,19 +613,12 @@ export function SurgicalPlanPanel() {
       <Card>
         <CardContent className="space-y-4 p-4">
           <div className="flex items-center justify-between gap-2">
-            <SectionTitle icon={<Activity className="h-4 w-4" />}>
-              Impact vs. nerve-sparing grade alone
-            </SectionTitle>
-            <RefLinks
-              tags={[
-                "Functional-outcome nomogram",
-                "Functional-outcome nomogram (recovery trajectory)",
-                "Plan functional deltas",
-                "Plan effect on positive-margin rate",
-                "BCR event-timing fractions",
-                "Obesity → BCR risk",
-              ]}
-            />
+            <div className="flex items-center gap-1.5">
+              <SectionTitle icon={<Activity className="h-4 w-4" />}>
+                Impact vs. nerve-sparing grade alone
+              </SectionTitle>
+              <EvidenceInfo title="Impact vs. nerve-sparing grade alone" tags={IMPACT_SOURCES} />
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -718,7 +721,10 @@ export function SurgicalPlanPanel() {
       {/* ── Anterior approach ──────────────────────────────────── */}
       <Card>
         <CardContent className="space-y-4 p-4">
-          <SectionTitle icon={<ShieldCheck className="h-4 w-4" />}>Anterior approach</SectionTitle>
+          <div className="flex items-center gap-1.5">
+            <SectionTitle icon={<ShieldCheck className="h-4 w-4" />}>Anterior approach</SectionTitle>
+            <EvidenceInfo title="Anterior approach" tags={ANTERIOR_SOURCES} />
+          </div>
           <div>
             <div className="mb-1.5 text-xs font-semibold text-foreground">
               Retzius-sparing / anterior hood
@@ -734,7 +740,6 @@ export function SurgicalPlanPanel() {
               ]}
             />
             <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{plan.hood.rationale}</p>
-            <RefLinks tags={["Anterior hood candidacy"]} className="mt-1.5" />
           </div>
           <TriToggle
             icon={<ShieldCheck className="h-4 w-4" />}
@@ -743,7 +748,6 @@ export function SurgicalPlanPanel() {
             resolved={plan.bladderNeckPreservation.value}
             value={S.plan_bnp}
             onChange={(v) => updateClinicalForm({ plan_bnp: v })}
-            sources={["Bladder-neck preservation candidacy"]}
           />
         </CardContent>
       </Card>
@@ -752,9 +756,12 @@ export function SurgicalPlanPanel() {
       <Card>
         <CardContent className="space-y-3 p-4">
           <div className="flex items-center justify-between">
-            <SectionTitle icon={<TriangleAlert className="h-4 w-4" />}>
-              Periprostatic inflammation risk
-            </SectionTitle>
+            <div className="flex items-center gap-1.5">
+              <SectionTitle icon={<TriangleAlert className="h-4 w-4" />}>
+                Periprostatic inflammation risk
+              </SectionTitle>
+              <EvidenceInfo title="Periprostatic inflammation risk" tags={INFLAMMATION_SOURCES} />
+            </div>
             <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold uppercase", tierTone.bg, tierTone.text)}>
               {inflammation.tier} · {pct(inflammation.score)}
             </span>
@@ -789,13 +796,6 @@ export function SurgicalPlanPanel() {
             </p>
           )}
 
-          <RefLinks
-            tags={[
-              "Inflammation-risk framing",
-              "Inflammation-risk weights (prior pelvic radiation)",
-              "Inflammation → grade escalation",
-            ]}
-          />
 
           {inflammation.contributors.length === 0 ? (
             <p className="text-xs text-muted-foreground">No risk factors recorded.</p>

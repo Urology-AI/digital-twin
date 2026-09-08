@@ -16,7 +16,11 @@ import {
   HEALER_THRESHOLD,
   MODIFIABLE_BCR,
   PLAN_DELTAS,
+  DIET_FUNCTIONAL_DELTA,
 } from "@/lib/compass/planningEvidence";
+// type-only: biologicalAge.ts imports the level types from here, so this must
+// never become a runtime import.
+import type { DietPattern } from "@/lib/compass/biologicalAge";
 
 /** Re-exported so panels can cite the functional model without a second import. */
 export const FUNCTIONAL_MODEL_CITATION = FUNCTIONAL_OUTCOMES_MODEL.citation;
@@ -54,6 +58,8 @@ export interface FunctionalInputs {
   smoking: SmokingStatus;
   pde5: Pde5Regimen;
   alcohol: AlcoholLevel;
+  /** dietary pattern; omit to score at the neutral "average" pattern */
+  diet?: DietPattern;
   dm: boolean;
   htn: boolean;
   cad: boolean;
@@ -115,6 +121,10 @@ const MF = {
     pot: { never: 0, former: -2, current: -8 } as Record<SmokingStatus, number>,
     cont: { never: 0, former: 0, current: -2 } as Record<SmokingStatus, number>,
   },
+  diet: {
+    // erectile function only — see DIET_FUNCTIONAL_DELTA
+    pot: DIET_FUNCTIONAL_DELTA.value as Record<DietPattern, number>,
+  },
   alcohol: {
     pot: { none: 2, moderate: 0, heavy: -10 } as Record<AlcoholLevel, number>,
     cont: { none: 0, moderate: 0, heavy: -2 } as Record<AlcoholLevel, number>,
@@ -124,6 +134,13 @@ const MF = {
     htn: { pot: -3, cont: -1 },
     cad: { pot: -5, cont: -1 },
   },
+};
+
+/** Readable detail text for the factor table — the stored values are terse. */
+export const DIET_DETAIL: Record<DietPattern, string> = {
+  favorable: "lean protein & healthy fats",
+  average: "average",
+  high_saturated_fat: "high red meat & saturated fat",
 };
 
 function clamp(v: number, lo: number, hi: number): number {
@@ -227,6 +244,7 @@ export function ageAdjustment(age: number): number {
 
 export function computeFunctionalOutcomes(inputs: FunctionalInputs): FunctionalOutcomesResult {
   const { nsL, nsR, age, shim, ipss, bmi, pfmt, exercise, smoking, pde5, alcohol, dm, htn, cad } = inputs;
+  const diet = inputs.diet ?? "average";
 
   const pd = getPot(nsL, nsR);
   const cd = getCont(nsL, nsR);
@@ -267,6 +285,8 @@ export function computeFunctionalOutcomes(inputs: FunctionalInputs): FunctionalO
 
   pA += MF.alcohol.pot[alcohol];
   cA += MF.alcohol.cont[alcohol];
+
+  pA += MF.diet.pot[diet];
 
   if (dm)  { pA += MF.comorbid.dm.pot;  cA += MF.comorbid.dm.cont; }
   if (htn) { pA += MF.comorbid.htn.pot; cA += MF.comorbid.htn.cont; }
@@ -338,11 +358,17 @@ export interface FactorContribution {
   bcrRisk: number;
   /** true if the patient can change it before surgery */
   modifiable: boolean;
+  /** pp on the potency timeline still available if this lever were optimised */
+  potGain: number;
+  /** pp on the continence timeline still available if this lever were optimised */
+  contGain: number;
+  /** what "optimised" means for this factor, for the patient-facing prompt */
+  target: string;
 }
 
 type BreakdownInput = Pick<
   FunctionalInputs,
-  "bmi" | "pfmt" | "exercise" | "pde5" | "smoking" | "alcohol" | "dm" | "htn" | "cad" | "ipss"
+  "bmi" | "pfmt" | "exercise" | "pde5" | "smoking" | "alcohol" | "diet" | "dm" | "htn" | "cad" | "ipss"
 >;
 
 export function modifiableFactorBreakdown(i: BreakdownInput): FactorContribution[] {
@@ -350,73 +376,123 @@ export function modifiableFactorBreakdown(i: BreakdownInput): FactorContribution
     i.bmi >= 35 ? MODIFIABLE_BCR.value.bmi_ge_35 : i.bmi >= 30 ? MODIFIABLE_BCR.value.bmi_ge_30 : 0;
   const ipssCont = i.ipss <= 7 ? 0 : i.ipss <= 14 ? -3 : i.ipss <= 19 ? -6 : -10;
 
+  // Best reachable setting per lever. A smoking history cannot be undone — a
+  // current smoker reaches "former" at best — and comorbidities are fixed,
+  // the same rule computeBiologicalAge() uses for its recoverable years.
+  const bestSmoking: SmokingStatus = i.smoking === "never" ? "never" : "former";
+
+  const row = (
+    r: Omit<FactorContribution, "potGain" | "contGain"> & { bestPot?: number; bestCont?: number },
+  ): FactorContribution => ({
+    label: r.label,
+    detail: r.detail,
+    pot: r.pot,
+    cont: r.cont,
+    bcrRisk: r.bcrRisk,
+    modifiable: r.modifiable,
+    target: r.target,
+    potGain: r.modifiable ? Math.max(0, (r.bestPot ?? r.pot) - r.pot) : 0,
+    contGain: r.modifiable ? Math.max(0, (r.bestCont ?? r.cont) - r.cont) : 0,
+  });
+
   const rows: FactorContribution[] = [
-    {
+    row({
       label: "BMI",
       detail: `${Math.round(i.bmi)} kg/m²`,
       pot: MF.bmi.pot(i.bmi),
       cont: MF.bmi.cont(i.bmi),
+      bestPot: MF.bmi.pot(24),
+      bestCont: MF.bmi.cont(24),
       bcrRisk: Math.round(bmiBcr * 100),
       modifiable: true,
-    },
-    {
+      target: "under 25",
+    }),
+    row({
       label: "Pelvic floor training",
       detail: i.pfmt,
       pot: MF.pfmt.pot[i.pfmt],
       cont: MF.pfmt.cont[i.pfmt],
+      bestPot: MF.pfmt.pot.intensive,
+      bestCont: MF.pfmt.cont.intensive,
       bcrRisk: 0,
       modifiable: true,
-    },
-    {
+      target: "intensive",
+    }),
+    row({
       label: "Exercise",
       detail: i.exercise,
       pot: MF.exercise.pot[i.exercise],
       cont: MF.exercise.cont[i.exercise],
+      bestPot: MF.exercise.pot.active,
+      bestCont: MF.exercise.cont.active,
       bcrRisk: 0,
       modifiable: true,
-    },
-    {
+      target: "active",
+    }),
+    row({
       label: "PDE5 inhibitor",
       detail: i.pde5,
       pot: MF.pde5.pot[i.pde5],
       cont: 0,
+      bestPot: MF.pde5.pot.daily,
       bcrRisk: 0,
       modifiable: true,
-    },
-    {
+      target: "daily",
+    }),
+    row({
       label: "Smoking",
       detail: i.smoking,
       pot: MF.smoking.pot[i.smoking],
       cont: MF.smoking.cont[i.smoking],
+      bestPot: MF.smoking.pot[bestSmoking],
+      bestCont: MF.smoking.cont[bestSmoking],
       bcrRisk: 0,
       modifiable: true,
-    },
-    {
+      target: i.smoking === "never" ? "never smoked" : "quit",
+    }),
+    row({
+      label: "Diet",
+      detail: DIET_DETAIL[i.diet ?? "average"],
+      pot: MF.diet.pot[i.diet ?? "average"],
+      cont: 0,
+      bestPot: MF.diet.pot.favorable,
+      bcrRisk: 0,
+      modifiable: true,
+      target: "lean protein & healthy fats",
+    }),
+    row({
       label: "Alcohol",
       detail: i.alcohol,
       pot: MF.alcohol.pot[i.alcohol],
       cont: MF.alcohol.cont[i.alcohol],
+      bestPot: MF.alcohol.pot.none,
+      bestCont: MF.alcohol.cont.none,
       bcrRisk: 0,
       modifiable: true,
-    },
-    {
+      target: "none",
+    }),
+    row({
       label: "Voiding symptoms (IPSS)",
       detail: String(i.ipss),
       pot: 0,
       cont: ipssCont,
+      bestCont: 0,
       bcrRisk: 0,
       modifiable: true,
-    },
+      target: "IPSS 7 or under",
+    }),
     ...(i.dm
-      ? [{ label: "Diabetes", detail: "present", pot: MF.comorbid.dm.pot, cont: MF.comorbid.dm.cont, bcrRisk: 0, modifiable: false }]
+      ? [row({ label: "Diabetes", detail: "present", pot: MF.comorbid.dm.pot, cont: MF.comorbid.dm.cont, bcrRisk: 0, modifiable: false, target: "" })]
       : []),
     ...(i.htn
-      ? [{ label: "Hypertension", detail: "present", pot: MF.comorbid.htn.pot, cont: MF.comorbid.htn.cont, bcrRisk: 0, modifiable: false }]
+      ? [row({ label: "Hypertension", detail: "present", pot: MF.comorbid.htn.pot, cont: MF.comorbid.htn.cont, bcrRisk: 0, modifiable: false, target: "" })]
       : []),
     ...(i.cad
-      ? [{ label: "Coronary disease", detail: "present", pot: MF.comorbid.cad.pot, cont: MF.comorbid.cad.cont, bcrRisk: 0, modifiable: false }]
+      ? [row({ label: "Coronary disease", detail: "present", pot: MF.comorbid.cad.pot, cont: MF.comorbid.cad.cont, bcrRisk: 0, modifiable: false, target: "" })]
       : []),
   ];
 
-  return rows.filter((r) => r.pot !== 0 || r.cont !== 0 || r.bcrRisk !== 0);
+  return rows.filter(
+    (r) => r.pot !== 0 || r.cont !== 0 || r.bcrRisk !== 0 || r.potGain > 0 || r.contGain > 0,
+  );
 }

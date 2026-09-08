@@ -9,158 +9,361 @@
     },
     "does_not_affect": "the six core COMPASS predictions (ECE, SVI, upgrade, PSM, BCR, LNI)"
   },
-
   "ns_base_model": {
     "source": "institutional",
     "citation": "COMPASS zone-aware NS grade (MODEL_CARD.md §9); side ECE/SVI from the fitted COMPASS side-specific models (Mount Sinai RARP cohort, N≈5,352)."
   },
-
   "ns_minimal_disease": {
     "source": "literature",
     "citation": "Tewari 2012 risk-stratified nerve-sparing; Patel 2015 grade of nerve-sparing",
-    "max_gg": 2, "max_positive_cores": 2, "max_ece_fraction": 0.1
+    "max_gg": 2,
+    "max_positive_cores": 2,
+    "max_ece_fraction": 0.1
   },
-
   "ns_zone_thresholds_ece_fraction": {
     "source": "literature",
     "citation": "posterolateral/base from existing COMPASS NS_THRESHOLDS; apex/anterior/bladder-neck from zone-specific PSM literature (Preisser 2019; Martini 2017)",
-    "posterolateral": { "grade2": 0.1, "grade3": 0.3 },
-    "base": { "grade2": 0.1, "grade3": 0.35 },
-    "apex": { "grade2": 0.1, "grade3": 0.3 },
-    "anterior": { "grade2": 0.12, "grade3": 0.35 },
-    "bladder_neck": { "grade2": 0.1, "grade3": 0.3 }
+    "posterolateral": {
+      "grade2": 0.1,
+      "grade3": 0.3
+    },
+    "base": {
+      "grade2": 0.1,
+      "grade3": 0.35
+    },
+    "apex": {
+      "grade2": 0.1,
+      "grade3": 0.3
+    },
+    "anterior": {
+      "grade2": 0.12,
+      "grade3": 0.35
+    },
+    "bladder_neck": {
+      "grade2": 0.1,
+      "grade3": 0.3
+    }
   },
-
   "ns_zone_ece_fallback_split": {
     "source": "literature",
     "citation": "ECE-site distribution on whole-mount RP series (Martini 2017; Ball 2015)",
-    "posterolateral": 0.35, "base": 0.3, "apex": 0.2, "anterior": 0.1, "bladder_neck": 0.05
+    "posterolateral": 0.35,
+    "base": 0.3,
+    "apex": 0.2,
+    "anterior": 0.1,
+    "bladder_neck": 0.05
   },
-
   "gg_boost_zone": {
     "source": "provisional",
     "citation": "monotone prior mapping biopsy GG (+ core involvement) to zone csPCa probability; expert prior pending COMPASS fitting",
-    "by_grade": { "1": 0.3, "2": 0.55, "3": 0.7, "4": 0.8, "5": 0.9 },
+    "by_grade": {
+      "1": 0.3,
+      "2": 0.55,
+      "3": 0.7,
+      "4": 0.8,
+      "5": 0.9
+    },
     "core_involvement_weight": 0.3
   },
-
   "ns_alert_thresholds": {
     "source": "literature",
     "citation": "Preisser 2019 apical margins; Tewari 2011 NVB anatomy; PSMA-positive-at-base 43% ECE (Hofman 2020)",
-    "apex": 0.1, "apex_high": 0.2, "anterior": 0.1, "anterior_high": 0.2,
-    "bladder_neck": 0.1, "bladder_neck_high": 0.2, "nvb": 0.15, "nvb_high": 0.3,
-    "svi_grade2": 0.15, "svi_grade3": 0.25, "svi_high": 0.3,
-    "mri_epe_posterior": 0.15, "psma_base": 0.08, "psma_base_high": 0.25,
-    "zone_data_present": 0.03, "zone_weight_alert": 0.05
+    "apex": 0.1,
+    "apex_high": 0.2,
+    "anterior": 0.1,
+    "anterior_high": 0.2,
+    "bladder_neck": 0.1,
+    "bladder_neck_high": 0.2,
+    "nvb": 0.15,
+    "nvb_high": 0.3,
+    "svi_grade2": 0.15,
+    "svi_grade3": 0.25,
+    "svi_high": 0.3,
+    "mri_epe_posterior": 0.15,
+    "psma_base": 0.08,
+    "psma_base_high": 0.25,
+    "zone_data_present": 0.03,
+    "zone_weight_alert": 0.05
   },
-
   "plane_technique": {
     "source": "literature",
     "citation": "Tewari 2011 anatomic fascial planes; Martini 2018 incremental nerve-sparing grades",
-    "grade1": "Intrafascial", "grade2": "Interfascial", "grade3": "Extrafascial (wide)"
+    "grade1": "Intrafascial",
+    "grade2": "Interfascial",
+    "grade3": "Extrafascial (wide)"
   },
-
   "ns_grade_escalation": {
     "source": "literature",
     "citation": "Martini 2018; Srivastava 2013 athermal technique",
-    "high_inflammation_steps": 1, "moderate_inflammation_steps": 0
+    "high_inflammation_steps": 1,
+    "moderate_inflammation_steps": 0
   },
-
   "inflammation_risk_weights": {
     "source": "provisional",
     "citation": "Martini 2018; Mandel 2018 salvage RP; Cheng 2021 PPAT inflammation; Rud 2015 post-biopsy MRI change. BPH sub-weights ranked by dissection burden. Expert priors pending fitting against whole-mount inflammation grade.",
     "intercept": -1.9,
     "points": {
-      "age_gt_70": 0.35, "volume_gt_80": 0.4, "volume_gt_100_additional": 0.35,
-      "prior_turp": 0.55, "prior_holep": 0.7, "prior_greenlight": 0.6,
-      "prior_urolift": 0.3, "prior_rezum": 0.25, "prior_bph_cap": 1.4,
-      "prior_pelvic_radiation": 1.1, "radiation_proctitis": 0.6,
-      "urinary_retention": 0.4, "recurrent_uti": 0.35, "ipss_gt_19": 0.3,
-      "pelvic_abscess": 0.9, "hernia_mesh": 0.7, "rectal_fistula": 0.9,
-      "ibd": 0.7, "diverticulitis": 0.45, "biopsy_inflammation": 0.4,
-      "multiple_biopsies": 0.35, "treated_prostatitis": 0.5, "bmi_gt_30": 0.3,
-      "mri_inflammation_equivocal": 0.5, "mri_inflammation_present": 1.0,
-      "mri_fat_stranding": 0.4, "intraop_per_grade": 1.0
+      "age_gt_70": 0.35,
+      "volume_gt_80": 0.4,
+      "volume_gt_100_additional": 0.35,
+      "prior_turp": 0.55,
+      "prior_holep": 0.7,
+      "prior_greenlight": 0.6,
+      "prior_urolift": 0.3,
+      "prior_rezum": 0.25,
+      "prior_bph_cap": 1.4,
+      "prior_pelvic_radiation": 1.1,
+      "radiation_proctitis": 0.6,
+      "urinary_retention": 0.4,
+      "recurrent_uti": 0.35,
+      "ipss_gt_19": 0.3,
+      "pelvic_abscess": 0.9,
+      "hernia_mesh": 0.7,
+      "rectal_fistula": 0.9,
+      "ibd": 0.7,
+      "diverticulitis": 0.45,
+      "biopsy_inflammation": 0.4,
+      "multiple_biopsies": 0.35,
+      "treated_prostatitis": 0.5,
+      "bmi_gt_30": 0.3,
+      "mri_inflammation_equivocal": 0.5,
+      "mri_inflammation_present": 1.0,
+      "mri_fat_stranding": 0.4,
+      "intraop_per_grade": 1.0
     },
     "intraop_override": "score = max(pre-op risk-factor score, intra-op-grade score); never de-escalates below the pre-op estimate"
   },
-
   "inflammation_tier_cutpoints": {
     "source": "provisional",
     "citation": "provisional tertile-style cutpoints; to be calibrated against whole-mount inflammation grade + an intra-op difficulty score",
-    "moderate": 0.3, "high": 0.55
+    "moderate": 0.3,
+    "high": 0.55
   },
-
   "hood_decision": {
     "source": "literature",
     "citation": "Rosenberg 2020 Cochrane; Menon 2018 RCT; Galfano 2013 Retzius-sparing technique",
     "anterior_apex_ece_max": 0.15
   },
-
   "bnp_decision": {
     "source": "literature",
     "citation": "Ma 2016 meta-analysis; Nyarangi-Dix 2013 RCT",
-    "max_median_lobe_grade": 2, "max_bladder_neck_ece": 0.1, "max_volume_cc": 120
+    "max_median_lobe_grade": 2,
+    "max_bladder_neck_ece": 0.1,
+    "max_volume_cc": 120
   },
-
   "sv_preservation": {
     "source": "literature",
     "citation": "John & Hauri 2000; Gilbert 2017",
     "max_side_svi_probability": 0.1
   },
-
   "hydrodissection_threshold": {
     "source": "literature",
     "citation": "Patel 2012; Kowalczyk 2011 peri-NVB dissection",
     "posterolateral_ece_min": 0.15,
     "not_applicable_when": "frank EPE on imaging, or a planned grade-3 wide excision"
   },
-
   "functional_outcome_model": {
     "source": "provisional",
     "citation": "COMPASS RARP functional-outcome working nomogram (Mount Sinai; ported from COMPASS_final.html); recovery-trajectory shape after Ficarra 2012 and Tewari 2012 systematic reviews. Not yet a formally published fitted model."
   },
-
   "plan_functional_deltas_pp": {
     "source": "literature",
     "citation": "Rosenberg 2020; Menon 2018; Ma 2016; Patel 2012. Inflammation penalties are expert priors.",
-    "hood_bilateral": { "contEarly": 12, "cont": 4, "pot": 2 },
-    "hood_unilateral": { "contEarly": 6, "cont": 2, "pot": 1 },
-    "bladder_neck_preservation": { "contEarly": 6, "cont": 3, "pot": 0 },
-    "hydrodissection": { "pot": 4 },
-    "sv_non_preservation_per_side": { "pot": -3 },
-    "inflammation_moderate": { "pot": -4, "cont": -2, "contEarly": -3 },
-    "inflammation_high": { "pot": -10, "cont": -5, "contEarly": -8 }
+    "hood_bilateral": {
+      "contEarly": 12,
+      "cont": 4,
+      "pot": 2
+    },
+    "hood_unilateral": {
+      "contEarly": 6,
+      "cont": 2,
+      "pot": 1
+    },
+    "bladder_neck_preservation": {
+      "contEarly": 6,
+      "cont": 3,
+      "pot": 0
+    },
+    "hydrodissection": {
+      "pot": 4
+    },
+    "sv_non_preservation_per_side": {
+      "pot": -3
+    },
+    "inflammation_moderate": {
+      "pot": -4,
+      "cont": -2,
+      "contEarly": -3
+    },
+    "inflammation_high": {
+      "pot": -10,
+      "cont": -5,
+      "contEarly": -8
+    }
   },
-
   "healer_threshold": {
     "source": "provisional",
     "citation": "modeled potency ≥ 50% (PDE5-assisted) = functional recovery; to be calibrated against serial SHIM/EHS follow-up",
     "potency_probability_pct": 50,
-    "buckets": { "super": "<=3 mo", "healer": "<=12 mo", "delayed": "18 mo", "non_recovery": "never" }
+    "buckets": {
+      "super": "<=3 mo",
+      "healer": "<=12 mo",
+      "delayed": "18 mo",
+      "non_recovery": "never"
+    }
   },
-
   "nsg_outcome_data": {
     "source": "institutional",
     "citation": "Mount Sinai 5,003-side RP database — PSM rate and BCR rate (margin- vs margin+) by NS grade and zone"
   },
-
   "bcr_hazard": {
     "source": "literature",
     "citation": "Han 2003; Freedland 2005 recurrence-timing series",
     "fraction_of_eventual_bcr_by_1y": 0.35,
     "fraction_of_eventual_bcr_by_2_3y": 0.7
   },
-
   "psm_plan_modulation": {
     "source": "provisional",
     "citation": "directional expert-prior adjustments to the NS-grade PSM rate",
-    "hydrodissection": -0.03, "inflammation_moderate": 0.02, "inflammation_high": 0.05
+    "hydrodissection": -0.03,
+    "inflammation_moderate": 0.02,
+    "inflammation_high": 0.05
   },
-
   "modifiable_bcr": {
     "source": "literature",
     "citation": "Cao & Ma 2011 meta-analysis (obesity → BCR); low-confidence",
-    "bmi_ge_30": 0.03, "bmi_ge_35": 0.06
+    "bmi_ge_30": 0.03,
+    "bmi_ge_35": 0.06
+  },
+  "modifiable_factor_deltas_pp": {
+    "_note": "Per-factor grounding for the MF table in src/lib/compass/functionalOutcomes.ts. Values mirror the runtime table; the TypeScript is the source of truth and src/test/surgicalPlanning.test.ts fails if the two drift.",
+    "age_and_shim": {
+      "source": "literature",
+      "citation": "Briganti A, Gallina A, Suardi N, et al. J Sex Med. 2010;7(7):2521-31 (N=435): age, preoperative IIEF and Charlson comorbidity index stratify erectile-function recovery; the age and SHIM multipliers reproduce that structure.",
+      "age_multiplier": {
+        "le_50": 1.1,
+        "70_plus": 0.85
+      },
+      "shim_multiplier": {
+        "ge_21": 1.0,
+        "lt_12": 0.7
+      }
+    },
+    "obesity": {
+      "source": "literature",
+      "citation": "Wei Y, Wu YP, Lin MY, et al. Biomed Res Int. 2018;2018:8279523: obesity raised incontinence at 12 mo after RARP (OR 2.43, 95% CI 1.21-4.88) and 24 mo (OR 2.00, 1.57-2.56); RARP series report 88% vs 85% continence at 12 mo and 56% vs 49% erectile function at 36 mo.",
+      "bmi_ge_30": {
+        "pot": -8,
+        "cont": -5
+      },
+      "bmi_25_to_30": {
+        "pot": -3,
+        "cont": -2
+      }
+    },
+    "pelvic_floor_training": {
+      "source": "provisional",
+      "citation": "Geng E, Yin S, Yang Y, et al. Int Braz J Urol. 2023;49(4):441-451 (15 RCTs, N=2,178): incontinence OR 0.26 at 1 mo, 0.30 at 3 mo, 0.20 at 6 mo, 0.85 (0.48-1.51, P=0.58) at 12 mo. Yu K, Bu F, Jian T, et al. Front Oncol. 2024;13:1307434 (42 RCTs, N=4,256): no significant long-term differences. Filocamo MT et al. Eur Urol. 2005;48(5):734-8: 96% vs 65% continent at 6 mo, 89% vs 67% pad-free at 12 mo. Manassero F et al. Neurourol Urodyn. 2007;26(7):985-9: 60% vs 40% at 6 mo. Johnson EE et al. Cochrane Database Syst Rev. 2023;(4):CD014799 grades the evidence low.",
+      "intensive": {
+        "pot": 6,
+        "cont": 10
+      }
+    },
+    "physical_activity": {
+      "source": "literature",
+      "citation": "Gerbild H, Larsen CM, Graugaard C, Areskoug Josefsson K. Sex Med. 2018;6(2):75-89: ~160 min/week moderate aerobic activity over 6 months improved IIEF in men with ED from inactivity, obesity, hypertension, metabolic syndrome or CVD. General-ED population, not post-RP.",
+      "active": {
+        "pot": 4,
+        "cont": 3
+      }
+    },
+    "pde5_regimen": {
+      "source": "literature",
+      "citation": "Montorsi F, Brock G, Stolzenburg JU, et al. Eur Urol. 2014;65(3):587-96 (REACTT): tadalafil 5 mg once daily beat placebo on drug-assisted erectile function (IIEF-EF P=0.016; SEP-3 P=0.019) and penile length loss (4.1 mm, 0.4-7.8, P=0.032); on-demand did not. Potency here is defined as PDE5-assisted (see healer_threshold).",
+      "daily": {
+        "pot": 8
+      },
+      "prn": {
+        "pot": 4
+      }
+    },
+    "smoking": {
+      "source": "literature",
+      "citation": "Visscher J, Bonevski B, O'Callaghan M. BJU Int. 2025;136(4):647-656 (N=2,676): ever-smokers 11 points lower on EPIC-26 sexual over 24 months (95% CI -15.0 to -7.0), urinary similar. Visscher et al. Prostate Cancer Prostatic Dis. 2024 (9 studies): erectile function OR 0.73 (0.56-0.95), incontinence OR 1.20 (0.75-1.91, ns), cessation +6.6 EPIC-26 points (P=0.03). Zhang C et al. Urology. 2025;207:155-161 (PIE, N=286): worse sexual recovery at 5 wk, 6 mo, 12 mo (P=0.002). The continence term is not supported by any of the three and is retained on clinical judgement.",
+      "current": {
+        "pot": -8,
+        "cont": -2
+      },
+      "former": {
+        "pot": -2,
+        "cont": 0
+      }
+    },
+    "alcohol": {
+      "source": "literature",
+      "citation": "Applies to dependence-level intake, not the >21 drinks/week band used in population epidemiology. Arackal BS, Benegal V. Indian J Psychiatry. 2007;49(2):109-112 (N=100): 72% with a sexual dysfunction, 33.3% erectile dysfunction, dose-response F=10.54 P=0.002; mechanisms are alcoholic peripheral neuropathy, gonadotropin suppression and reduced NO-mediated vasodilation. Continence term rests on vasopressin suppression / diuresis and bladder irritation - Bradley CS, Erickson BA, Messersmith EE, et al. J Urol. 2017;198(5):1010-20 (LURN, 110 articles), evidence graded low. At lower intake no penalty is measurable: Wang X et al. Int J Impot Res. 2018 (24 studies, N=154,295) OR 0.99 (0.80-1.22) above 21 drinks/week.",
+      "heavy": {
+        "pot": -10,
+        "cont": -2
+      },
+      "none": {
+        "pot": 2,
+        "cont": 0
+      }
+    },
+    "diet": {
+      "source": "provisional",
+      "citation": "Bauer SR, Breyer BN, Stampfer MJ, et al. JAMA Netw Open. 2020;3(11):e2021701 (N=21,469): AHEI-2010 Q5 vs Q1 HR 0.78 (0.63-0.97) under 60 and 0.78 (0.69-0.87) at 60-69 for incident ED; red/processed meat top quintile HR 1.17 (1.09-1.25). Incident ED in the general population, not post-RP recovery - the pp spread is a conservative translation.",
+      "favorable": {
+        "pot": 3
+      },
+      "high_saturated_fat": {
+        "pot": -3
+      }
+    },
+    "comorbidities": {
+      "source": "literature",
+      "citation": "Rabbani F, Schiff J, Piecuch M, et al. J Urol. 2009;181(4):1817-22 (N=1,110): age, absence of diabetes and neurovascular-bundle preservation were the independent predictors of preserved erectile function. Comorbidity burden also enters the Briganti stratification via the Charlson index. The split across the three conditions is an expert ordering, not a fitted decomposition.",
+      "dm": {
+        "pot": -8,
+        "cont": -3
+      },
+      "htn": {
+        "pot": -3,
+        "cont": -1
+      },
+      "cad": {
+        "pot": -5,
+        "cont": -1
+      }
+    },
+    "baseline_voiding_symptoms": {
+      "source": "literature",
+      "citation": "Kimura N, Yamada Y, Hakozaki Y, et al. J Robot Surg. 2026;20:198 (N=243, median 65.5 mo): preoperative IPSS storage subscore above 7 was independently associated with lower odds of pad-free status (HR 0.50, 95% CI 0.32-0.78) and 1 pad/day (HR 0.60, 0.41-0.87), the only factor significant for both. The ladder above the first cut is the nomogram's own banding.",
+      "ipss_thresholds": [
+        7,
+        14,
+        19
+      ],
+      "cont_by_band": [
+        0,
+        -3,
+        -6,
+        -10
+      ]
+    },
+    "band_definitions": {
+      "source": "literature",
+      "citation": "Alcohol: 'moderate' = up to 2 drinks/day for men (Dietary Guidelines for Americans 2020-2025); 'heavy' = more than 4 on any day or more than 14 per week (NIAAA). Activity: Bull FC, Al-Ansari SS, Biddle S, et al. Br J Sports Med. 2020;54(24):1451-1462 (WHO 2020) - 150-300 min/week moderate or 75-150 vigorous plus strengthening on 2+ days; 'moderate' meets it, 'active' exceeds it.",
+      "alcohol": {
+        "moderate": "<=2 drinks/day",
+        "heavy": ">4/day or >14/week"
+      },
+      "exercise": {
+        "light": "<150 min/wk",
+        "moderate": "150-300 min/wk",
+        "active": ">300 min/wk"
+      }
+    }
   }
 }

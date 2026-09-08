@@ -101,6 +101,7 @@ export function OverviewPanel({ tab }: { tab: DesktopTab }) {
     smoking: toSmoking(S.smoking),
     pde5: toPde5(S.pde5),
     alcohol: (S.alcohol || "moderate") as AlcoholLevel,
+    diet: toDiet(S.diet),
     dm: S.dm, htn: S.htn, cad: S.cad,
     plan: {
       hood: plan.hood.value,

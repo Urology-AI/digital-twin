@@ -163,7 +163,20 @@ function InfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                 ))}
               </tbody>
             </table>
-            <RefLinks tags={["Functional-outcome nomogram", "Plan functional deltas"]} className="mt-2" />
+            <RefLinks tags={[
+              "Functional-outcome nomogram",
+              "Plan functional deltas",
+              "Modifiable factor — age & baseline erectile function",
+              "Modifiable factor — obesity",
+              "Modifiable factor — pelvic floor muscle training",
+              "Modifiable factor — physical activity",
+              "Modifiable factor — PDE5 inhibitor regimen",
+              "Modifiable factor — smoking (functional recovery)",
+              "Modifiable factor — alcohol",
+              "Modifiable factor — comorbidities (functional recovery)",
+              "Modifiable factor — baseline voiding symptoms (IPSS)",
+              "Diet → erectile-function recovery",
+            ]} className="mt-2" />
           </section>
 
           <section>
@@ -193,6 +206,8 @@ function InfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                   ["Diabetes", "−8 pp", "−3 pp"],
                   ["Current smoker", "−8 pp", "−2 pp"],
                   ["Heavy alcohol", "−10 pp", "−2 pp"],
+                  ["Diet — lean protein & healthy fats", "+3 pp", "—"],
+                  ["Diet — high red meat / sat. fat", "−3 pp", "—"],
                   ["High IPSS (>19)", "—", "−10 pp"],
                 ].map(([f, p, c]) => (
                   <tr key={f} className="border-b border-border/40">
@@ -326,6 +341,7 @@ export function FunctionalOutcomesPanel() {
     smoking: toSmokingStatus(S.smoking),
     pde5: toPde5Regimen(S.pde5),
     alcohol: (S.alcohol || "moderate") as AlcoholLevel,
+    diet: toDietPattern(S.diet ?? "average"),
     dm: S.dm, htn: S.htn, cad: S.cad,
   };
 
@@ -502,7 +518,7 @@ export function FunctionalOutcomesPanel() {
         bio={{
           age: fnInputs.age, bmi: fnInputs.bmi, smoking: fnInputs.smoking,
           exercise: fnInputs.exercise, alcohol: fnInputs.alcohol,
-          diet: toDietPattern(S?.diet ?? "average"),
+          diet: fnInputs.diet,
           dm: fnInputs.dm, htn: fnInputs.htn, cad: fnInputs.cad,
         }}
       />
