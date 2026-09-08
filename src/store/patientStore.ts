@@ -304,6 +304,7 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       if (patch.exercise !== undefined) record.patient.exercise = patch.exercise;
       if (patch.pfmt !== undefined) record.patient.pfmt = patch.pfmt;
       if (patch.alcohol !== undefined) record.patient.alcohol = patch.alcohol;
+      if (patch.diet !== undefined) record.patient.diet = patch.diet;
       if (patch.pde5 !== undefined) {
         record.patient.pde5_plan = patch.pde5;
         record.patient.pde5 = patch.pde5 !== "none";
@@ -376,6 +377,16 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
         H.intraop_inflammation_l = patch.intraop_inflammation_l || null;
       if (patch.intraop_inflammation_r !== undefined)
         H.intraop_inflammation_r = patch.intraop_inflammation_r || null;
+      const hNumSet: (keyof NonNullable<Prostate3DInputV1["history"]>)[] = [
+        "mri_capsule_interface_l", "mri_capsule_interface_r",
+        "mri_nvb_plane_l", "mri_nvb_plane_r",
+        "mri_post_treatment_distortion_l", "mri_post_treatment_distortion_r",
+        "mri_nonmass_inflammatory_signal_l", "mri_nonmass_inflammatory_signal_r",
+      ];
+      for (const k of hNumSet) {
+        const v = (patch as Record<string, number | undefined>)[k];
+        if (v !== undefined) (H as Record<string, unknown>)[k] = v || null;
+      }
       // ── Surgeon's operative plan ─────────────────────────────────────────
       const PL = (record.plan ??= {});
       if (patch.plan_ns_override_l !== undefined) PL.ns_override_l = patch.plan_ns_override_l;

@@ -25,6 +25,13 @@ import {
 } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { NSG_DATA, STATION_FP } from "@/lib/compass/nsgOutcomes";
+import { EvidenceInfo } from "@/components/EvidenceInfo";
+import {
+  BCR_MODEL_DEFINITION,
+  CORE_MODELS_PROVENANCE,
+  LNI_MODEL_DEFINITION,
+  NS_BASE_MODEL,
+} from "@/lib/compass/planningEvidence";
 import { cn } from "@/lib/utils";
 
 function riskCls(v: number) {
@@ -183,8 +190,12 @@ export function PredictionPanel() {
         <CardHeader className="border-b border-border/50 bg-gradient-to-br from-muted/40 to-transparent pb-3 pt-3 dark:from-muted/25 sm:pb-4 sm:pt-4">
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0">
-              <CardTitle className="text-sm font-semibold text-foreground sm:text-xl">
+              <CardTitle className="flex items-center gap-1.5 text-sm font-semibold text-foreground sm:text-xl">
                 COMPASS predictions
+                <EvidenceInfo
+                  entries={[CORE_MODELS_PROVENANCE, BCR_MODEL_DEFINITION, LNI_MODEL_DEFINITION]}
+                  title="COMPASS predictions"
+                />
               </CardTitle>
               <CardDescription className="hidden sm:block">
                 Preoperative outcome predictions at time of radical prostatectomy.
@@ -246,7 +257,10 @@ export function PredictionPanel() {
 
             {/* Left: Nerve Sparing 5-zone */}
             <div data-tutorial="ns-grades">
-              <div className="mb-2 text-sm font-semibold uppercase tracking-wide text-primary">Nerve sparing — 5-zone</div>
+              <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-primary">
+                Nerve sparing — 5-zone
+                <EvidenceInfo entries={[NS_BASE_MODEL]} title="Nerve sparing — 5-zone" />
+              </div>
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-border text-left text-muted-foreground">

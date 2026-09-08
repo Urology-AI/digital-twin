@@ -50,6 +50,47 @@ export const SOURCE_LABEL: Record<EvidenceSource, string> = {
 };
 
 /* ================================================================== */
+/* Core COMPASS prediction models — provenance                         */
+/* (ECE, SVI, Upgrade, PSM, BCR, LNI — Predictions tab). These are the */
+/* six fitted models MODEL_CARD.md §9.6 says the planning/inflammation */
+/* modules never modify; the entries below only document where their  */
+/* numbers come from, not a change to any of their coefficients.      */
+/* ================================================================== */
+
+export const CORE_MODELS_PROVENANCE = ev(
+  { cohortN: 5352, span: "Jan 2015 – Jan 2026" },
+  "institutional",
+  "Core COMPASS models (ECE, SVI, Upgrade, PSM)",
+  "Fitted on the Mount Sinai RARP cohort — 5,352 consecutive patients, " +
+    "January 2015 to January 2026 (MODEL_CARD.md §2-3). Model-level Ns and " +
+    "cross-validated AUCs are reported per outcome in MODEL_CARD.md §2. The " +
+    "peer-reviewed manuscript describing COMPASS is in preparation; until " +
+    "publication this is institutional evidence, not an external citation.",
+);
+
+export const BCR_MODEL_DEFINITION = ev(
+  { definition: "PSA ≥0.2 ng/mL on two consecutive measures" },
+  "literature",
+  "BCR outcome definition & natural history",
+  "Biochemical recurrence defined per the AUA/ASTRO guideline on clinically " +
+    "localized prostate cancer (amended 2026); event-timing consistent with " +
+    "post-prostatectomy recurrence series (Han M et al., J Urol 2003; " +
+    "Freedland SJ et al., JAMA 2005). The BCR risk model itself is fitted on " +
+    "the Mount Sinai cohort (see Core COMPASS models entry above).",
+);
+
+export const LNI_MODEL_DEFINITION = ev(
+  { template: "extended PLND: obturator + external + internal iliac + common iliac" },
+  "literature",
+  "LNI outcome definition & PSMA nodal positivity",
+  "Lymph-node invasion scored against an extended pelvic lymph-node-" +
+    "dissection template. PSMA nodal positivity as the strongest single " +
+    "predictor is consistent with proPSMA (Hofman MS et al., Lancet 2020). " +
+    "The LNI risk model itself is fitted on the Mount Sinai cohort (N=663 " +
+    "PSMA-imaged patients with extended PLND; see Core COMPASS models entry).",
+);
+
+/* ================================================================== */
 /* Nerve-sparing grade model                                           */
 /* ================================================================== */
 
@@ -221,6 +262,93 @@ export const INFLAMMATION_CUTS = ev(
   "Inflammation-risk tier cutpoints",
   "Provisional tertile-style cutpoints; to be calibrated against whole-mount " +
     "periprostatic inflammation grade and an intra-op difficulty score.",
+);
+
+/* ================================================================== */
+/* PIPS-H — side-specific plane hostility                              */
+/* ================================================================== */
+
+/**
+ * Side-specific MRI "plane phenotype" weights (additive logit points, added
+ * on top of the shared `INFLAMMATION_WEIGHTS` history/systemic terms) — the
+ * piece the whole-patient `inflammationRisk.ts` score cannot see, per the
+ * PIPS framework's core argument that plane hostility must be assessed per
+ * side, not per patient.
+ */
+export const PLANE_HOSTILITY_MRI_WEIGHTS = ev(
+  {
+    capsuleInterfacePerLevel: 0.35, // 0 sharp .. 3 effaced
+    nvbPlanePerLevel: 0.5, // 0 visible .. 2 obliterated/tethered
+    postTreatmentDistortionPerLevel: 0.4, // 0 none .. 2 reaches posterolateral/NVB
+    nonmassInflammatorySignalPerLevel: 0.35, // 0 none .. 2 diffuse
+  },
+  "provisional",
+  "PIPS-H MRI plane-phenotype weights",
+  "Candidate MRI fibrosis/plane features — capsule-fat interface loss, NVB " +
+    "corridor fibrosis/tethering, post-treatment distortion reaching the " +
+    "posterolateral capsule, non-mass-like inflammatory signal — from the PIPS " +
+    "development framework's MRI-phenotype domain (periprostatic-inflammation " +
+    "and plane-score research protocol, 2026), itself built on periprostatic " +
+    "adipose inflammation associated with high-grade disease (Gucalp A et al., " +
+    "Prostate Cancer Prostatic Dis 2017) and periprostatic-fat fibrosis as a " +
+    "cancer-aggressiveness marker (Jin Y et al., Cancers 2026). Expert priors " +
+    "pending a video-validated Plane Difficulty Index and whole-mount fitting.",
+);
+
+/** PIPS-style 4-tier hostility cutpoints (probability of a difficult plane). */
+export const PLANE_HOSTILITY_CUTS = ev(
+  { intermediate: 0.25, high: 0.5, veryHigh: 0.75 },
+  "provisional",
+  "PIPS-H tier cutpoints",
+  "Low < 25%, intermediate 25–50%, high 50–75%, very high ≥ 75% — the tier " +
+    "bands used in the PIPS v0.1 research-instrument prototype; provisional " +
+    "pending fitting against a video-validated Plane Difficulty Index.",
+);
+
+/**
+ * PIPS-style decision matrix: combines PIPS-EPE (oncologic — already the
+ * fitted COMPASS side-specific ECE model, `eceL`/`eceR`) with PIPS-H (plane
+ * hostility, above) ONLY at this final lookup step. This replaces
+ * `NS_GRADE_ESCALATION`'s "high inflammation always raises the grade by one
+ * step" rule: escalation now happens only when EPE itself is elevated, and a
+ * hostile-but-oncologically-low-risk side gets an operative *protocol* note
+ * instead of a wider excision.
+ */
+export const PIPS_EPE_CUTS = ev(
+  { intermediate: 0.15, high: 0.35 },
+  "literature",
+  "PIPS-EPE tier cutpoints",
+  "Low < 15%, intermediate 15–35%, high > 35% ipsilateral EPE probability — " +
+    "matches the tiering used by the side-specific MRI/microultrasound EPE " +
+    "nomograms this module is meant to sit alongside (Soeterik TFW et al., " +
+    "simple PSA/biopsy/MRI decision rule, Int Urol Nephrol 2019; Pedraza AM, " +
+    "Parekh S, Joshi H et al., side-specific microultrasound-based nomogram, " +
+    "Eur Urol Open Sci 2023; Fasulo V et al., World J Urol 2022).",
+);
+
+export const PIPS_DECISION_MATRIX = ev(
+  {
+    // code: recommended plane action; escalates only when EPE itself is high.
+    "low-low": "maximal",
+    "low-high": "preserve-hostile-protocol",
+    "high-low": "wider-plane",
+    "high-high": "wider-plane",
+    "intermediate-any": "graded-frozen-section",
+  },
+  "literature",
+  "PIPS EPE x hostility decision matrix",
+  "Never dissect through suspected EPE to preserve erectile function, and " +
+    "never let fibrosis alone trigger wide excision when EPE probability is " +
+    "low — the two questions (oncologic safety vs. technical difficulty) are " +
+    "combined only at this final step, not blended into one score. Frozen-" +
+    "section-guided grading at intermediate EPE is the highest-value setting " +
+    "for NeuroSAFE (NeuroSAFE PROOF Collaborative Group, randomised phase 3 " +
+    "trial of NeuroSAFE-guided vs. standard RARP, Lancet Oncol 2025) and for " +
+    "side-specific frozen sections generally. Periprostatic-plane risk factors " +
+    "— prior BPH surgery (Creta M et al., systematic review, Prostate Cancer " +
+    "Prostatic Dis 2024), post-biopsy prostatitis (Türk H et al., Int Braz J " +
+    "Urol 2018), and prior focal/ablative therapy (systematic review, salvage " +
+    "RP after focal ablative therapy, Cancers 2023) — feed PIPS-H, never PIPS-EPE.",
 );
 
 /* ================================================================== */
@@ -422,7 +550,33 @@ export const BIOLOGICAL_AGE_SMOKING = ev(
     "continuing smokers lose about 10 years of life expectancy, and cessation " +
     "recovers most of it. Held at +6 rather than +10 because the potency and " +
     "continence models already charge smoking directly — this figure is the " +
-    "counselling equivalent, not the epidemiological total.",
+    "counselling equivalent, not the epidemiological total. Disease-specific " +
+    "reinforcement: in a metastatic prostate cancer cohort, current smoking was " +
+    "independently associated with worse overall survival (HR 1.27, 95% CI " +
+    "1.01-1.59) with a dose-response by pack-years (HR 1.006/pack-yr, 95% CI " +
+    "1.002-1.011) — Choi C, Labriola M, et al., Prostate Cancer Prostatic Dis " +
+    "2026 (PROMISE registry, N=2353). That cohort is metastatic, not this app's " +
+    "localized pre-prostatectomy population, so it reinforces direction rather " +
+    "than resetting the magnitude above.",
+);
+
+/** postdiagnosis dietary fat pattern — general-mortality counseling only; the source study found no association with prostate-cancer-specific mortality. */
+export const BIOLOGICAL_AGE_DIET = ev(
+  { favorable: -1, average: 0, high_saturated_fat: 1.5 },
+  "literature",
+  "Biological age — diet years",
+  "Zhang Y, Shanahan MR, Guard HE, et al.; Mucci LA (senior/corresponding). " +
+    "Dietary Fat Intake and Mortality Among Patients With Nonmetastatic " +
+    "Prostate Cancer. JAMA Netw Open. 2026;9(9):e2630693 (Health Professionals " +
+    "Follow-Up Study, N=4884, median 12.8-yr follow-up). Highest vs. lowest " +
+    "quintile of postdiagnosis saturated-fat intake: all-cause mortality HR " +
+    "1.24 (95% CI 1.05-1.47), cardiovascular HR 1.42 (1.02-1.98). Replacing 10% " +
+    "of calories from animal fat with plant-based fat (HR 0.84, 0.76-0.93) or " +
+    "5% of calories from saturated fat with monounsaturated fat (HR 0.80, " +
+    "0.70-0.91) was associated with lower all-cause mortality. No association " +
+    "with prostate-cancer-specific mortality — this is a general-health/" +
+    "counseling factor, not an oncologic or functional-recovery one, and is " +
+    "not wired into the potency/continence or BCR models for that reason.",
 );
 
 export const BIOLOGICAL_AGE_EXERCISE = ev(

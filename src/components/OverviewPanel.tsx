@@ -11,7 +11,7 @@ import {
   type PfmtLevel,
   type SmokingStatus,
 } from "@/lib/compass/functionalOutcomes";
-import { computeBiologicalAge } from "@/lib/compass/biologicalAge";
+import { computeBiologicalAge, type DietPattern } from "@/lib/compass/biologicalAge";
 import { cn } from "@/lib/utils";
 
 /**
@@ -63,6 +63,8 @@ const toPfmt = (v: string): PfmtLevel =>
   (["none", "basic", "moderate", "intensive"] as string[]).includes(v) ? (v as PfmtLevel) : "basic";
 const toPde5 = (v: string): Pde5Regimen =>
   (["none", "prn", "daily"] as string[]).includes(v) ? (v as Pde5Regimen) : "prn";
+const toDiet = (v: string): DietPattern =>
+  (["favorable", "average", "high_saturated_fat"] as string[]).includes(v) ? (v as DietPattern) : "average";
 
 export function OverviewPanel({ tab }: { tab: DesktopTab }) {
   const predictions = usePatientStore((s) => s.predictions);
@@ -117,6 +119,7 @@ export function OverviewPanel({ tab }: { tab: DesktopTab }) {
         smoking: toSmoking(S.smoking),
         exercise: toExercise(S.exercise),
         alcohol: (S.alcohol || "moderate") as AlcoholLevel,
+        diet: toDiet(S.diet),
         dm: S.dm, htn: S.htn, cad: S.cad,
       })
     : null;

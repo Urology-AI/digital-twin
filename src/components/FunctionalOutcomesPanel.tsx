@@ -20,6 +20,7 @@ import { RecoveryLineChart } from "@/components/outcomes/RecoveryLineChart";
 import { HealerBands } from "@/components/outcomes/HealerBands";
 import { FactorContributionTable } from "@/components/outcomes/FactorContributionTable";
 import { BiologicalAgeCard } from "@/components/outcomes/BiologicalAgeCard";
+import type { DietPattern } from "@/lib/compass/biologicalAge";
 
 /** Approximate 90% CI on logit scale (SE ≈ 0.58 logit units, z = 1.64) */
 function computeCI(pct: number): { lo: number; hi: number } {
@@ -260,6 +261,9 @@ function toExerciseLevel(v: string): ExerciseLevel {
 function toPfmtLevel(v: string): PfmtLevel {
   return (["none","basic","moderate","intensive"] as string[]).includes(v) ? v as PfmtLevel : "basic";
 }
+function toDietPattern(v: string): DietPattern {
+  return (["favorable","average","high_saturated_fat"] as string[]).includes(v) ? v as DietPattern : "average";
+}
 function toPde5Regimen(v: string): Pde5Regimen {
   return (["none","prn","daily"] as string[]).includes(v) ? v as Pde5Regimen : "prn";
 }
@@ -498,6 +502,7 @@ export function FunctionalOutcomesPanel() {
         bio={{
           age: fnInputs.age, bmi: fnInputs.bmi, smoking: fnInputs.smoking,
           exercise: fnInputs.exercise, alcohol: fnInputs.alcohol,
+          diet: toDietPattern(S?.diet ?? "average"),
           dm: fnInputs.dm, htn: fnInputs.htn, cad: fnInputs.cad,
         }}
       />

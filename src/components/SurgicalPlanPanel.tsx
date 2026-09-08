@@ -250,8 +250,61 @@ function Segmented<T extends string>({
 /* side card                                                          */
 /* ------------------------------------------------------------------ */
 
+function PipsStat({
+  label,
+  sublabel,
+  pct: value,
+  meta,
+}: {
+  label: string;
+  sublabel: string;
+  pct: number;
+  meta: { label: string; tone: "emerald" | "amber" | "red" };
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-lg border p-2",
+        meta.tone === "emerald" && "border-emerald-500/25 bg-emerald-500/[0.05]",
+        meta.tone === "amber" && "border-amber-500/25 bg-amber-500/[0.05]",
+        meta.tone === "red" && "border-red-500/25 bg-red-500/[0.05]",
+      )}
+    >
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="mt-0.5 flex items-baseline gap-1.5">
+        <span
+          className={cn(
+            "text-lg font-bold",
+            meta.tone === "emerald" && "text-emerald-600 dark:text-emerald-400",
+            meta.tone === "amber" && "text-amber-600 dark:text-amber-400",
+            meta.tone === "red" && "text-red-600 dark:text-red-400",
+          )}
+        >
+          {pct(value)}
+        </span>
+        <span className="text-[11px] font-medium text-muted-foreground">{meta.label}</span>
+      </div>
+      <div className="mt-0.5 text-[10.5px] leading-tight text-muted-foreground">{sublabel}</div>
+    </div>
+  );
+}
+
+const HOSTILITY_META: Record<SidePlan["hostilityTier"], { label: string; tone: "emerald" | "amber" | "red" }> = {
+  low: { label: "Low", tone: "emerald" },
+  intermediate: { label: "Intermediate", tone: "amber" },
+  high: { label: "High", tone: "red" },
+  "very-high": { label: "Very high", tone: "red" },
+};
+
+const EPE_TIER_META: Record<SidePlan["epeTier"], { label: string; tone: "emerald" | "amber" | "red" }> = {
+  low: { label: "Low", tone: "emerald" },
+  intermediate: { label: "Intermediate", tone: "amber" },
+  high: { label: "High", tone: "red" },
+};
+
 function SideCard({
   plan,
+  sideEce,
   hydroOverride,
   svOverride,
   onOverride,
@@ -259,6 +312,7 @@ function SideCard({
   onSv,
 }: {
   plan: SidePlan;
+  sideEce: number;
   hydroOverride: boolean | null;
   svOverride: boolean | null;
   onOverride: (g: number | null) => void;
@@ -324,6 +378,41 @@ function SideCard({
               "Fascial-plane nomenclature",
               "Fascial-plane nomenclature & athermal technique",
             ]}
+            className="mt-1.5"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-xs font-semibold text-foreground">PIPS — oncologic risk vs. plane hostility</span>
+          </div>
+          <p className="mb-1.5 text-[11px] leading-snug text-muted-foreground">
+            Two independent questions, combined only in the recommendation above — never blended into one number.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <PipsStat
+              label="PIPS-EPE"
+              sublabel="can this be preserved oncologically?"
+              pct={sideEce}
+              meta={EPE_TIER_META[plan.epeTier]}
+            />
+            <PipsStat
+              label="PIPS-H"
+              sublabel="how hostile is the plane?"
+              pct={plan.hostilityScore}
+              meta={HOSTILITY_META[plan.hostilityTier]}
+            />
+          </div>
+          {plan.hostileProtocol && (
+            <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-2 text-[11px] leading-snug text-amber-700 dark:text-amber-300/90">
+              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              Hostile-plane protocol: early exposure, athermal low-traction dissection, alternate direction,
+              hydrodissection, and consent for an intraoperative plane change — fibrosis alone does not justify a
+              wider excision here.
+            </div>
+          )}
+          <RefLinks
+            tags={["PIPS-EPE tier cutpoints", "PIPS-H MRI plane-phenotype weights", "PIPS EPE x hostility decision matrix"]}
             className="mt-1.5"
           />
         </div>
@@ -608,6 +697,7 @@ export function SurgicalPlanPanel() {
       <div className="grid gap-4 lg:grid-cols-2">
         <SideCard
           plan={plan.left}
+          sideEce={predictions.eceL}
           hydroOverride={S.plan_hydrodissection_l}
           svOverride={S.plan_sv_preservation_l}
           onOverride={(g) => updateClinicalForm({ plan_ns_override_l: g })}
@@ -616,6 +706,7 @@ export function SurgicalPlanPanel() {
         />
         <SideCard
           plan={plan.right}
+          sideEce={predictions.eceR}
           hydroOverride={S.plan_hydrodissection_r}
           svOverride={S.plan_sv_preservation_r}
           onOverride={(g) => updateClinicalForm({ plan_ns_override_r: g })}

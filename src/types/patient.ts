@@ -58,6 +58,8 @@ export interface Prostate3DInputV1 {
     exercise?: string;
     pfmt?: string;
     alcohol?: string;
+    /** postdiagnosis dietary fat pattern — biological-age counseling only, see BIOLOGICAL_AGE_DIET */
+    diet?: string;
     pde5?: boolean;
     pde5_plan?: string;
   };
@@ -101,6 +103,19 @@ export interface Prostate3DInputV1 {
     /** intra-operative inflammation grade 0–3 (Kacie's data) — recorded, not predicted */
     intraop_inflammation_l?: number | null;
     intraop_inflammation_r?: number | null;
+    /**
+     * Side-specific MRI "plane phenotype" (PIPS-H) — distinct from the whole-
+     * gland `mri_periprostatic_inflammation` read above. 0 = normal at every
+     * item. Added in schema working-set version 5.
+     */
+    mri_capsule_interface_l?: number | null;
+    mri_capsule_interface_r?: number | null;
+    mri_nvb_plane_l?: number | null;
+    mri_nvb_plane_r?: number | null;
+    mri_post_treatment_distortion_l?: number | null;
+    mri_post_treatment_distortion_r?: number | null;
+    mri_nonmass_inflammatory_signal_l?: number | null;
+    mri_nonmass_inflammatory_signal_r?: number | null;
   };
   /**
    * Surgeon's editable operative plan. Persisted on the record so it round-trips
@@ -202,6 +217,7 @@ export interface ClinicalState {
   cad: boolean;
   statin: boolean;
   alcohol: string;
+  diet: string;
   leftMaxScore: number;
   rightMaxScore: number;
   mri_size: number;
@@ -248,6 +264,15 @@ export interface ClinicalState {
   mri_periprostatic_fat_stranding: boolean;
   intraop_inflammation_l: number;
   intraop_inflammation_r: number;
+  // Side-specific MRI plane phenotype (PIPS-H) — 0 = normal.
+  mri_capsule_interface_l: number;
+  mri_capsule_interface_r: number;
+  mri_nvb_plane_l: number;
+  mri_nvb_plane_r: number;
+  mri_post_treatment_distortion_l: number;
+  mri_post_treatment_distortion_r: number;
+  mri_nonmass_inflammatory_signal_l: number;
+  mri_nonmass_inflammatory_signal_r: number;
 
   // ── Surgeon's editable operative plan (null / "auto" = follow the model) ──
   plan_ns_override_l: number | null;
@@ -301,6 +326,7 @@ export function defaultClinicalState(): ClinicalState {
     cad: false,
     statin: false,
     alcohol: "moderate",
+    diet: "average",
     leftMaxScore: 0,
     rightMaxScore: 0,
     mri_size: 0,
@@ -346,6 +372,14 @@ export function defaultClinicalState(): ClinicalState {
     mri_periprostatic_fat_stranding: false,
     intraop_inflammation_l: 0,
     intraop_inflammation_r: 0,
+    mri_capsule_interface_l: 0,
+    mri_capsule_interface_r: 0,
+    mri_nvb_plane_l: 0,
+    mri_nvb_plane_r: 0,
+    mri_post_treatment_distortion_l: 0,
+    mri_post_treatment_distortion_r: 0,
+    mri_nonmass_inflammatory_signal_l: 0,
+    mri_nonmass_inflammatory_signal_r: 0,
 
     plan_ns_override_l: null,
     plan_ns_override_r: null,

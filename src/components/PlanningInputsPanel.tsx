@@ -250,7 +250,103 @@ export function PlanningInputsPanel() {
             <Toggle k="mri_periprostatic_fat_stranding" label="Fat stranding" />
           </div>
         </Group>
+
+        <Group title="MRI — plane phenotype, per side (PIPS-H)">
+          <p className="text-[11px] text-muted-foreground">
+            Side-specific — feeds the plane-hostility axis independently of the whole-gland read above.
+          </p>
+          <SidePhenotypeRow
+            label="Capsule–fat interface"
+            leftKey="mri_capsule_interface_l"
+            rightKey="mri_capsule_interface_r"
+            S={S}
+            onChange={updateClinicalForm}
+            options={[
+              { label: "Sharp", value: 0 },
+              { label: "Focal blur", value: 1 },
+              { label: "Blurred most", value: 2 },
+              { label: "Effaced", value: 3 },
+            ]}
+          />
+          <SidePhenotypeRow
+            label="NVB corridor plane"
+            leftKey="mri_nvb_plane_l"
+            rightKey="mri_nvb_plane_r"
+            S={S}
+            onChange={updateClinicalForm}
+            options={[
+              { label: "Visible", value: 0 },
+              { label: "Partial", value: 1 },
+              { label: "Obliterated", value: 2 },
+            ]}
+          />
+          <SidePhenotypeRow
+            label="Post-treatment distortion"
+            leftKey="mri_post_treatment_distortion_l"
+            rightKey="mri_post_treatment_distortion_r"
+            S={S}
+            onChange={updateClinicalForm}
+            options={[
+              { label: "None", value: 0 },
+              { label: "Remote", value: 1 },
+              { label: "Reaches NVB", value: 2 },
+            ]}
+          />
+          <SidePhenotypeRow
+            label="Non-mass inflammatory signal"
+            leftKey="mri_nonmass_inflammatory_signal_l"
+            rightKey="mri_nonmass_inflammatory_signal_r"
+            S={S}
+            onChange={updateClinicalForm}
+            options={[
+              { label: "None", value: 0 },
+              { label: "Focal", value: 1 },
+              { label: "Diffuse", value: 2 },
+            ]}
+          />
+        </Group>
       </CardContent>
     </Card>
+  );
+}
+
+/** One MRI plane-phenotype item, entered independently for the left and right side. */
+function SidePhenotypeRow({
+  label,
+  leftKey,
+  rightKey,
+  S,
+  onChange,
+  options,
+}: {
+  label: string;
+  leftKey: keyof ClinicalState;
+  rightKey: keyof ClinicalState;
+  S: ClinicalState;
+  onChange: (patch: Partial<ClinicalState>) => void;
+  options: { label: string; value: number }[];
+}) {
+  return (
+    <div className="space-y-1 pt-1">
+      <span className="text-xs font-semibold text-foreground">{label}</span>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Left</span>
+          <Seg<number>
+            value={Number(S[leftKey]) || 0}
+            onChange={(v) => onChange({ [leftKey]: v } as Partial<ClinicalState>)}
+            options={options}
+          />
+        </div>
+        <div className="space-y-1">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Right</span>
+          <Seg<number>
+            value={Number(S[rightKey]) || 0}
+            onChange={(v) => onChange({ [rightKey]: v } as Partial<ClinicalState>)}
+            options={options}
+          />
+        </div>
+      </div>
+    </div>
   );
 }

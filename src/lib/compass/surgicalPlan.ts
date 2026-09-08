@@ -12,12 +12,13 @@ import {
   BNP_DECISION,
   HOOD_DECISION,
   HYDRODISSECTION_THRESHOLD,
-  NS_GRADE_ESCALATION,
   NS_ZONE_THRESHOLDS,
   PLANE_TECHNIQUE,
   SV_PRESERVATION,
 } from "@/lib/compass/planningEvidence";
 import type { InflammationRisk } from "@/lib/compass/inflammationRisk";
+import { predictPlaneHostility } from "@/lib/compass/planeHostility";
+import { epeTier, planeDecisionMatrix } from "@/lib/compass/planeDecisionMatrix";
 import { clamp } from "@/lib/utils/math";
 import type { ClinicalState } from "@/types/patient";
 import type { NsSideDetail, PlanRec, SidePlan, SurgicalPlan } from "@/types/prediction";
@@ -49,15 +50,21 @@ function buildSide(
   nsDetail: NsSideDetail,
   sideSvi: number,
   psmaSvi: boolean,
-  infl: InflammationRisk,
+  sideEce: number,
 ): SidePlan {
   const override = side === "left" ? S.plan_ns_override_l : S.plan_ns_override_r;
   const modelGrade = nsDetail.nsGrade;
 
-  // Inflammation escalation: severe inflammation → one step less nerve-sparing.
-  const esc = NS_GRADE_ESCALATION.value;
-  const inflEscalated = infl.tier === "high" && esc.high_steps > 0 && modelGrade < 3;
-  const recommendedGrade = inflEscalated ? Math.min(3, modelGrade + esc.high_steps) : modelGrade;
+  // PIPS-style decision matrix: PIPS-EPE (sideEce, the fitted COMPASS side
+  // model) and PIPS-H (plane hostility, side-specific) are combined ONLY
+  // here — never blended into one score. Escalation toward a wider plane
+  // happens only when EPE itself is elevated; a hostile-but-EPE-low side
+  // gets a hostile-plane operative protocol instead of a wider excision.
+  const hostility = predictPlaneHostility(S, side);
+  const tier = epeTier(sideEce);
+  const decision = planeDecisionMatrix(tier, hostility.tier);
+  const inflEscalated = decision.escalate && modelGrade < 3;
+  const recommendedGrade = inflEscalated ? Math.min(3, modelGrade + 1) : modelGrade;
   let grade = recommendedGrade;
 
   const overridden = override != null && override !== recommendedGrade;
@@ -71,9 +78,11 @@ function buildSide(
   const reason = nsDetail.reason || `model NS grade ${modelGrade}`;
   let gradeRationale = reason;
   if (inflEscalated) {
-    gradeRationale = `${reason} · raised for severe inflammation`;
-  } else if (infl.tier === "moderate") {
-    gradeRationale = `${reason} · moderate inflammation flagged`;
+    gradeRationale = `${reason} · ${decision.rationale}`;
+  } else if (decision.hostileProtocol) {
+    gradeRationale = `${reason} · hostile-plane protocol (fibrosis, not EPE)`;
+  } else if (hostility.tier === "intermediate") {
+    gradeRationale = `${reason} · moderate plane hostility flagged`;
   }
 
   // Zone grades from raw zone ECE, shifted only by the inflammation escalation
@@ -139,6 +148,11 @@ function buildSide(
     hydrodissection,
     svPreservation,
     cautions,
+    epeTier: tier,
+    hostilityScore: hostility.score,
+    hostilityTier: hostility.tier,
+    hostileProtocol: decision.hostileProtocol,
+    decisionCode: decision.code,
   };
 }
 
@@ -149,10 +163,12 @@ export function buildSurgicalPlan(
   sviL: number,
   sviR: number,
   infl: InflammationRisk,
+  eceL: number,
+  eceR: number,
 ): SurgicalPlan {
   const psmaSvi = !!S.psma_svi && !!S.psma_avail;
-  const left = buildSide("left", S, nsDetailL, sviL, psmaSvi, infl);
-  const right = buildSide("right", S, nsDetailR, sviR, psmaSvi, infl);
+  const left = buildSide("left", S, nsDetailL, sviL, psmaSvi, eceL);
+  const right = buildSide("right", S, nsDetailR, sviR, psmaSvi, eceR);
 
   const wideSides = [left, right].filter((s) => s.nsGrade >= 3).length;
   const anteriorApexEce = Math.max(
