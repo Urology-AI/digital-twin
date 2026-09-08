@@ -246,6 +246,20 @@ export function clinicalStateFromRecord(
     S.mri_post_treatment_distortion_r = num(h.mri_post_treatment_distortion_r, S.mri_post_treatment_distortion_r);
     S.mri_nonmass_inflammatory_signal_l = num(h.mri_nonmass_inflammatory_signal_l, S.mri_nonmass_inflammatory_signal_l);
     S.mri_nonmass_inflammatory_signal_r = num(h.mri_nonmass_inflammatory_signal_r, S.mri_nonmass_inflammatory_signal_r);
+    S.mri_fat_stranding_l = num(h.mri_fat_stranding_l, S.mri_fat_stranding_l);
+    S.mri_fat_stranding_r = num(h.mri_fat_stranding_r, S.mri_fat_stranding_r);
+    S.prior_focal_ablation_l = num(h.prior_focal_ablation_l, S.prior_focal_ablation_l);
+    S.prior_focal_ablation_r = num(h.prior_focal_ablation_r, S.prior_focal_ablation_r);
+    if (h.prior_pelvic_surgery) S.prior_pelvic_surgery = h.prior_pelvic_surgery;
+    if (h.penile_prosthesis_reservoir) S.penile_prosthesis_reservoir = h.penile_prosthesis_reservoir;
+    S.catheter_prolonged_or_traumatic = !!h.catheter_prolonged_or_traumatic;
+    S.biopsy_recent_or_complicated = !!h.biopsy_recent_or_complicated;
+    if (h.crp !== null && h.crp !== undefined) S.crp = h.crp;
+    if (h.nlr !== null && h.nlr !== undefined) S.nlr = h.nlr;
+    S.flag_active_infection = !!h.flag_active_infection;
+    S.flag_imaging_discordant = !!h.flag_imaging_discordant;
+    S.flag_mri_artifact = !!h.flag_mri_artifact;
+    S.flag_key_data_missing = !!h.flag_key_data_missing;
   }
 
   const pl = P.plan;

@@ -116,6 +116,32 @@ export interface Prostate3DInputV1 {
     mri_post_treatment_distortion_r?: number | null;
     mri_nonmass_inflammatory_signal_l?: number | null;
     mri_nonmass_inflammatory_signal_r?: number | null;
+    /** side-specific fat stranding/fibrotic bands — 0 none, 1 mild, 2 marked. Added in schema working-set version 6 (PIPS-H gap closure). */
+    mri_fat_stranding_l?: number | null;
+    mri_fat_stranding_r?: number | null;
+    /** prior focal/whole-gland ablative therapy, this side — 0 none, 1 ipsilateral focal (IRE/laser/PDT), 2 ipsilateral/whole-gland (HIFU/cryo) */
+    prior_focal_ablation_l?: number | null;
+    prior_focal_ablation_r?: number | null;
+    /** prior bladder surgery, pelvic fracture fixation, urethroplasty, or rectal/LAR/APR surgery at Denonvilliers */
+    prior_pelvic_surgery?: "none" | "bladder_fracture_urethroplasty" | "rectal_denonvilliers";
+    /** penile prosthesis reservoir in Retzius space */
+    penile_prosthesis_reservoir?: "none" | "present" | "prior_infection_or_revision";
+    /** prolonged (>=4wk), traumatic, or infected catheterization */
+    catheter_prolonged_or_traumatic?: boolean;
+    /** transrectal biopsy with complication, or biopsy <6 weeks before surgery */
+    biopsy_recent_or_complicated?: boolean;
+    /** hs-CRP, mg/L */
+    crp?: number | null;
+    /** neutrophil-to-lymphocyte ratio */
+    nlr?: number | null;
+    /** hard-stop gate: active bacterial prostatitis, abscess, fistula, sepsis, or a positive culture with symptoms */
+    flag_active_infection?: boolean;
+    /** review gate: MRI/PSMA/biopsy/micro-US disagree on side or extent */
+    flag_imaging_discordant?: boolean;
+    /** confidence gate: MRI degraded by hip hardware or motion artifact */
+    flag_mri_artifact?: boolean;
+    /** confidence gate: no MRI plane read, no baseline IIEF, or prior operative reports unavailable */
+    flag_key_data_missing?: boolean;
   };
   /**
    * Surgeon's editable operative plan. Persisted on the record so it round-trips
@@ -273,6 +299,20 @@ export interface ClinicalState {
   mri_post_treatment_distortion_r: number;
   mri_nonmass_inflammatory_signal_l: number;
   mri_nonmass_inflammatory_signal_r: number;
+  mri_fat_stranding_l: number;
+  mri_fat_stranding_r: number;
+  prior_focal_ablation_l: number;
+  prior_focal_ablation_r: number;
+  prior_pelvic_surgery: "none" | "bladder_fracture_urethroplasty" | "rectal_denonvilliers";
+  penile_prosthesis_reservoir: "none" | "present" | "prior_infection_or_revision";
+  catheter_prolonged_or_traumatic: boolean;
+  biopsy_recent_or_complicated: boolean;
+  crp: number | null;
+  nlr: number | null;
+  flag_active_infection: boolean;
+  flag_imaging_discordant: boolean;
+  flag_mri_artifact: boolean;
+  flag_key_data_missing: boolean;
 
   // ── Surgeon's editable operative plan (null / "auto" = follow the model) ──
   plan_ns_override_l: number | null;
@@ -380,6 +420,20 @@ export function defaultClinicalState(): ClinicalState {
     mri_post_treatment_distortion_r: 0,
     mri_nonmass_inflammatory_signal_l: 0,
     mri_nonmass_inflammatory_signal_r: 0,
+    mri_fat_stranding_l: 0,
+    mri_fat_stranding_r: 0,
+    prior_focal_ablation_l: 0,
+    prior_focal_ablation_r: 0,
+    prior_pelvic_surgery: "none",
+    penile_prosthesis_reservoir: "none",
+    catheter_prolonged_or_traumatic: false,
+    biopsy_recent_or_complicated: false,
+    crp: null,
+    nlr: null,
+    flag_active_infection: false,
+    flag_imaging_discordant: false,
+    flag_mri_artifact: false,
+    flag_key_data_missing: false,
 
     plan_ns_override_l: null,
     plan_ns_override_r: null,

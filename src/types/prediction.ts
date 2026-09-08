@@ -77,7 +77,15 @@ export interface SidePlan {
   hostilityTier: "low" | "intermediate" | "high" | "very-high";
   /** true when a hostile plane calls for the operative protocol note without widening the plane */
   hostileProtocol: boolean;
-  decisionCode: "maximal" | "preserve-hostile-protocol" | "wider-plane" | "graded-frozen-section";
+  decisionCode: "maximal" | "preserve-hostile-protocol" | "wider-plane" | "graded-frozen-section" | "defer";
+}
+
+/** Hard-stop / review gates — whole-patient facts, never folded into either PIPS axis's score. */
+export interface PipsGates {
+  activeInfection: boolean;
+  imagingDiscordant: boolean;
+  mriArtifact: boolean;
+  keyDataMissing: boolean;
 }
 
 export interface SurgicalPlan {
@@ -85,6 +93,7 @@ export interface SurgicalPlan {
   right: SidePlan;
   hood: PlanRec<"none" | "unilateral" | "bilateral">;
   bladderNeckPreservation: PlanRec<boolean>;
+  gates: PipsGates;
 }
 
 /** Tri-state surgeon override: null = follow the model recommendation. */

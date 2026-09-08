@@ -18,7 +18,7 @@ import {
 } from "@/lib/compass/planningEvidence";
 import type { InflammationRisk } from "@/lib/compass/inflammationRisk";
 import { predictPlaneHostility } from "@/lib/compass/planeHostility";
-import { epeTier, planeDecisionMatrix } from "@/lib/compass/planeDecisionMatrix";
+import { applyDeferGate, checkPipsGates, epeTier, planeDecisionMatrix } from "@/lib/compass/planeDecisionMatrix";
 import { clamp } from "@/lib/utils/math";
 import type { ClinicalState } from "@/types/patient";
 import type { NsSideDetail, PlanRec, SidePlan, SurgicalPlan } from "@/types/prediction";
@@ -62,7 +62,7 @@ function buildSide(
   // gets a hostile-plane operative protocol instead of a wider excision.
   const hostility = predictPlaneHostility(S, side);
   const tier = epeTier(sideEce);
-  const decision = planeDecisionMatrix(tier, hostility.tier);
+  const decision = applyDeferGate(planeDecisionMatrix(tier, hostility.tier), checkPipsGates(S));
   const inflEscalated = decision.escalate && modelGrade < 3;
   const recommendedGrade = inflEscalated ? Math.min(3, modelGrade + 1) : modelGrade;
   let grade = recommendedGrade;
@@ -83,6 +83,9 @@ function buildSide(
     gradeRationale = `${reason} · hostile-plane protocol (fibrosis, not EPE)`;
   } else if (hostility.tier === "intermediate") {
     gradeRationale = `${reason} · moderate plane hostility flagged`;
+  }
+  if (decision.code === "defer") {
+    gradeRationale = decision.rationale;
   }
 
   // Zone grades from raw zone ECE, shifted only by the inflammation escalation
@@ -224,5 +227,5 @@ export function buildSurgicalPlan(
         : "Very large gland — preservation may not be achievable.";
   const bnp = resolveTri(S.plan_bnp, bnpRec, bnpRationale);
 
-  return { left, right, hood, bladderNeckPreservation: bnp };
+  return { left, right, hood, bladderNeckPreservation: bnp, gates: checkPipsGates(S) };
 }
