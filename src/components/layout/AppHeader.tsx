@@ -3,7 +3,6 @@ import {
   Activity,
   ClipboardList,
   FilePlus2,
-  FlaskConical,
   Info,
   Layers,
   MessageCircle,
@@ -27,7 +26,6 @@ const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[]
   { id: "input",        label: "Input",       Icon: ClipboardList },
   { id: "predictions",  label: "Predictions", Icon: Activity },
   { id: "outcomes",     label: "Factors",     Icon: Layers },
-  { id: "plan",         label: "Planning",    Icon: FlaskConical },
 ];
 
 export function AppHeader() {
