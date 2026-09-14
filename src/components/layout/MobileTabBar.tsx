@@ -1,4 +1,4 @@
-import { Activity, ClipboardList, FlaskConical, Layers, MessageCircle } from "lucide-react";
+import { Activity, ClipboardList, Layers, MessageCircle } from "lucide-react";
 import { useUiStore, type DesktopTab } from "@/store/uiStore";
 import { isDemoMode } from "@/lib/demoMode";
 import { cn } from "@/lib/utils";
@@ -7,7 +7,6 @@ const TABS: { id: DesktopTab; label: string; Icon: typeof Activity }[] = [
   { id: "input",        label: "Input",       Icon: ClipboardList },
   { id: "predictions",  label: "Predictions", Icon: Activity },
   { id: "outcomes",     label: "Factors",     Icon: Layers },
-  { id: "plan",         label: "Planning",    Icon: FlaskConical },
 ];
 
 export function MobileTabBar() {
