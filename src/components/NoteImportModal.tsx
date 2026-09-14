@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { parseClinicNote } from "@/lib/parseClinicNote";
+import { parseSafeSheet } from "@/lib/safeSheet";
 import { isAiParsingEnabled, parseClinicalText } from "@/lib/api";
 import { emptyLesion, type LesionRow, type LesionSource } from "@/types/lesion";
 import { cn } from "@/lib/utils";
@@ -155,6 +155,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
   const [parseError, setParseError] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [extracting, setExtracting] = useState(false);
+  const [phi, setPhi] = useState<{ removed: string[]; count: number } | null>(null);
 
   async function handleExtract() {
     setParseError("");
@@ -162,30 +163,44 @@ export function NoteImportModal({ onClose, onApply }: Props) {
     try {
       // Zone/lesion table always comes from the deterministic text parser —
       // it's the source of truth for the per-zone grid the "fix" step edits.
-      const parsed = parseClinicNote(noteText);
+      // Identifiers are removed in the browser before anything else reads the
+      // text, so no name, MRN or date can reach the parsed case — or a later
+      // AI request, which is given the scrubbed text below.
+      const sheet = parseSafeSheet(noteText);
+      setPhi(sheet.phi);
+      const parsed = sheet.note;
       if (parsed.lesions.length === 0 && !parsed.prostateVolumeCc && parsed.biopsyGG === undefined) {
         setParseError("No recognizable data found. Make sure your note has section headers: Biopsy, MRI, MUS, PSMA.");
         return;
       }
-      const noteWarnings = [...(parsed.warnings ?? [])];
+      const noteWarnings = [...(sheet.warnings ?? [])];
       let demographics: NoteImportClinical = {};
       if (isAiParsingEnabled()) {
         try {
-          const llm = await parseClinicalText(noteText);
+          const llm = await parseClinicalText(sheet.phi.text);
           demographics = { age: llm.age, psa: llm.psa, bmi: llm.bmi, decipher: llm.decipher, shim: llm.shim, ipss: llm.ipss };
         } catch {
           noteWarnings.push("AI demographic extraction failed — used offline text patterns only for zone/volume data.");
         }
       } else {
-        noteWarnings.push("Parsed offline — note text stayed in your browser. Age / PSA / BMI etc. were not auto-filled (turn on AI parsing in AI Settings to send text to Google Gemini for those).");
+        noteWarnings.push("Parsed in your browser — the note text was not sent anywhere. Anything the offline parser could not find is left blank for you to fill in.");
       }
 
-      setEntries(collapseToReviewEntries(parsed.lesions));
+      setEntries(collapseToReviewEntries(sheet.lesions));
+      // Row-scoped safe-sheet fields win over the free-text parser: the row
+      // label disambiguates the value, where a whole-document regex cannot
+      // (a bare "64" on the Patient row is an age; the same digits elsewhere
+      // are an MRN fragment or a date).
       setClinical({
-        vol: parsed.prostateVolumeCc,
+        vol: sheet.fields.prostateVolumeCc ?? parsed.prostateVolumeCc,
         gg: parsed.biopsyGG,
-        cores: parsed.biopsyTotalCores,
+        cores: sheet.fields.positiveCores ?? parsed.biopsyTotalCores,
         maxcore: parsed.biopsyMaxCorePct,
+        age: sheet.fields.age,
+        psa: sheet.fields.psa ?? parsed.psa,
+        bmi: sheet.fields.bmi,
+        shim: sheet.fields.shim ?? parsed.shim,
+        ipss: sheet.fields.ipss,
         ...demographics,
       });
       setWarnings(noteWarnings);
@@ -326,7 +341,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
         {step === "paste" && (
           <>
             <div className="flex-1 overflow-y-auto px-5 py-4">
-              <p className="mb-2 text-sm text-muted-foreground">Paste your clinical note below. The parser handles copy-pasted EHR text, tab-indented tables, and inline section headers.</p>
+              <p className="mb-2 text-sm text-muted-foreground">Paste a clinic note or a pre-operative safe sheet. Names, MRN and dates are removed in your browser before anything is parsed.</p>
               <p className={cn(
                 "mb-3 rounded-md border px-2.5 py-1.5 text-xs",
                 isAiParsingEnabled()
@@ -364,6 +379,15 @@ export function NoteImportModal({ onClose, onApply }: Props) {
             <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
               <p className="text-sm text-muted-foreground">Here's what was found in your note. Make sure the counts look right before fixing individual entries.</p>
 
+              {phi && phi.count > 0 && (
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-600 dark:text-emerald-400">
+                  <span className="font-semibold">
+                    {phi.count} identifier{phi.count > 1 ? "s" : ""} removed
+                  </span>{" "}
+                  in your browser before parsing — {phi.removed.join(", ")}. Only the clinical values below are kept.
+                </div>
+              )}
+
               {/* Section counts */}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
@@ -398,7 +422,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
               {/* Demographics (LLM-extracted) */}
               {(clinical.age !== undefined || clinical.psa !== undefined || clinical.bmi !== undefined || clinical.decipher !== undefined || clinical.shim !== undefined || clinical.ipss !== undefined) && (
                 <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
-                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Demographics extracted (LLM)</p>
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Demographics extracted</p>
                   <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
                     {clinical.age !== undefined && <span className="text-muted-foreground">Age <span className="font-semibold text-foreground">{clinical.age}</span></span>}
                     {clinical.psa !== undefined && <span className="text-muted-foreground">PSA <span className="font-semibold text-foreground">{clinical.psa} ng/mL</span></span>}

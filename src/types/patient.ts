@@ -148,6 +148,14 @@ export interface Prostate3DInputV1 {
    * with the case. `null` NS overrides mean "use the model's recommendation".
    */
   plan?: {
+    /**
+     * Nerve-sparing grade the surgeon expected pre-operatively, as recorded on
+     * the safe sheet. Deliberately NOT `ns_override` — an override changes what
+     * the model reports, whereas this is the surgeon's own read, kept alongside
+     * the prediction so the two can be compared rather than conflated.
+     */
+    ns_expected_l?: number | null;
+    ns_expected_r?: number | null;
     ns_override_l?: number | null;
     ns_override_r?: number | null;
     /** "auto" = follow the model recommendation */
