@@ -31,14 +31,26 @@
     { "pattern": "digital-twin.urology.edu.eu.org/clinical/*", "zone_name": "urology.edu.eu.org" }
   ],
 
-  // Per-IP rate limit for /api/turso/* (see src/index.ts). namespace_id is any
+  // Per-IP rate limit for /api/turso/* and /api/chat (see src/index.ts). namespace_id is any
   // positive-integer string, unique per limiter in the account. period: 10 | 60.
   "ratelimits": [
-    { "name": "TURSO_RL", "namespace_id": "1", "simple": { "limit": 30, "period": 10 } }
+    { "name": "TURSO_RL", "namespace_id": "1", "simple": { "limit": 30, "period": 10 } },
+    // /api/chat spends a real Gemini quota per call, so it gets its own much
+    // tighter budget: 5 requests per minute per IP is ample for a clinician
+    // typing questions, and useless to anyone trying to drain the key.
+    { "name": "CHAT_RL", "namespace_id": "2", "simple": { "limit": 5, "period": 60 } }
   ]
   // Secrets — never put them here. Set with `npx wrangler secret put <NAME>`:
   //   TURSO_URL, TURSO_AUTH_TOKEN   — Turso proxy
   //   GEMINI_API_KEY                — /api/chat (aistudio.google.com/apikey)
+  //   ACCESS_AUD, ACCESS_TEAM_DOMAIN — REQUIRED to close /api/chat. Add
+  //                                   /api/chat to the existing /clinical
+  //                                   Access application, then copy that
+  //                                   app's Application Audience (AUD) tag
+  //                                   and your <team>.cloudflareaccess.com
+  //                                   domain into these two secrets. Until
+  //                                   both are set the Gemini key is
+  //                                   spendable by anyone with the URL.
   //   RELEASES_READ_PAT             — /api/updates/* (read-only, fine-grained
   //                                   PAT for Urology-AI/digital-twin-releases;
   //                                   the same value CI used to bake into the
