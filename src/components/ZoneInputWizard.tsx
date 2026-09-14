@@ -908,10 +908,9 @@ export function ZoneInputWizard() {
           <div className="mx-auto max-w-2xl space-y-5 p-4 sm:space-y-7 sm:p-8">
             <div>
               <h3 className="text-xl font-bold text-foreground sm:text-2xl">Demographics &amp; Labs</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Three numbers are enough to get predictions. Everything else is optional.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Baseline parameters for risk calibration</p>
             </div>
 
-            <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Required</div>
             <div className="grid grid-cols-3 gap-3 sm:gap-5">
               <div className="space-y-1.5 sm:space-y-2">
                 <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-age">Age <span className="font-normal text-muted-foreground">(years)</span><InfoHint text="Patient age at time of surgery. Used to calibrate several COMPASS risk models." /></label>
