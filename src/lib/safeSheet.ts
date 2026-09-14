@@ -113,6 +113,13 @@ export function stripSheetPhi(input: string): SheetPhiResult {
 
 export interface SheetFields {
   age?: number;
+  /**
+   * Nerve-sparing grade the surgeon expected, per side — the `Left: 2` /
+   * `Right: 3` cells on the PSA row. Kept separate from the model's predicted
+   * grade so the two can be shown side by side, never merged.
+   */
+  nsExpectedL?: number;
+  nsExpectedR?: number;
   psa?: number;
   bmi?: number;
   shim?: number;
@@ -180,6 +187,16 @@ export function parseSheetFields(text: string): SheetFields {
       if (shim !== undefined) out.shim = shim;
       const ipss = find(rest, "IPSS");
       if (ipss !== undefined) out.ipss = ipss;
+      // "Left: 2   Right: 3" — the surgeon's expected nerve-sparing grade.
+      // Range-checked, because a bare number after Left/Right on this row is
+      // only meaningful as a 1-3 grade; anything else is a different field.
+      const l = find(rest, "Left");
+      const r = find(rest, "Right");
+      if (l !== undefined && l >= 1 && l <= 3) out.nsExpectedL = l;
+      if (r !== undefined && r >= 1 && r <= 3) out.nsExpectedR = r;
+    } else if (/^(?:prostate\s+)?(?:volume|vol|pv)\b/i.test(key)) {
+      const m = new RegExp(`^[ \t]*${NUM}`).exec(rest);
+      if (m?.[1]) out.prostateVolumeCc = parseFloat(m[1]);
     } else if (key.startsWith("biopsy")) {
       // "7/14" in its own cell — a cores fraction with no "cores" word.
       const m = /(?<![\d./])(\d{1,2})\s*\/\s*(\d{1,3})(?![\d./])/.exec(rest);
@@ -195,7 +212,7 @@ export function parseSheetFields(text: string): SheetFields {
     ["bmi", "BMI", ""],
     ["shim", "SHIM", ""],
     ["ipss", "IPSS", ""],
-    ["prostateVolumeCc", String.raw`(?:prostate\s+)?volume`, "(?:cc|ml)?"],
+    ["prostateVolumeCc", String.raw`(?:prostate\s+)?vol(?:ume)?`, "(?:cc|ml)?"],
   ];
   for (const [key, label, unit] of fallbacks) {
     if (out[key] === undefined) {

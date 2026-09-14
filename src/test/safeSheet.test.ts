@@ -106,6 +106,48 @@ describe("sheetToNote", () => {
   });
 });
 
+describe("prostate volume", () => {
+  it("reads a Volume row in the common spellings", () => {
+    for (const row of [
+      "Prostate volume\t52 cc",
+      "Volume\t52cc",
+      "Vol\t52",
+      "PV\t52 mL",
+      "Prostate Volume: 52 cc",
+    ]) {
+      expect(parseSheetFields(row).prostateVolumeCc, row).toBe(52);
+    }
+  });
+
+  it("still warns when the sheet has no volume at all", () => {
+    // The current template has no field for it, so PSA density cannot be
+    // computed and COMPASS silently falls back to a default.
+    expect(parseSafeSheet(SHEET).warnings.some((w) => /prostate volume/i.test(w))).toBe(true);
+  });
+});
+
+describe("expected nerve-sparing grades", () => {
+  it("reads the Left/Right cells on the PSA row", () => {
+    const f = parseSheetFields("PSA\t11.4\tSHIM  18\tLeft: 2\tRight: 3");
+    expect(f.nsExpectedL).toBe(2);
+    expect(f.nsExpectedR).toBe(3);
+  });
+
+  it("ignores values outside the 1-3 grade range", () => {
+    // A bare number after Left/Right is only meaningful as a grade; anything
+    // else on that row is a different field we must not silently adopt.
+    const f = parseSheetFields("PSA\t11.4\tLeft: 12\tRight: 0");
+    expect(f.nsExpectedL).toBeUndefined();
+    expect(f.nsExpectedR).toBeUndefined();
+  });
+
+  it("does not touch PSA or SHIM on the same row", () => {
+    const f = parseSheetFields("PSA\t11.4\tSHIM  18\tLeft: 2\tRight: 3");
+    expect(f.psa).toBeCloseTo(11.4);
+    expect(f.shim).toBe(18);
+  });
+});
+
 describe("parseSafeSheet", () => {
   it("warns when prostate volume is absent — the sheet has no field for it", () => {
     const r = parseSafeSheet(SHEET);
