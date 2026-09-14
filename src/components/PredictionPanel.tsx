@@ -1,8 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { predictEcePatient, clampEcePatient } from "@/lib/models/ece";
-import { predictSviPatient } from "@/lib/models/svi";
-import { predictLni } from "@/lib/models/lni";
-import { predictBcrPreop } from "@/lib/models/bcr";
 import {
   Card,
   CardContent,
@@ -26,6 +22,7 @@ import {
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { NSG_DATA, STATION_FP } from "@/lib/compass/nsgOutcomes";
 import { EvidenceInfo } from "@/components/EvidenceInfo";
+import { CaseSummary } from "@/components/CaseSummary";
 import {
   BCR_MODEL_DEFINITION,
   CORE_MODELS_PROVENANCE,
@@ -213,6 +210,8 @@ export function PredictionPanel() {
           </div>
         </CardHeader>
         <CardContent className="pt-4">
+          <CaseSummary />
+
           {/* 6 prediction value cards — extra top margin so floating overlays
               (e.g. CSPCA-by-zone popout from the 3D canvas) don't overlap. */}
           <div className="mb-3 mt-2 grid grid-cols-3 gap-2 sm:mb-4 sm:mt-4 sm:gap-3">
@@ -387,70 +386,6 @@ export function PredictionPanel() {
             </div>
 
           </div>
-
-          {/* Multi-case comparison */}
-          {patients.length > 1 && (
-            <details className="group">
-              <summary className="flex cursor-pointer list-none select-none items-center justify-between rounded-md px-1 py-1.5 text-sm font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground">
-                <span>Multi-case comparison ({patients.length} cases)</span>
-                <svg className="h-3 w-3 shrink-0 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M2 3.5l3 3 3-3" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </summary>
-              <div className="mt-1 overflow-x-auto rounded-lg border border-border/50 bg-muted/20">
-                <table className="w-full border-collapse text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-left text-muted-foreground">
-                      <th className="py-1.5 pl-2 pr-1 font-medium">Case</th>
-                      <th className="px-1 py-1.5 text-center font-medium">ECE</th>
-                      <th className="px-1 py-1.5 text-center font-medium">SVI</th>
-                      <th className="px-1 py-1.5 text-center font-medium">LNI</th>
-                      <th className="px-1 py-1.5 pr-2 text-center font-medium">BCR</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {patients.map((pat) => {
-                      const isActive = pat.id === activeId;
-                      const rec = { ...pat.record, lesions: pat.lesionRows };
-                      const S0 = clinicalStateFromRecord(rec);
-                      const S = deriveClinicalFromLesions(S0, lesionsFromRows(pat.lesionRows));
-                      const ece = clampEcePatient(predictEcePatient(S));
-                      const svi = predictSviPatient(S);
-                      const lni = predictLni(S);
-                      const bcr = predictBcrPreop(S);
-                      return (
-                        <tr
-                          key={pat.id}
-                          className={cn(
-                            "border-b border-border/30 last:border-0",
-                            isActive && "bg-primary/5",
-                          )}
-                        >
-                          <td className="max-w-[72px] truncate py-1.5 pl-2 pr-1">
-                            <span className={cn("font-medium", isActive && "text-primary")}>
-                              {isActive && <span className="mr-0.5">▶</span>}{pat.name}
-                            </span>
-                          </td>
-                          <td className={cn("px-1 py-1.5 text-center font-bold tabular-nums", riskCls(ece))}>
-                            {Math.round(ece * 100)}%
-                          </td>
-                          <td className={cn("px-1 py-1.5 text-center font-bold tabular-nums", svi < 0.1 ? "text-muted-foreground/40" : riskCls(svi))}>
-                            {Math.round(svi * 100)}%
-                          </td>
-                          <td className={cn("px-1 py-1.5 text-center font-bold tabular-nums", riskCls(lni))}>
-                            {Math.round(lni * 100)}%
-                          </td>
-                          <td className={cn("px-1 py-1.5 pr-2 text-center font-bold tabular-nums", riskCls(bcr))}>
-                            {Math.round(bcr * 100)}%
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </details>
-          )}
 
         </CardContent>
       </Card>
