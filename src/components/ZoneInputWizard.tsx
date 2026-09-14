@@ -569,6 +569,7 @@ export function ZoneInputWizard() {
   const setActiveTab = (t: 1 | 2) => setLocalTab(t);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [showNoteImport, setShowNoteImport] = useState(false);
+  const [showOptional, setShowOptional] = useState(false);
 
   const [age,      setAge]      = useState("");
   const [psa,      setPsa]      = useState("");
@@ -911,6 +912,19 @@ export function ZoneInputWizard() {
               <p className="mt-1 text-sm text-muted-foreground">Three numbers are enough to get predictions. Everything else is optional.</p>
             </div>
 
+            {/* Fastest path in: let the note/file importer fill these fields. */}
+            <button
+              type="button"
+              onClick={() => setShowNoteImport(true)}
+              className="flex w-full items-center justify-between gap-3 rounded-xl border border-dashed border-primary/40 bg-primary/[0.04] px-4 py-3 text-left transition-colors hover:bg-primary/[0.08]"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-primary">Import from a clinic note</span>
+                <span className="block text-xs text-muted-foreground">Paste a note or safe sheet — fills these fields and the zone grid.</span>
+              </span>
+              <span aria-hidden className="shrink-0 text-lg text-primary">→</span>
+            </button>
+
             <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Required</div>
             <div className="grid grid-cols-3 gap-3 sm:gap-5">
               <div className="space-y-1.5 sm:space-y-2">
@@ -948,7 +962,23 @@ export function ZoneInputWizard() {
               </div>
             )}
 
-            <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Enter if available</div>
+            {/* Optional refinements — hidden until asked for, so the first screen
+                is just the three numbers the models actually need. */}
+            <div className="rounded-xl border border-border/60">
+              <button
+                type="button"
+                onClick={() => setShowOptional((v) => !v)}
+                aria-expanded={showOptional}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
+              >
+                <span>
+                  <span className="block text-sm font-semibold text-foreground">Optional — refines predictions</span>
+                  <span className="block text-xs text-muted-foreground">Decipher, SHIM, IPSS, BMI</span>
+                </span>
+                <span aria-hidden className={cn("text-sm text-muted-foreground transition-transform", showOptional && "rotate-180")}>▾</span>
+              </button>
+              {showOptional && (
+                <div className="space-y-5 border-t border-border/60 px-4 py-4 sm:space-y-7">
             <div className="grid grid-cols-3 gap-3 sm:gap-5">
               <div className="space-y-1.5 sm:space-y-2">
                 <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-dec">
@@ -1113,6 +1143,9 @@ export function ZoneInputWizard() {
                       className="h-11 text-base"
                     />
                   </div>
+                </div>
+              )}
+            </div>
                 </div>
               )}
             </div>
