@@ -46,6 +46,19 @@ interface Env {
   // Google Generative Language API key (free tier: aistudio.google.com/apikey).
   //   npx wrangler secret put GEMINI_API_KEY
   GEMINI_API_KEY?: string;
+  // Cloudflare Access application audience (AUD) tag for the /clinical app.
+  // REQUIRED: without it /api/chat refuses every request. See verifyAccessJwt.
+  //   npx wrangler secret put ACCESS_AUD
+  ACCESS_AUD?: string;
+  // Cloudflare Access team domain, e.g. "yourteam.cloudflareaccess.com".
+  //   npx wrangler secret put ACCESS_TEAM_DOMAIN
+  ACCESS_TEAM_DOMAIN?: string;
+  // Optional comma-separated email-domain allowlist, e.g. "mountsinai.org".
+  // Defence in depth only — the Access application policy is the real control
+  // over who gets a token at all.
+  ACCESS_ALLOWED_DOMAINS?: string;
+  // Separate, much tighter limiter for the metered Gemini route.
+  CHAT_RL?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
 }
 
 // COMPASS's own Gemini call lives here so the API key never ships in the
@@ -248,6 +261,102 @@ function withSecurityHeaders(response: Response, status = response.status): Resp
   return new Response(response.body, { status, headers });
 }
 
+// ── Cloudflare Access verification for the metered Gemini route ───────────────
+//
+// /api/chat spends a real Google API key on every call. Origin checks do not
+// stop a non-browser client (curl sends no Origin), and a per-IP rate limit
+// does not stop a botnet — so without this the key is spendable by anyone who
+// knows the URL, which is how a free-tier key gets suspended.
+//
+// The chat widget only renders outside demo mode (src/App.tsx), i.e. only on
+// /clinical, which already sits behind a Cloudflare Access application. So
+// requiring an Access JWT here costs no legitimate user anything: add /api/chat
+// to that same Access application, then set ACCESS_AUD + ACCESS_TEAM_DOMAIN.
+//
+// This gate fails CLOSED. With the secrets unset the route returns 503 rather
+// than serving Gemini to anyone who finds the URL.
+//
+// The JWT signature is verified against Access's published keys — the
+// Cf-Access-Jwt-Assertion header alone is not trusted, since a header can be
+// forged by anything that reaches the Worker directly.
+
+interface Jwk { kid: string; kty: string; n: string; e: string; alg?: string }
+
+let jwksCache: { keys: Jwk[]; fetchedAt: number } | null = null;
+const JWKS_TTL_MS = 60 * 60 * 1000;
+
+async function accessKeys(teamDomain: string): Promise<Jwk[]> {
+  const now = Date.now();
+  if (jwksCache && now - jwksCache.fetchedAt < JWKS_TTL_MS) return jwksCache.keys;
+  const res = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
+  if (!res.ok) throw new Error(`Access certs ${res.status}`);
+  const { keys } = (await res.json()) as { keys: Jwk[] };
+  jwksCache = { keys, fetchedAt: now };
+  return keys;
+}
+
+function b64urlToBytes(s: string): Uint8Array {
+  const b64 = s.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(s.length / 4) * 4, "=");
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/**
+ * Returns the authenticated email, or null if the request is not a valid
+ * Access session. Never throws to the caller's advantage — any failure is a
+ * rejection.
+ */
+async function verifyAccessJwt(token: string, aud: string, teamDomain: string): Promise<string | null> {
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  let header: { kid?: string; alg?: string };
+  let payload: { aud?: string | string[]; exp?: number; iss?: string; email?: string };
+  try {
+    header = JSON.parse(new TextDecoder().decode(b64urlToBytes(parts[0])));
+    payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(parts[1])));
+  } catch {
+    return null;
+  }
+  if (header.alg !== "RS256" || !header.kid) return null;
+
+  let keys: Jwk[];
+  try {
+    keys = await accessKeys(teamDomain);
+  } catch {
+    return null;
+  }
+  const jwk = keys.find((k) => k.kid === header.kid);
+  if (!jwk) return null;
+
+  let ok = false;
+  try {
+    const key = await crypto.subtle.importKey(
+      "jwk",
+      { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256", ext: true },
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["verify"],
+    );
+    ok = await crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5",
+      key,
+      b64urlToBytes(parts[2]),
+      new TextEncoder().encode(`${parts[0]}.${parts[1]}`),
+    );
+  } catch {
+    return null;
+  }
+  if (!ok) return null;
+
+  const auds = Array.isArray(payload.aud) ? payload.aud : payload.aud ? [payload.aud] : [];
+  if (!auds.includes(aud)) return null;
+  if (typeof payload.exp !== "number" || payload.exp * 1000 <= Date.now()) return null;
+  if (payload.iss !== `https://${teamDomain}`) return null;
+  return payload.email ?? "authenticated";
+}
+
 // ── /api/chat — COMPASS's own Gemini call ─────────────────────────────────────
 // The browser POSTs an OpenAI-style body ({ messages, temperature?, max_tokens?,
 // model? }) to this same-origin route; the Worker translates to Gemini's
@@ -303,15 +412,49 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
   if (origin && !ALLOWED_ORIGINS.has(origin)) return reply({ error: "Origin not allowed" }, 403);
   if (!env.GEMINI_API_KEY) return reply({ error: "Chat not configured on server" }, 503);
 
+  // Access gate — FAILS CLOSED.
+  //
+  // If the Access secrets are missing, this route refuses rather than falling
+  // back to open. A configuration gap must not silently reopen a public proxy
+  // to a metered API key: that is what drained the key once already, and an
+  // unconfigured deploy is exactly when nobody is watching.
+  if (!env.ACCESS_AUD || !env.ACCESS_TEAM_DOMAIN) {
+    return reply({ error: "Chat is not configured on this server" }, 503);
+  }
+  const token =
+    request.headers.get("Cf-Access-Jwt-Assertion") ??
+    (/CF_Authorization=([^;]+)/.exec(request.headers.get("Cookie") ?? "")?.[1] ?? "");
+  const email = token
+    ? await verifyAccessJwt(token, env.ACCESS_AUD, env.ACCESS_TEAM_DOMAIN)
+    : null;
+  if (!email) return reply({ error: "Sign in to use chat" }, 401);
+
+  // Optional second check on the identity Access vouched for. The Access
+  // application policy already decides who gets a token; this only limits the
+  // blast radius if that policy is ever widened by accident.
+  const allowed = (env.ACCESS_ALLOWED_DOMAINS ?? "")
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean);
+  if (allowed.length) {
+    const domain = email.split("@")[1]?.toLowerCase() ?? "";
+    if (!allowed.some((d) => domain === d || domain.endsWith(`.${d}`))) {
+      return reply({ error: "This account is not permitted to use chat" }, 403);
+    }
+  }
+
   // Content-Length is a hint the client can simply omit (chunked encoding), so
   // it is only a cheap early-out. The authoritative check is on the bytes we
   // actually read, below.
   if (Number(request.headers.get("Content-Length") || 0) > MAX_CHAT_BODY_BYTES) {
     return reply({ error: "Request too large" }, 413);
   }
-  if (env.TURSO_RL) {
+  // Metered route: its own limiter, far tighter than the Turso one. Falls back
+  // to the shared limiter if CHAT_RL has not been provisioned yet.
+  const limiter = env.CHAT_RL ?? env.TURSO_RL;
+  if (limiter) {
     const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-    const { success } = await env.TURSO_RL.limit({ key: `chat:${ip}` });
+    const { success } = await limiter.limit({ key: `chat:${ip}` });
     if (!success) return reply({ error: "Rate limit exceeded — slow down" }, 429);
   }
 
