@@ -289,50 +289,55 @@ export function NoteImportModal({ onClose, onApply }: Props) {
         {/* ── Step 1: Show example ── */}
         {step === "example" && (
           <>
-            <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-              <p className="text-sm text-muted-foreground">
-                Your note needs section headers (<span className="font-mono font-semibold text-foreground">Biopsy</span>, <span className="font-mono font-semibold text-foreground">MRI</span>, <span className="font-mono font-semibold text-foreground">MUS</span>, <span className="font-mono font-semibold text-foreground">PSMA</span>) — each on its own line or at the start of a tab-indented row. Put one finding per line below each header.
-              </p>
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-4">
+              {/* Two rules, stated once — then show, don't tell. */}
+              <ul className="space-y-1.5 text-sm text-muted-foreground">
+                <li className="flex gap-2">
+                  <span aria-hidden className="text-primary">1.</span>
+                  <span>Start each section with its header on its own line — <span className="font-mono font-semibold text-foreground">Biopsy</span>, <span className="font-mono font-semibold text-foreground">MRI</span>, <span className="font-mono font-semibold text-foreground">MUS</span>, <span className="font-mono font-semibold text-foreground">PSMA</span>.</span>
+                </li>
+                <li className="flex gap-2">
+                  <span aria-hidden className="text-primary">2.</span>
+                  <span>Put one finding per line beneath its header.</span>
+                </li>
+              </ul>
 
               <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Example note</span>
-                  <button
-                    type="button"
-                    onClick={() => { setNoteText(EXAMPLE_NOTE); setStep("paste"); }}
-                    className="text-xs font-semibold text-primary hover:underline"
-                  >
-                    Use this example →
-                  </button>
-                </div>
-                <pre className="rounded-lg border border-border bg-muted/20 p-3 font-mono text-[11px] leading-relaxed text-foreground/80 whitespace-pre-wrap">{EXAMPLE_NOTE}</pre>
+                <p className="mb-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Example note</p>
+                <pre className="overflow-x-auto rounded-lg border border-border bg-muted/20 p-3 font-mono text-[11px] leading-relaxed text-foreground/80">{EXAMPLE_NOTE}</pre>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 text-xs">
-                <div className="rounded-lg border border-border bg-muted/10 p-2.5">
-                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Sections</p>
-                  {["Biopsy", "MRI", "MUS", "PSMA"].map((s) => <div key={s} className="font-mono text-foreground/80">{s}</div>)}
-                </div>
-                <div className="rounded-lg border border-border bg-muted/10 p-2.5">
-                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Zones</p>
-                  {["PL PZ (posterolateral)", "PZ (posterior)", "TZ (anterior)", "CZ (medial)"].map((z) => <div key={z} className="text-foreground/80">{z}</div>)}
-                </div>
-                <div className="rounded-lg border border-border bg-muted/10 p-2.5">
-                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Levels</p>
-                  {["base", "mid", "apex", "base to apex"].map((l) => <div key={l} className="text-foreground/80">{l}</div>)}
-                </div>
-                <div className="rounded-lg border border-border bg-muted/10 p-2.5">
-                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Scores</p>
-                  <div className="text-foreground/80">Gleason X (a+b) %</div>
-                  <div className="text-foreground/80">PIRADS 1–5</div>
-                  <div className="text-foreground/80">PRIMUS 1–5</div>
-                  <div className="text-foreground/80">SUV (any)</div>
-                </div>
+              <div>
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Words the parser recognises</p>
+                <dl className="divide-y divide-border/60 rounded-lg border border-border bg-muted/10 text-xs">
+                  {[
+                    { term: "Sections", vals: ["Biopsy", "MRI", "MUS", "PSMA"], mono: true },
+                    { term: "Zones", vals: ["PL PZ (posterolateral)", "PZ (posterior)", "TZ (anterior)", "CZ (medial)"], mono: false },
+                    { term: "Levels", vals: ["base", "mid", "apex", "base to apex"], mono: false },
+                    { term: "Scores", vals: ["Gleason X (a+b) %", "PIRADS 1–5", "PRIMUS 1–5", "SUV (any)"], mono: true },
+                  ].map(({ term, vals, mono }) => (
+                    <div key={term} className="flex flex-col gap-1 px-3 py-2 sm:flex-row sm:gap-4">
+                      <dt className="shrink-0 font-semibold text-muted-foreground sm:w-20">{term}</dt>
+                      <dd className={cn("flex flex-wrap gap-x-3 gap-y-1 text-foreground/80", mono && "font-mono")}>
+                        {vals.map((v) => <span key={v}>{v}</span>)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
               </div>
             </div>
-            <div className="flex shrink-0 justify-end gap-2 border-t border-border px-5 py-3">
-              <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-              <Button size="sm" onClick={() => setStep("paste")}>Next: Paste note →</Button>
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setNoteText(EXAMPLE_NOTE); setStep("paste"); }}
+              >
+                Use this example
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
+                <Button size="sm" onClick={() => setStep("paste")}>Next: Paste note →</Button>
+              </div>
             </div>
           </>
         )}
