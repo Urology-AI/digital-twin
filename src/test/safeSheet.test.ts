@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseSafeSheet, parseSheetFields, stripSheetPhi } from "@/lib/safeSheet";
+import { parseSafeSheet, parseSheetFields, sheetToNote, stripSheetPhi } from "@/lib/safeSheet";
 
 /** The real pre-operative safe sheet layout, as pasted out of Word. */
 const SHEET = `Patient\tBMI: 29.1\tSMITH, JOHN  64\tMRN 4471829\tDOB 03/14/1961\tDATE OF SURGERY 02/02/2025
@@ -62,6 +62,47 @@ describe("parseSheetFields", () => {
   it("does not mistake an MRN or DOB for an age", () => {
     const scrubbed = stripSheetPhi("Patient\tMRN 4471829\tDOB 03/14/1961").text;
     expect(parseSheetFields(scrubbed).age).toBeUndefined();
+  });
+});
+
+describe("sheetToNote", () => {
+  const r = parseSafeSheet(SHEET);
+
+  it("extracts findings from grid cells, which the note parser alone cannot", () => {
+    // Every finding sits inside one tab-separated cell behind a row label, so
+    // without normalisation parseClinicNote sees only unparseable headers.
+    expect(r.lesions.length).toBeGreaterThanOrEqual(4);
+    const kinds = new Set(r.lesions.map((l) => l.source));
+    expect(kinds).toContain("Bx");
+    expect(kinds).toContain("MRI");
+    expect(kinds).toContain("MUS");
+    expect(kinds).toContain("PSMA");
+  });
+
+  it("converts the sheet's Gleason spelling into a grade group", () => {
+    // Sheet writes "Gleason 4+3"; the parser matches "Gleason 7 (4+3)".
+    const bx = r.lesions.find((l) => l.source === "Bx" && l.side === "R");
+    expect(bx?.score).toBe("3");
+  });
+
+  it("maps spelled-out posterolateral, which is matched as an abbreviation", () => {
+    expect(r.lesions.some((l) => l.zone === "Posterolateral")).toBe(true);
+  });
+
+  it("splits a multi-level finding into one lesion per level", () => {
+    // "mid to base" is one sentence but two zones on the map.
+    const mri = r.lesions.filter((l) => l.source === "MRI");
+    expect(mri.map((l) => l.level).sort()).toEqual(["Base", "Mid"]);
+  });
+
+  it("leaves a free-text note untouched rather than mangling it", () => {
+    const note = "Biopsy\nGleason 7 (4+3) 5% Right PL PZ\nMRI\nPIRADS 5 Right PL PZ mid";
+    expect(sheetToNote(note)).toBe(note);
+  });
+
+  it("ignores sheet rows COMPASS has no input for", () => {
+    // ASA, DVT risk, research consent etc. are recorded for other purposes.
+    expect(sheetToNote(stripSheetPhi(SHEET).text)).not.toMatch(/ASA/);
   });
 });
 

@@ -206,6 +206,75 @@ export function parseSheetFields(text: string): SheetFields {
   return out;
 }
 
+// ── Sheet → note normalisation ───────────────────────────────────────────────
+
+/**
+ * Rows whose content COMPASS actually uses. Everything else on the sheet —
+ * ASA, DVT risk, research consent, trans-operative care, abdominal wall — is
+ * recorded for other purposes and has no model input to land in, so it is
+ * ignored rather than captured into a field that does not exist.
+ */
+const SECTION_OF: [RegExp, string][] = [
+  [/^biopsy\b/i, "Biopsy"],
+  [/^mri\b/i, "MRI"],
+  [/^(?:mus|micro[- ]?us|micro[- ]?ultrasound|exactvu)\b/i, "MUS"],
+  [/^psma\b/i, "PSMA"],
+];
+
+/**
+ * Score spellings vary by site; `parseClinicNote` expects one form.
+ * Normalising here rather than loosening that parser keeps the sheet's quirks
+ * in the sheet's own module.
+ */
+function normalizeScoreWords(line: string): string {
+  return (
+    line
+      .replace(/\bPI[- ]?RADS\b/gi, "PIRADS")
+      .replace(/\bPRI[- ]?MUS\b/gi, "PRIMUS")
+      .replace(/\bSUV\s*max\b/gi, "SUV")
+      // The sheet writes "Gleason 4+3"; parseClinicNote matches
+      // "Gleason <sum> (<major>+<minor>)". Add the sum rather than loosen that
+      // regex, which also guards against a bare "4+3" elsewhere in a sentence.
+      .replace(/\bGleason\s*(\d)\s*\+\s*(\d)\b(?!\s*\))/gi, (_m, a: string, b: string) =>
+        `Gleason ${Number(a) + Number(b)} (${a}+${b})`)
+      // Zone words are matched as abbreviations ("PL"), not spelled out.
+      .replace(/\bpostero[- ]?lateral\b/gi, "PL")
+      .replace(/\bantero[- ]?lateral\b/gi, "AL")
+      .replace(/\bbilat(?:eral)?\b/gi, "bilateral")
+  );
+}
+
+/**
+ * Turn the grid into the line-per-finding shape `parseClinicNote` understands.
+ *
+ * This is the whole reason grid pastes produced no lesions: the sheet puts a
+ * row label and a date in the first cells and the entire finding in the next
+ * one, so every line looked like an unparseable header. Here each relevant row
+ * becomes a section heading followed by its findings, one per line — split on
+ * semicolons, and on sentence breaks that start a new scored finding.
+ */
+export function sheetToNote(text: string): string {
+  const rows = sheetRows(text);
+  if (!rows.length) return text;
+
+  const out: string[] = [];
+  let matched = 0;
+  for (const { label, rest } of rows) {
+    const hit = SECTION_OF.find(([re]) => re.test(label));
+    if (!hit || !rest) continue;
+    matched += 1;
+    out.push(hit[1]);
+    const cleaned = rest.replace(/\[[^\]]*\]/g, " ").trim();
+    for (const part of cleaned.split(/\s*;\s*|(?<=\.)\s+(?=(?:PIRADS|PI-RADS|PRIMUS|PRI-MUS|SUV|Gleason|GG)\b)/i)) {
+      const line = normalizeScoreWords(part.trim());
+      if (line) out.push(line);
+    }
+  }
+  // No recognisable section rows: this is a free-text note, not a grid, so pass
+  // it through untouched rather than mangling it.
+  return matched ? out.join("\n") : text;
+}
+
 // ── Combined entry point ─────────────────────────────────────────────────────
 
 export interface SafeSheetResult {
@@ -237,7 +306,7 @@ function dedupeLesions(rows: LesionRow[]): LesionRow[] {
 export function parseSafeSheet(input: string): SafeSheetResult {
   const phi = stripSheetPhi(input);
   const fields = parseSheetFields(phi.text);
-  const note = parseClinicNote(phi.text);
+  const note = parseClinicNote(sheetToNote(phi.text));
   const warnings = [...note.warnings];
 
   if (fields.prostateVolumeCc === undefined && note.prostateVolumeCc === undefined) {
