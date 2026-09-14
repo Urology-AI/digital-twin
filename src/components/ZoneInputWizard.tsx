@@ -908,7 +908,7 @@ export function ZoneInputWizard() {
           <div className="mx-auto max-w-2xl space-y-5 p-4 sm:space-y-7 sm:p-8">
             <div>
               <h3 className="text-xl font-bold text-foreground sm:text-2xl">Demographics &amp; Labs</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Age, PSA and volume are required. The rest feed the functional-outcome and BCR models — enter whatever you have.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Three numbers are enough to get predictions. Everything else is optional.</p>
             </div>
 
             <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Required</div>
