@@ -304,15 +304,30 @@ interface Jwk { kid: string; kty: string; n: string; e: string; alg?: string }
 
 let jwksCache: { keys: Jwk[]; fetchedAt: number } | null = null;
 const JWKS_TTL_MS = 60 * 60 * 1000;
+const JWKS_MIN_REFETCH_MS = 60 * 1000;
+
+async function fetchAccessKeys(teamDomain: string): Promise<Jwk[]> {
+  const res = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
+  if (!res.ok) throw new Error(`Access certs ${res.status}`);
+  const { keys } = (await res.json()) as { keys: Jwk[] };
+  jwksCache = { keys, fetchedAt: Date.now() };
+  return keys;
+}
 
 async function accessKeys(teamDomain: string): Promise<Jwk[]> {
   const now = Date.now();
   if (jwksCache && now - jwksCache.fetchedAt < JWKS_TTL_MS) return jwksCache.keys;
-  const res = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
-  if (!res.ok) throw new Error(`Access certs ${res.status}`);
-  const { keys } = (await res.json()) as { keys: Jwk[] };
-  jwksCache = { keys, fetchedAt: now };
-  return keys;
+  return fetchAccessKeys(teamDomain);
+}
+
+/** Force one refresh (rate-limited) when a kid isn't in the cached set —
+ *  handles an Access signing-key rotation before the TTL lapses, so a rotation
+ *  doesn't 401 every request for up to an hour. */
+async function accessKeysForKid(teamDomain: string, kid: string): Promise<Jwk[]> {
+  const keys = await accessKeys(teamDomain);
+  if (keys.some((k) => k.kid === kid)) return keys;
+  if (jwksCache && Date.now() - jwksCache.fetchedAt < JWKS_MIN_REFETCH_MS) return keys;
+  return fetchAccessKeys(teamDomain);
 }
 
 function b64urlToBytes(s: string): Uint8Array {
@@ -343,7 +358,7 @@ async function verifyAccessJwt(token: string, aud: string, teamDomain: string): 
 
   let keys: Jwk[];
   try {
-    keys = await accessKeys(teamDomain);
+    keys = await accessKeysForKid(teamDomain, header.kid);
   } catch {
     return null;
   }
