@@ -89,7 +89,7 @@ jobs:
         if: ${{ inputs.preflight }}
         run: echo "Preflight passed. Re-run without preflight (or push a tag) to build." && exit 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         if: ${{ !inputs.preflight }}
         with:
           node-version: 20
@@ -270,7 +270,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
