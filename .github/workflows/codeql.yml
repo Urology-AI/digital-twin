@@ -23,7 +23,7 @@ jobs:
         # expects it, and a missing one fails the aggregate check.
         language: [javascript-typescript, python, actions]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: github/codeql-action/init@v3
         with:
           language: ${{ matrix.language }}
