@@ -23,10 +23,10 @@
  * having no Access application on them at all, not by a bypass rule (no
  * path-precedence ambiguity between competing apps that way).
  *
- * No route here does its own auth check — by the time a request reaches
- * this Worker on /clinical/*, Access has already authenticated it, and
- * injects `Cf-Access-Authenticated-User-Email` on every request if you
- * want to attribute a write to a specific clinician later.
+ * /clinical/* is authenticated by Access before it reaches this Worker.
+ * /api/turso/* and /api/chat are not under Access, so the Worker verifies the
+ * Access JWT itself (requireAccess / accessEmail). The only unauthenticated
+ * database statement is the patient share lookup by id.
  */
 import { createClient } from "@libsql/client/web";
 import { downloadPageHtml } from "./downloadPage";
@@ -57,6 +57,10 @@ interface Env {
   // Defence in depth only — the Access application policy is the real control
   // over who gets a token at all.
   ACCESS_ALLOWED_DOMAINS?: string;
+  // Bearer token the ePSA admin dashboard sends to read case_log server-side.
+  // Grants the case_log SELECT only — nothing else, no writes.
+  //   npx wrangler secret put DASHBOARD_READ_TOKEN
+  DASHBOARD_READ_TOKEN?: string;
   // Separate, much tighter limiter for the metered Gemini route.
   CHAT_RL?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
 }
@@ -90,7 +94,8 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 
 /**
- * SQL allowlist. The proxy is public (no Access application on /api/*), so
+ * SQL allowlist. There is no Access application on /api/* (requireAccess
+ * checks the Access JWT in the Worker instead), so
  * without this any caller could `SELECT * FROM patient_shares` and dump
  * every shared patient record — or `SELECT * FROM sqlite_master` to map the
  * whole schema. Only the exact statements src/lib/turso.ts issues are
@@ -186,6 +191,15 @@ async function handleTursoExecute(request: Request, env: Env): Promise<Response>
   if (!Array.isArray(args)) return jsonError("'args' must be an array", 400);
   if (!isAllowedSql(sql, args)) return jsonError("SQL statement not permitted", 403);
 
+  // Only a patient share lookup by id is public (/patient/<id> links). The
+  // case_log read also admits the dashboard's read token; everything else
+  // needs a signed-in /clinical user.
+  const s = normalizeSql(sql);
+  if (s !== SHARE_GET) {
+    const denied = await requireAccess(request, env, { allowDashboard: s === CASE_LOG_SELECT });
+    if (denied) return denied;
+  }
+
   try {
     const result = await tursoClient(env).execute({ sql, args: args as Args });
     // libsql's Row objects support both row[0] and row.columnName access but
@@ -202,7 +216,9 @@ async function handleTursoExecute(request: Request, env: Env): Promise<Response>
 }
 
 /** Real connectivity check — not just "are the env vars set", an actual round-trip to Turso. */
-async function handleTursoHealth(env: Env): Promise<Response> {
+async function handleTursoHealth(request: Request, env: Env): Promise<Response> {
+  const denied = await requireAccess(request, env);
+  if (denied) return denied;
   try {
     await tursoClient(env).execute({ sql: "SELECT 1", args: [] });
     return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
@@ -228,6 +244,10 @@ async function handleTursoBatch(request: Request, env: Env): Promise<Response> {
   if (!Array.isArray(statements) || statements.length === 0) {
     return jsonError("Missing non-empty 'statements' array", 400);
   }
+  // Every batch statement is a write — signed-in /clinical users only.
+  const denied = await requireAccess(request, env);
+  if (denied) return denied;
+
   for (const s of statements as BatchStatement[]) {
     if (typeof s.sql !== "string" || !Array.isArray(s.args)) {
       return jsonError("Each statement needs 'sql' (string) and 'args' (array)", 400);
@@ -284,15 +304,30 @@ interface Jwk { kid: string; kty: string; n: string; e: string; alg?: string }
 
 let jwksCache: { keys: Jwk[]; fetchedAt: number } | null = null;
 const JWKS_TTL_MS = 60 * 60 * 1000;
+const JWKS_MIN_REFETCH_MS = 60 * 1000;
+
+async function fetchAccessKeys(teamDomain: string): Promise<Jwk[]> {
+  const res = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
+  if (!res.ok) throw new Error(`Access certs ${res.status}`);
+  const { keys } = (await res.json()) as { keys: Jwk[] };
+  jwksCache = { keys, fetchedAt: Date.now() };
+  return keys;
+}
 
 async function accessKeys(teamDomain: string): Promise<Jwk[]> {
   const now = Date.now();
   if (jwksCache && now - jwksCache.fetchedAt < JWKS_TTL_MS) return jwksCache.keys;
-  const res = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
-  if (!res.ok) throw new Error(`Access certs ${res.status}`);
-  const { keys } = (await res.json()) as { keys: Jwk[] };
-  jwksCache = { keys, fetchedAt: now };
-  return keys;
+  return fetchAccessKeys(teamDomain);
+}
+
+/** Force one refresh (rate-limited) when a kid isn't in the cached set —
+ *  handles an Access signing-key rotation before the TTL lapses, so a rotation
+ *  doesn't 401 every request for up to an hour. */
+async function accessKeysForKid(teamDomain: string, kid: string): Promise<Jwk[]> {
+  const keys = await accessKeys(teamDomain);
+  if (keys.some((k) => k.kid === kid)) return keys;
+  if (jwksCache && Date.now() - jwksCache.fetchedAt < JWKS_MIN_REFETCH_MS) return keys;
+  return fetchAccessKeys(teamDomain);
 }
 
 function b64urlToBytes(s: string): Uint8Array {
@@ -323,7 +358,7 @@ async function verifyAccessJwt(token: string, aud: string, teamDomain: string): 
 
   let keys: Jwk[];
   try {
-    keys = await accessKeys(teamDomain);
+    keys = await accessKeysForKid(teamDomain, header.kid);
   } catch {
     return null;
   }
@@ -355,6 +390,58 @@ async function verifyAccessJwt(token: string, aud: string, teamDomain: string): 
   if (typeof payload.exp !== "number" || payload.exp * 1000 <= Date.now()) return null;
   if (payload.iss !== `https://${teamDomain}`) return null;
   return payload.email ?? "authenticated";
+}
+
+/** Verified Access email from the header or the CF_Authorization cookie, else null. */
+async function accessEmail(request: Request, env: Env): Promise<string | null> {
+  if (!env.ACCESS_AUD || !env.ACCESS_TEAM_DOMAIN) return null;
+  const token =
+    request.headers.get("Cf-Access-Jwt-Assertion") ??
+    (/CF_Authorization=([^;]+)/.exec(request.headers.get("Cookie") ?? "")?.[1] ?? "");
+  return token ? verifyAccessJwt(token, env.ACCESS_AUD, env.ACCESS_TEAM_DOMAIN) : null;
+}
+
+// Optional second check on the identity Access vouched for. The Access
+// application policy already decides who gets a token; this only limits the
+// blast radius if that policy is ever widened by accident.
+function emailDomainAllowed(email: string, env: Env): boolean {
+  const allowed = (env.ACCESS_ALLOWED_DOMAINS ?? "")
+    .split(",")
+    .map((d) => d.trim().toLowerCase())
+    .filter(Boolean);
+  if (!allowed.length) return true;
+  const domain = email.split("@")[1]?.toLowerCase() ?? "";
+  return allowed.some((d) => domain === d || domain.endsWith(`.${d}`));
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  const x = new TextEncoder().encode(a);
+  const y = new TextEncoder().encode(b);
+  if (x.length !== y.length) return false;
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
+  return diff === 0;
+}
+
+// ── /api/turso gate ───────────────────────────────────────────────────────────
+// /api/* has no Access application in front of it, so the Worker checks the
+// same Access JWT /api/chat does. Fails CLOSED: with ACCESS_AUD or
+// ACCESS_TEAM_DOMAIN unset, gated statements are refused with 503.
+// Returns null when the request may proceed, else the error response.
+async function requireAccess(
+  request: Request,
+  env: Env,
+  opts: { allowDashboard?: boolean } = {},
+): Promise<Response | null> {
+  if (opts.allowDashboard && env.DASHBOARD_READ_TOKEN) {
+    const auth = request.headers.get("Authorization") ?? "";
+    if (auth.startsWith("Bearer ") && timingSafeEqual(auth.slice(7), env.DASHBOARD_READ_TOKEN)) return null;
+  }
+  if (!env.ACCESS_AUD || !env.ACCESS_TEAM_DOMAIN) return jsonError("Case sync is not configured on this server", 503);
+  const email = await accessEmail(request, env);
+  if (!email) return jsonError("Sign in to sync cases", 401);
+  if (!emailDomainAllowed(email, env)) return jsonError("This account is not permitted to sync cases", 403);
+  return null;
 }
 
 // ── /api/chat — COMPASS's own Gemini call ─────────────────────────────────────
@@ -421,26 +508,10 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
   if (!env.ACCESS_AUD || !env.ACCESS_TEAM_DOMAIN) {
     return reply({ error: "Chat is not configured on this server" }, 503);
   }
-  const token =
-    request.headers.get("Cf-Access-Jwt-Assertion") ??
-    (/CF_Authorization=([^;]+)/.exec(request.headers.get("Cookie") ?? "")?.[1] ?? "");
-  const email = token
-    ? await verifyAccessJwt(token, env.ACCESS_AUD, env.ACCESS_TEAM_DOMAIN)
-    : null;
+  const email = await accessEmail(request, env);
   if (!email) return reply({ error: "Sign in to use chat" }, 401);
-
-  // Optional second check on the identity Access vouched for. The Access
-  // application policy already decides who gets a token; this only limits the
-  // blast radius if that policy is ever widened by accident.
-  const allowed = (env.ACCESS_ALLOWED_DOMAINS ?? "")
-    .split(",")
-    .map((d) => d.trim().toLowerCase())
-    .filter(Boolean);
-  if (allowed.length) {
-    const domain = email.split("@")[1]?.toLowerCase() ?? "";
-    if (!allowed.some((d) => domain === d || domain.endsWith(`.${d}`))) {
-      return reply({ error: "This account is not permitted to use chat" }, 403);
-    }
+  if (!emailDomainAllowed(email, env)) {
+    return reply({ error: "This account is not permitted to use chat" }, 403);
   }
 
   // Content-Length is a hint the client can simply omit (chunked encoding), so
@@ -678,7 +749,7 @@ export default {
         }
         return await handleUpdateAsset(pathname.slice("/api/updates/".length), request, env);
       }
-      if (pathname === "/api/turso/health") return await handleTursoHealth(env);
+      if (pathname === "/api/turso/health") return await handleTursoHealth(request, env);
       if (pathname === "/api/turso/execute") return await handleTursoExecute(request, env);
       if (pathname === "/api/turso/batch") return await handleTursoBatch(request, env);
       // Before the SPA fallback: this path is a Worker-rendered page, not a
