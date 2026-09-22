@@ -59,3 +59,7 @@ release/
 
 # Offline app: baked-in update token (CI generates it)
 electron/update-auth.json
+
+# Playwright
+test-results/
+playwright-report/

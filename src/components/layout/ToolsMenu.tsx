@@ -64,7 +64,7 @@ export function ToolsMenu() {
 
   const items: { label: string; Icon: React.ElementType; onClick: () => void; active?: boolean }[] = [
     { label: "Case log", Icon: BookOpen, onClick: run(() => setCaseLogOpen(true)) },
-    { label: "Patient summary", Icon: UserRound, onClick: run(() => setPatientView(true)) },
+    { label: "Patient mode", Icon: UserRound, onClick: run(() => setPatientView(true)) },
     {
       // Overview = every tab collapsed to its key points (also the header
       // toggle). Presenter view is the separate full-screen consult display.

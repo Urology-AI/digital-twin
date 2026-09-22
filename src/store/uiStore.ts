@@ -17,6 +17,14 @@ function readWelcomeSeen(): boolean {
   }
 }
 
+const PATIENT_LANG_KEY = "compass-patient-lang";
+function readPatientLang(): "en" | "es" {
+  try { return !isDemoMode() && localStorage.getItem(PATIENT_LANG_KEY) === "es" ? "es" : "en"; } catch { return "en"; }
+}
+
+/** Tabs of patient mode (see PatientView.tsx). */
+export type PatientTab = "case" | "surgery" | "factors" | "prep";
+
 /**
  * A link built for a patient uses the `/patient/<id>` path (not a query
  * flag) so a Cloudflare Access rule can match on it — Access matches
@@ -97,6 +105,10 @@ interface UiState {
   patientViewLocked: boolean;
   /** Full-screen 3D model overlay, opened on demand from within patient view. */
   patientView3DOpen: boolean;
+  /** which patient-mode tab is showing */
+  patientTab: PatientTab;
+  /** patient-mode language (English / Spanish) */
+  patientLang: "en" | "es";
   /** Full-screen presenter overlay — big-type highlight of ECE/SVI/potency/continence for showing to a patient or in a meeting. */
   presenterView: boolean;
   /** Local autosave status, shown as a header dot — reflects localStorage writes only, not cloud sync. */
@@ -122,6 +134,8 @@ interface UiState {
   setOverview: (v: boolean) => void;
   setPatientView: (v: boolean) => void;
   setPatientView3DOpen: (v: boolean) => void;
+  setPatientTab: (t: PatientTab) => void;
+  setPatientLang: (l: "en" | "es") => void;
   setPresenterView: (v: boolean) => void;
   startTutorial: () => void;
   nextTutorialStep: () => void;
@@ -131,7 +145,12 @@ interface UiState {
 }
 
 const fromPath = readPatientViewPath();
-const fromSession = readPatientViewSession();
+// A locked session was written by a /patient/<id> link. It only means
+// anything on that path — once the tab navigates elsewhere (e.g. a clinician
+// opening /clinical in it), drop it instead of trapping the tab in patient mode.
+const rawSession = readPatientViewSession();
+const fromSession = !fromPath && rawSession.locked ? { patientView: false, locked: false } : rawSession;
+if (!fromPath && rawSession.locked) writePatientViewSession(false, false);
 const initialPatientView = fromPath || fromSession.patientView;
 const initialPatientViewLocked = fromPath || fromSession.locked;
 // Keep the session fallback in sync too, so the clinician-preview path
@@ -162,6 +181,8 @@ export const useUiStore = create<UiState>((set, get) => ({
   patientView: initialPatientView,
   patientViewLocked: initialPatientViewLocked,
   patientView3DOpen: false,
+  patientTab: "case",
+  patientLang: readPatientLang(),
   presenterView: false,
   saveStatus: "saved",
   setSaveStatus: (v) => set({ saveStatus: v }),
@@ -202,6 +223,12 @@ export const useUiStore = create<UiState>((set, get) => ({
     set({ patientView: v, patientViewLocked: locked, patientView3DOpen: false });
   },
   setPatientView3DOpen: (v) => set({ patientView3DOpen: v }),
+  setPatientTab: (t) => set({ patientTab: t, patientView3DOpen: false }),
+  setPatientLang: (l) => {
+    // A per-viewer convenience, not case data — but the public demo keeps nothing.
+    try { if (!isDemoMode()) localStorage.setItem(PATIENT_LANG_KEY, l); } catch { /* private mode */ }
+    set({ patientLang: l });
+  },
   setPresenterView: (v) => set({ presenterView: v }),
   startTutorial: () => {
     try { if (!isDemoMode()) localStorage.setItem(WELCOME_SEEN_KEY, "1"); } catch { /* private mode */ }

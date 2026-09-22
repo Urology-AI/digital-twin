@@ -229,6 +229,10 @@ export function clinicalStateFromRecord(
     S.hernia_mesh = !!h.hernia_mesh;
     S.rectal_fistula = !!h.rectal_fistula;
     S.radiation_proctitis = !!h.radiation_proctitis;
+    if (h.asa_class !== null && h.asa_class !== undefined) S.asa_class = h.asa_class;
+    S.prior_abdominal_surgery = !!h.prior_abdominal_surgery;
+    S.anticoagulant = !!h.anticoagulant;
+    S.osa = !!h.osa;
     if (h.mri_periprostatic_inflammation)
       S.mri_periprostatic_inflammation = h.mri_periprostatic_inflammation;
     S.mri_periprostatic_fat_stranding = !!h.mri_periprostatic_fat_stranding;

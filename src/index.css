@@ -139,3 +139,10 @@
     }
   }
 }
+
+/* Patient mode: darker grey text and primary in light mode so body text and
+   buttons meet WCAG AA (4.5:1) — the patient audience skews older. */
+html:not(.dark) .patient-contrast {
+  --muted-foreground: 220 12% 36%;
+  --primary: 199 89% 32%;
+}

@@ -20,7 +20,7 @@ export function OutcomesWorkspace() {
             onClick={() => setPatientView(true)}
           >
             <UserRound className="h-3.5 w-3.5" />
-            Patient summary
+            Patient mode
           </Button>
         </div>
       )}

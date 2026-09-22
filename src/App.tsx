@@ -45,6 +45,7 @@ import { useUiStore, type DesktopTab } from "@/store/uiStore";
 import { isDemoMode } from "@/lib/demoMode";
 import { isOfflineBuild } from "@/lib/offlineBuild";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
+import { usePatientT } from "@/hooks/usePatientT";
 import { cn } from "@/lib/utils";
 
 
@@ -170,21 +171,26 @@ export default function App() {
   // side, live 3D model on the other — so the 3D canvas needs to react to it too.
   const showSplitCanvas = onPredictions || presenterView;
   const patientView3DOpen = useUiStore((s) => s.patientView3DOpen);
+  const patientTab = useUiStore((s) => s.patientTab);
+  // Patient mode "My surgery" tab: explanations left/top, live 3D right/bottom.
+  const patientSplit = patientView && patientTab === "surgery" && !patientView3DOpen;
   const setPatientView3DOpen = useUiStore((s) => s.setPatientView3DOpen);
   const demo = isDemoMode();
+  // Translates only while patient mode is showing (patient language setting).
+  const { tp } = usePatientT();
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background">
       {patientView ? <PatientViewHeader /> : <AppHeader />}
 
-      <div className="flex shrink-0 items-center justify-center gap-1.5 border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-600 dark:text-amber-400 sm:text-[11px]">
+      <div className="flex shrink-0 items-center justify-center gap-1.5 border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-800 dark:text-amber-400 sm:text-[11px]">
         {demo && (
           <span className="font-semibold">
             Preview — explore a sample case; nothing is saved. The full tool is for Mount Sinai clinicians.
           </span>
         )}
         <span>
-          Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment.
+          {tp("Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment.")}
         </span>
       </div>
 
@@ -206,7 +212,9 @@ export default function App() {
             "bg-muted/20",
             patientView && patientView3DOpen
               ? "fixed inset-0 z-40"
-              : cn("absolute inset-0 z-0", showSplitCanvas && "lg:left-1/2", showSplitCanvas && "max-lg:top-[42%]"),
+              : patientSplit
+                ? "absolute inset-0 z-20 lg:left-1/2 max-lg:top-[50%]"
+                : cn("absolute inset-0 z-0", showSplitCanvas && "lg:left-1/2", showSplitCanvas && "max-lg:top-[42%]"),
           )}
         >
           <div className="absolute inset-0 min-h-0 min-w-0" data-tutorial="three-canvas">
@@ -221,8 +229,8 @@ export default function App() {
           </div>
           {patientView && patientView3DOpen && (
             <>
-              <div className="absolute inset-x-0 top-0 z-50 flex items-center justify-center border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-400 sm:text-[11px]">
-                Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment.
+              <div className="absolute inset-x-0 top-0 z-50 flex items-center justify-center border-b border-border/50 bg-amber-500/10 px-3 py-1 text-center text-[10px] text-amber-800 dark:text-amber-400 sm:text-[11px]">
+                {tp("Research tool only — not a medical device, not FDA cleared, and no substitute for clinical judgment.")}
               </div>
               <OrientationBadge />
               <Button
@@ -231,17 +239,17 @@ export default function App() {
                 className="absolute right-4 top-4 z-50 gap-1.5 shadow-lg"
                 onClick={() => setPatientView3DOpen(false)}
               >
-                <X className="h-4 w-4" /> Close 3D model
+                <X className="h-4 w-4" /> {tp("Close 3D model")}
               </Button>
               <div className="pointer-events-none absolute inset-x-0 bottom-6 z-50 flex flex-col items-center gap-2 px-4">
                 <div className="flex items-center gap-2 rounded-lg bg-black/70 px-3 py-1.5 text-xs text-white/90 backdrop-blur">
                   <span className="h-2 w-6 rounded-full" style={{ background: "linear-gradient(to right,#22c55e,#eab308,#ef4444)" }} />
-                  <span>Lower risk</span>
+                  <span>{tp("Lower risk")}</span>
                   <span className="mx-1 text-white/40">→</span>
-                  <span>Higher risk</span>
+                  <span>{tp("Higher risk")}</span>
                 </div>
                 <div className="rounded-lg bg-black/70 px-4 py-2.5 text-center text-sm text-white/90 backdrop-blur">
-                  This is a 3D model of your prostate, colored by cancer risk, built from your own scan measurements. Drag to rotate.
+                  {tp("This is a 3D model of your prostate, colored by cancer risk, built from your own scan measurements. Drag to rotate.")}
                 </div>
               </div>
             </>
@@ -294,11 +302,12 @@ export default function App() {
           {overview ? <OverviewScreen tab="plan" /> : <SurgicalPlanWorkspace />}
         </div>
 
-        {/* ── Patient view: full-width Inputs | Recovery, 3D model behind a button ── */}
+        {/* ── Patient mode: four tabs; on "My surgery" it shares the screen with the 3D canvas ── */}
         <div
           className={cn(
-            "absolute inset-0 z-10 overflow-hidden bg-background",
+            "patient-contrast absolute inset-0 z-10 overflow-hidden bg-background",
             patientView ? "block" : "hidden",
+            patientSplit && "lg:right-1/2 max-lg:bottom-[50%]",
           )}
         >
           <PatientView />
@@ -327,20 +336,20 @@ export default function App() {
             you work, so it lives here rather than in the header bar. */}
         <BuildStatus />
         <StatusChips />
-        <span className="ml-auto text-[10px] text-muted-foreground/50">
+        <span className="ml-auto text-[10px] text-foreground/70">
           COMPASS · Tewari Lab · Mount Sinai · Research Use Only
         </span>
         <button
           type="button"
           onClick={() => setReferenceOpen(true)}
-          className="rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 hover:bg-muted/70 hover:text-foreground transition-colors"
+          className="rounded px-1.5 py-0.5 text-[10px] font-medium text-foreground/70 hover:bg-muted/70 hover:text-foreground transition-colors"
         >
           Anatomy view
         </button>
         <button
           type="button"
           onClick={() => setCreditsOpen(true)}
-          className="rounded px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground/70 hover:bg-muted/70 hover:text-foreground transition-colors"
+          className="rounded px-1.5 py-0.5 text-[10px] font-medium text-foreground/70 hover:bg-muted/70 hover:text-foreground transition-colors"
         >
           Credits
         </button>
