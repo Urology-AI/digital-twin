@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePatientStore } from "@/store/patientStore";
+import { usePatientT } from "@/hooks/usePatientT";
 import type {
   AlcoholLevel,
   ExerciseLevel,
@@ -25,6 +26,7 @@ function SegPicker<T extends string>({
   value: T;
   onChange: (v: T) => void;
 }) {
+  const { tp } = usePatientT();
   return (
     <div className="space-y-1.5">
       <div className="text-xs font-semibold text-foreground">{label}</div>
@@ -41,15 +43,15 @@ function SegPicker<T extends string>({
                 : "bg-card text-muted-foreground hover:bg-muted/60",
             )}
           >
-            {opt.label}
+            {tp(opt.label)}
             {opt.hint && (
               <span
                 className={cn(
                   "block text-[9px] font-normal leading-tight",
-                  value === opt.value ? "text-primary-foreground/70" : "text-muted-foreground/60",
+                  value === opt.value ? "text-primary-foreground/90" : "text-muted-foreground",
                 )}
               >
-                {opt.hint}
+                {tp(opt.hint)}
               </span>
             )}
           </button>
@@ -71,10 +73,11 @@ function BiologicalAgeReadout({
   ageText: string;
   onAge: (v: string) => void;
 }) {
+  const { tp } = usePatientT();
   const ageInput = (
     <div className="flex items-center gap-2">
       <label className="text-xs font-semibold text-foreground" htmlFor="mf-age">
-        Age
+        {tp("Age")}
       </label>
       <Input
         id="mf-age"
@@ -102,20 +105,20 @@ function BiologicalAgeReadout({
       {ageInput}
       <div className="border-l border-border/60 pl-3">
         <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-          Biological age
+          {tp("Biological age")}
         </div>
         <div className="flex items-baseline gap-1.5">
           <span
             className={cn(
               "text-lg font-bold tabular-nums",
-              older ? "text-amber-400" : younger ? "text-emerald-400" : "text-foreground",
+              older ? "text-amber-700 dark:text-amber-400" : younger ? "text-emerald-700 dark:text-emerald-400" : "text-foreground",
             )}
           >
             {bio.biological}
           </span>
           <span className="text-[11px] text-muted-foreground">
             {older ? "+" : ""}
-            {bio.offset} yr
+            {bio.offset} {tp("yr")}
           </span>
         </div>
       </div>
@@ -155,6 +158,9 @@ export function ModifiableFactorsPanel() {
   const activeId = usePatientStore((s) => s.activeId);
   const updateClinicalForm = usePatientStore((s) => s.updateClinicalForm);
   const pushHistory = usePatientStore((s) => s.pushHistory);
+  // Patient mode shows the same controls with plain-language labels (translated).
+  const { patientView: patientMode, tp } = usePatientT();
+  const L = (clinical: string, patient: string) => (patientMode ? tp(patient) : clinical);
 
   const entry = patients.find((p) => p.id === activeId);
 
@@ -261,10 +267,10 @@ export function ModifiableFactorsPanel() {
         <div className="flex items-start gap-x-4">
           <div className="min-w-0 flex-1">
             <CardTitle className="text-base font-semibold text-foreground">
-              Modifiable Factors
+              {L("Modifiable Factors", "Your habits and health")}
             </CardTitle>
             <p className="text-[11px] text-muted-foreground">
-              Lifestyle and medical inputs that drive functional-outcome predictions
+              {L("Lifestyle and medical inputs that drive functional-outcome predictions", "Tap to try changes and see how your recovery estimate moves")}
             </p>
           </div>
           {/* Age sits to the right of the title: it is the baseline the levers
@@ -288,14 +294,14 @@ export function ModifiableFactorsPanel() {
       </CardHeader>
       <CardContent className="space-y-3 px-4 py-3">
         <div className="flex items-center gap-1.5">
-          <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Body & Lifestyle</h3>
+          <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{L("Body & Lifestyle", "Body and lifestyle")}</h3>
           <EvidenceInfo title="Body & lifestyle factors" tags={BODY_LIFESTYLE_SOURCES} />
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground" htmlFor="mf-bmi">
-              BMI <span className="font-normal text-muted-foreground">(kg/m²)</span>
+              {L("BMI", "BMI")} <span className="font-normal text-muted-foreground">(kg/m²)</span>
             </label>
             <div className="flex items-center gap-2">
               <Input
@@ -315,15 +321,15 @@ export function ModifiableFactorsPanel() {
                   className={cn(
                     "rounded-full px-2 py-0.5 text-[11px] font-semibold",
                     bmiNum < 18.5
-                      ? "bg-blue-500/10 text-blue-500"
+                      ? "bg-blue-500/10 text-blue-700 dark:text-blue-400"
                       : bmiNum < 25
-                        ? "bg-emerald-500/10 text-emerald-400"
+                        ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                         : bmiNum < 30
-                          ? "bg-amber-500/10 text-amber-400"
-                          : "bg-red-500/10 text-red-500",
+                          ? "bg-amber-500/10 text-amber-800 dark:text-amber-400"
+                          : "bg-red-500/10 text-red-700 dark:text-red-400",
                   )}
                 >
-                  {bmiCat}
+                  {tp(bmiCat)}
                 </span>
               )}
             </div>
@@ -331,7 +337,7 @@ export function ModifiableFactorsPanel() {
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground" htmlFor="mf-shim">
-              SHIM <span className="font-normal text-muted-foreground">(0–25)</span>
+              {L("SHIM", "Erection score")} <span className="font-normal text-muted-foreground">({L("0–25", "SHIM, 0–25")})</span>
             </label>
             <Input
               id="mf-shim"
@@ -348,7 +354,7 @@ export function ModifiableFactorsPanel() {
 
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-foreground" htmlFor="mf-ipss">
-              IPSS <span className="font-normal text-muted-foreground">(0–35)</span>
+              {L("IPSS", "Urinary symptoms")} <span className="font-normal text-muted-foreground">({L("0–35", "IPSS, 0–35")})</span>
             </label>
             <Input
               id="mf-ipss"
@@ -365,7 +371,7 @@ export function ModifiableFactorsPanel() {
         </div>
 
         <SegPicker<PfmtLevel>
-          label="Pelvic Floor Training (PFMT)"
+          label={L("Pelvic Floor Training (PFMT)", "Pelvic-floor (Kegel) exercises")}
           options={[
             { label: "None", value: "none" },
             { label: "Basic", value: "basic" },
@@ -376,7 +382,7 @@ export function ModifiableFactorsPanel() {
           onChange={handlePfmt}
         />
         <SegPicker<ExerciseLevel>
-          label="Exercise Level"
+          label={L("Exercise Level", "How active you are")}
           options={[
             { label: "Sedentary", value: "sedentary", hint: "little / none" },
             { label: "Light", value: "light", hint: "under 150 min/wk" },
@@ -387,7 +393,7 @@ export function ModifiableFactorsPanel() {
           onChange={handleExercise}
         />
         <SegPicker<SmokingStatus>
-          label="Smoking Status"
+          label={L("Smoking Status", "Smoking")}
           options={[
             { label: "Never", value: "never" },
             { label: "Former", value: "former" },
@@ -399,22 +405,22 @@ export function ModifiableFactorsPanel() {
 
         <div className="space-y-3 border-t border-border/60 pt-3">
           <div className="flex items-center gap-1.5">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Medical Factors</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{L("Medical Factors", "Medicines and conditions")}</h3>
             <EvidenceInfo title="Medical factors" tags={MEDICAL_SOURCES} />
           </div>
 
           <SegPicker<Pde5Regimen>
-            label="PDE5 Inhibitor Plan"
+            label={L("PDE5 Inhibitor Plan", "Erection pill after surgery (e.g. tadalafil)")}
             options={[
               { label: "None", value: "none" },
-              { label: "PRN", value: "prn" },
+              { label: L("PRN", "As needed"), value: "prn" },
               { label: "Daily", value: "daily" },
             ]}
             value={pde5}
             onChange={handlePde5}
           />
           <SegPicker<AlcoholLevel>
-            label="Alcohol Usage"
+            label={L("Alcohol Usage", "Alcohol")}
             options={[
               { label: "None", value: "none", hint: "non-drinker" },
               { label: "Moderate", value: "moderate", hint: "up to 2/day" },
@@ -424,7 +430,7 @@ export function ModifiableFactorsPanel() {
             onChange={handleAlcohol}
           />
           <SegPicker<DietPattern>
-            label="Dietary Pattern"
+            label={L("Dietary Pattern", "Diet")}
             options={[
               { label: "Lean protein & healthy fats", value: "favorable" },
               { label: "Average", value: "average" },
@@ -435,13 +441,13 @@ export function ModifiableFactorsPanel() {
           />
 
           <div className="space-y-1.5">
-            <div className="text-xs font-semibold text-foreground">Comorbidities</div>
+            <div className="text-xs font-semibold text-foreground">{L("Comorbidities", "Other conditions")}</div>
             <div className="flex gap-2">
               {(
                 [
-                  ["Diabetes", dm, handleDm],
-                  ["HTN", htn, handleHtn],
-                  ["CAD", cad, handleCad],
+                  [L("Diabetes", "Diabetes"), dm, handleDm],
+                  [L("HTN", "High blood pressure"), htn, handleHtn],
+                  [L("CAD", "Heart disease"), cad, handleCad],
                 ] as [string, boolean, (v: boolean) => void][]
               ).map(([label, val, setter]) => (
                 <button
@@ -462,11 +468,14 @@ export function ModifiableFactorsPanel() {
           </div>
         </div>
 
-        <div className="border-t border-border/60 pt-3">
-          <Button type="button" size="sm" onClick={() => pushHistory()} className="w-full">
-            Save Checkpoint
-          </Button>
-        </div>
+        {/* Undo checkpoints are a clinician tool. */}
+        {!patientMode && (
+          <div className="border-t border-border/60 pt-3">
+            <Button type="button" size="sm" onClick={() => pushHistory()} className="w-full">
+              Save Checkpoint
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

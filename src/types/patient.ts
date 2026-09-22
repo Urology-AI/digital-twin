@@ -97,6 +97,11 @@ export interface Prostate3DInputV1 {
     hernia_mesh?: boolean;
     rectal_fistula?: boolean;
     radiation_proctitis?: boolean;
+    /** pre-op counseling only (not a COMPASS model input) */
+    asa_class?: number | null;
+    prior_abdominal_surgery?: boolean;
+    anticoagulant?: boolean;
+    osa?: boolean;
     /** radiologist read of periprostatic inflammation on MRI */
     mri_periprostatic_inflammation?: "none" | "equivocal" | "present";
     mri_periprostatic_fat_stranding?: boolean;
@@ -205,6 +210,8 @@ export interface Prostate3DInputV1 {
   };
   zones: ZoneMap;
   lesions: import("./lesion").LesionRow[];
+  /** clinician sign-off on the patient pre-op counseling page */
+  preop_review?: { reviewer: string; date: string; fingerprint: string } | null;
   media?: Record<
     string,
     { dataUrl?: string; type?: string; name?: string; size?: number }
@@ -294,6 +301,11 @@ export interface ClinicalState {
   hernia_mesh: boolean;
   rectal_fistula: boolean;
   radiation_proctitis: boolean;
+  /** pre-op counseling only — ASA physical status 1–4 */
+  asa_class: number;
+  prior_abdominal_surgery: boolean;
+  anticoagulant: boolean;
+  osa: boolean;
   mri_periprostatic_inflammation: "none" | "equivocal" | "present";
   mri_periprostatic_fat_stranding: boolean;
   intraop_inflammation_l: number;
@@ -416,6 +428,10 @@ export function defaultClinicalState(): ClinicalState {
     hernia_mesh: false,
     rectal_fistula: false,
     radiation_proctitis: false,
+    asa_class: 2,
+    prior_abdominal_surgery: false,
+    anticoagulant: false,
+    osa: false,
     mri_periprostatic_inflammation: "none",
     mri_periprostatic_fat_stranding: false,
     intraop_inflammation_l: 0,

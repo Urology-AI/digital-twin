@@ -358,3 +358,34 @@ export async function chatWithAssistant(
   const reply = await llmChat(llmMessages, { maxTokens: 1024 });
   return { reply };
 }
+
+/**
+ * Patient-facing pre-op expectation-setting narrative. Receives only the
+ * identifier-free summary from `counselingContext()`; may cite only the
+ * reference keys passed in (no free-form citations — models invent them).
+ */
+export async function generatePreopNarrative(
+  context: Record<string, unknown>,
+  referenceKeys: string[],
+  lang: "en" | "es" = "en",
+): Promise<string> {
+  const system =
+    "You write pre-operative counseling for a man about to have robot-assisted radical " +
+    "prostatectomy. Write for a patient at an 8th-grade reading level, warm but honest.\n" +
+    "Cover, with short headings: what the day of surgery looks like; his personal risk " +
+    "considerations (anesthesia/ASA, metabolic health and weight, prior abdominal surgery, " +
+    "clots, lungs, bleeding) using ONLY the data given; what recovery will likely feel like; " +
+    "what he can do now to prepare; questions to ask his surgeon.\n" +
+    "Rules: give ranges, never certainties. Do not invent numbers that are not in the data. " +
+    "Cite sources ONLY as [key] using these keys: " + referenceKeys.join(", ") + ". " +
+    "Never make a treatment decision — defer to the surgical team. End with: " +
+    "'This is educational information for research use, not medical advice.'" +
+    (lang === "es" ? "\nWrite the entire letter in clear, plain US Spanish (including the closing line)." : "");
+  return llmChat(
+    [
+      { role: "system", content: system },
+      { role: "user", content: JSON.stringify(deidentifyClinical(context), null, 2) },
+    ],
+    { temperature: 0.3, maxTokens: 1500 },
+  );
+}

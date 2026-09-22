@@ -21,7 +21,7 @@ export function BuildStatus() {
         : null;
 
   return (
-    <span className="flex items-center gap-2 text-[10px] text-muted-foreground/50">
+    <span className="flex items-center gap-2 text-[10px] text-foreground/70">
       <span className="tabular-nums" title="Build version">v{__APP_VERSION__}</span>
       {(desktop || ready) && (
         <button

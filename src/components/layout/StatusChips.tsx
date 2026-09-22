@@ -50,7 +50,7 @@ export function StatusChips() {
     return (
       <span
         title="Signed in through Cloudflare Access"
-        className={cn(chip, "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400")}
+        className={cn(chip, "bg-emerald-500/15 text-emerald-800 dark:text-emerald-400")}
       >
         <Lock className="h-3 w-3" />
         Clinical
@@ -74,7 +74,7 @@ export function StatusChips() {
   return (
     <span
       title="Restricted — no Cloudflare Access session, so no patient data loads"
-      className={cn(chip, "bg-red-500/15 text-red-600 dark:text-red-400")}
+      className={cn(chip, "bg-red-500/15 text-red-800 dark:text-red-400")}
     >
       <LockOpen className="h-3 w-3" />
       Restricted

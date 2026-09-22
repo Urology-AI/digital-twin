@@ -68,6 +68,8 @@ interface PatientState {
   predictions: CompassPredictions | null;
   threeZones: ThreeZoneRuntime[];
   loading: boolean;
+  /** Patient-link case fetch: "loading" until it resolves, "missing" if the link found nothing. */
+  sharedLinkStatus: "none" | "loading" | "loaded" | "missing";
   history: string[];
   historyIndex: number;
   bootstrapFromJson: (rows: { id: string; name: string; record: Prostate3DInputV1 }[]) => void;
@@ -80,6 +82,7 @@ interface PatientState {
   updateClinicalForm: (patch: Partial<import("@/types/patient").ClinicalState>) => void;
   /** Wholesale-replaces one patient's record + lesions — used by patient view's "reset to original" after local-only edits (e.g. Modifiable Factors exploration). */
   restorePatientRecord: (id: string, record: Prostate3DInputV1, lesionRows: LesionRow[]) => void;
+  setPreopReview: (review: Prostate3DInputV1["preop_review"]) => void;
   newCase: () => void;
   /** Load a read-only demo template, replacing any existing copy of it. */
   loadDemoCase: (demo: import("@/data/demoCases").DemoCase) => void;
@@ -127,6 +130,7 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
     predictions: null,
     threeZones: createBaseThreeZones(),
     loading: true,
+    sharedLinkStatus: "none",
     history: [],
     historyIndex: -1,
 
@@ -249,6 +253,18 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       return { S, predictions };
     },
 
+    setPreopReview: (review) => {
+      const { activeId, patients } = get();
+      if (!activeId) return;
+      set({
+        patients: patients.map((p) =>
+          p.id === activeId ? { ...p, record: { ...clone(p.record), preop_review: review ?? null } } : p,
+        ),
+      });
+      get().recompute();
+      get().pushHistory();
+    },
+
     restorePatientRecord: (id, record, lesionRows) => {
       const { patients } = get();
       const next = patients.map((p) =>
@@ -364,6 +380,7 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
         "recurrent_uti", "treated_prostatitis", "biopsy_shows_inflammation",
         "crohns", "ulcerative_colitis", "diverticulitis", "pelvic_abscess",
         "hernia_mesh", "rectal_fistula", "radiation_proctitis",
+        "prior_abdominal_surgery", "anticoagulant", "osa",
         "mri_periprostatic_fat_stranding",
         "catheter_prolonged_or_traumatic", "biopsy_recent_or_complicated",
         "flag_active_infection", "flag_imaging_discordant", "flag_mri_artifact",
@@ -373,6 +390,7 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
         const v = (patch as Record<string, unknown>)[k];
         if (v !== undefined) (H as Record<string, unknown>)[k] = v;
       }
+      if (patch.asa_class !== undefined) H.asa_class = patch.asa_class;
       if (patch.biopsy_sessions !== undefined) H.biopsy_sessions = patch.biopsy_sessions;
       if (patch.mri_periprostatic_inflammation !== undefined)
         H.mri_periprostatic_inflammation = patch.mri_periprostatic_inflammation;
@@ -906,7 +924,7 @@ function applySharedRecord(data: Prostate3DInputV1): void {
   const updated = existing >= 0
     ? patients.map((p, i) => (i === existing ? entry : p))
     : [...patients, entry];
-  usePatientStore.setState({ patients: updated, activeId: id, loading: false });
+  usePatientStore.setState({ patients: updated, activeId: id, loading: false, sharedLinkStatus: "loaded" });
   usePatientStore.getState().recompute();
 }
 
@@ -928,11 +946,12 @@ export async function loadSharedCaseFromUrl(): Promise<void> {
       json = new TextDecoder().decode(Uint8Array.from(atob(match[1]!), (c) => c.charCodeAt(0)));
     }
     const data = JSON.parse(json) as Prostate3DInputV1;
-    if (data._schema !== "prostate-3d-input-v1") return;
+    if (data._schema !== "prostate-3d-input-v1") throw new Error("wrong schema");
     applySharedRecord(data);
     history.replaceState(null, "", window.location.pathname + window.location.search);
   } catch {
-    /* malformed hash — ignore */
+    // Malformed hash — ignored in the clinical app, but a patient link must say so.
+    if (window.location.pathname.startsWith("/patient/")) usePatientStore.setState({ sharedLinkStatus: "missing" });
   }
 }
 
@@ -945,15 +964,25 @@ export async function loadSharedCaseFromUrl(): Promise<void> {
  */
 export async function loadSharedCaseFromPath(): Promise<void> {
   if (window.location.hash) return;
+  const onPatientPath = window.location.pathname.startsWith("/patient/");
   const match = window.location.pathname.match(/^\/patient\/([^/]+)\/?$/);
-  if (!match) return;
+  if (!match) {
+    if (onPatientPath) usePatientStore.setState({ sharedLinkStatus: "missing" });
+    return;
+  }
   const id = match[1]!;
+  usePatientStore.setState({ sharedLinkStatus: "loading" });
   try {
     const { loadShareCase } = await import("@/lib/turso");
     const data = await loadShareCase(id);
-    if (!data || (data as Prostate3DInputV1)._schema !== "prostate-3d-input-v1") return;
+    if (!data || (data as Prostate3DInputV1)._schema !== "prostate-3d-input-v1") {
+      usePatientStore.setState({ sharedLinkStatus: "missing" });
+      return;
+    }
     applySharedRecord(data as Prostate3DInputV1);
   } catch {
-    /* Turso/Worker unreachable or malformed record — leave whatever's already loaded */
+    // Turso/Worker unreachable or malformed record. Patient mode must not fall
+    // back to showing whatever default case is loaded as if it were theirs.
+    usePatientStore.setState({ sharedLinkStatus: "missing" });
   }
 }
