@@ -367,12 +367,13 @@ describe("buildSurgicalPlan", () => {
     expect(plan.left.decisionCode).toBe("preserve-hostile-protocol");
   });
 
-  it("escalates NS grade when EPE probability itself is high, regardless of hostility", () => {
+  it("keeps the 5-zone model grade when EPE is high — the matrix is advisory only", () => {
     const S = defaultClinicalState();
     const infl = predictInflammationRisk(S);
     const plan = buildSurgicalPlan(S, nsDetail(2), nsDetail(1), 0.02, 0.02, infl, 0.4, 0.02);
     expect(plan.left.epeTier).toBe("high");
-    expect(plan.left.nsGrade).toBe(3);
+    expect(plan.left.nsGrade).toBe(2);
+    expect(plan.left.pipsGrade).toBe(3);
     expect(plan.left.decisionCode).toBe("wider-plane");
   });
 

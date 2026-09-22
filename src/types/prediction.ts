@@ -60,6 +60,8 @@ export interface SidePlan {
   modelGrade: number;
   /** what the model recommends = modelGrade + inflammation escalation, no override */
   recommendedGrade: number;
+  /** PIPS decision-matrix grade: modelGrade + 1 when side EPE is high, else modelGrade (advisory) */
+  pipsGrade: number;
   /** true when the surgeon override differs from recommendedGrade */
   overridden: boolean;
   /** why the model landed on this grade, + any inflammation escalation note */
