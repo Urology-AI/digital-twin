@@ -19,7 +19,6 @@ import {
 import type { InflammationRisk } from "@/lib/compass/inflammationRisk";
 import { predictPlaneHostility } from "@/lib/compass/planeHostility";
 import { applyDeferGate, checkPipsGates, epeTier, planeDecisionMatrix } from "@/lib/compass/planeDecisionMatrix";
-import { clamp } from "@/lib/utils/math";
 import type { ClinicalState } from "@/types/patient";
 import type { NsSideDetail, PlanRec, SidePlan, SurgicalPlan } from "@/types/prediction";
 
@@ -63,8 +62,10 @@ function buildSide(
   const hostility = predictPlaneHostility(S, side);
   const tier = epeTier(sideEce);
   const decision = applyDeferGate(planeDecisionMatrix(tier, hostility.tier), checkPipsGates(S));
-  const inflEscalated = decision.escalate && modelGrade < 3;
-  const recommendedGrade = inflEscalated ? Math.min(3, modelGrade + 1) : modelGrade;
+  // The matrix is advisory only: the 5-zone grade already reflects side ECE,
+  // so escalating again on high EPE would double-count it.
+  const recommendedGrade = modelGrade;
+  const pipsGrade = decision.escalate ? Math.min(3, modelGrade + 1) : modelGrade;
   let grade = recommendedGrade;
 
   const overridden = override != null && override !== recommendedGrade;
@@ -77,7 +78,7 @@ function buildSide(
   // above already shows the model grade, so this line explains why.
   const reason = nsDetail.reason || `model NS grade ${modelGrade}`;
   let gradeRationale = reason;
-  if (inflEscalated) {
+  if (decision.escalate) {
     gradeRationale = `${reason} · ${decision.rationale}`;
   } else if (decision.hostileProtocol) {
     gradeRationale = `${reason} · hostile-plane protocol (fibrosis, not EPE)`;
@@ -88,17 +89,15 @@ function buildSide(
     gradeRationale = decision.rationale;
   }
 
-  // Zone grades from raw zone ECE, shifted only by the inflammation escalation
-  // (a real per-zone risk signal). A surgeon's side-level plane override does
+  // Zone grades from raw zone ECE. A surgeon's side-level plane override does
   // NOT move the zone chips — those stay the recommended per-zone picture.
   const T = NS_ZONE_THRESHOLDS.value;
-  const gradeDelta = recommendedGrade - modelGrade;
   const zoneGrades: Record<string, number> = {};
   for (const z of ZONES) {
     const ece = nsDetail.zones[z] ?? 0;
     const th = T[z] ?? T.posterolateral;
     const raw = ece >= th.grade3 ? 3 : ece >= th.grade2 ? 2 : 1;
-    zoneGrades[z] = clamp(raw + gradeDelta, 1, 3);
+    zoneGrades[z] = raw;
   }
 
   // ── Hydrodissection ───────────────────────────────────────────────────
@@ -143,6 +142,7 @@ function buildSide(
     nsGrade: grade,
     modelGrade,
     recommendedGrade,
+    pipsGrade,
     overridden,
     gradeRationale,
     plane,

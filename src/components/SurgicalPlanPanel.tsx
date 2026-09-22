@@ -407,6 +407,24 @@ function SideCard({
               { value: "3", label: "3", hint: "Wide" },
             ]}
           />
+          {plan.pipsGrade !== recGrade && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+              <span className="text-muted-foreground">
+                5-zone model: <span className="font-semibold text-foreground">grade {recGrade}</span>
+                {" · "}PIPS (side ECE {Math.round(sideEce * 100)}%, high):{" "}
+                <span className="font-semibold text-red-600 dark:text-red-400">grade {plan.pipsGrade}</span>
+              </span>
+              {plan.nsGrade !== plan.pipsGrade && (
+                <button
+                  type="button"
+                  onClick={() => onOverride(plan.pipsGrade)}
+                  className="font-medium text-primary hover:underline"
+                >
+                  use grade {plan.pipsGrade}
+                </button>
+              )}
+            </div>
+          )}
           <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{plan.gradeRationale}</p>
         </div>
 
