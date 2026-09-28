@@ -4,10 +4,9 @@ import { mapZoneDataToThree } from "@/lib/compass/mapZoneData";
 import { getNsGradeZoneAware } from "@/lib/compass/nsGrade";
 import { buildSurgicalPlan } from "@/lib/compass/surgicalPlan";
 import { predictBcrPreop } from "@/lib/models/bcr";
+import { predictEceVNext } from "@/lib/models/vnext/ece";
 import {
-  clampEcePatient,
   clampEceSide,
-  predictEcePatient,
   predictEceSide,
   predictExtensiveEce,
 } from "@/lib/models/ece";
@@ -36,7 +35,11 @@ export function runCompassModels(
 
   S.psad = S.vol > 0 ? S.psa / S.vol : S.psad;
 
-  const ece = clampEcePatient(predictEcePatient(S));
+  // vNext ECE (vNext-core-candidate-2026-09-24). No clamp. If PSA, volume or
+  // grade group is missing the model refuses to predict and ece is NaN; the
+  // display of that "cannot compute" state is handled with the UI update.
+  const eceV = predictEceVNext(S);
+  const ece = eceV.ok ? eceV.probability : NaN;
   const svi = clamp(predictSviPatient(S), 0.01, 0.9);
   const upgrade =
     S.gg >= 1 ? clamp(predictUpgrade(S), 0.05, 0.85) : 0.05;
