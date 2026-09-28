@@ -1,4 +1,8 @@
 import type { ClinicalState } from "@/types/patient";
+// COMPAT SHIM (Phase 1A): see inputContract.ts. Each v22Absent() call passes
+// the exact in-band value the field held when absent pre-Phase-1A, so model
+// outputs are bit-identical. Phases 2–7 replace these with vNext imputation.
+import { v22Absent } from "./inputContract";
 import { sigmoid } from "@/lib/utils/math";
 import { UPGRADE as UPGRADE_W, weightsToArrays } from "./weights";
 
@@ -9,15 +13,15 @@ export function predictUpgrade(S: ClinicalState): number {
   const vals = [
     S.psad,
     S.gg,
-    S.cores,
-    S.maxcore,
+    v22Absent(S.cores, 0),
+    v22Absent(S.maxcore, 0),
     S.linear_mm,
     S.pct45,
     S.cribriform_bx,
     S.pni_bx,
     S.bilateral,
-    Math.max(S.pirads, 2),
-    S.mri_svi,
+    Math.max(v22Absent(S.pirads, 2), 2),
+    v22Absent(S.mri_svi, 0),
     S.mus_ece,
     S.suv,
     S.psma_epe,

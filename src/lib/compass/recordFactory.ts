@@ -1,4 +1,5 @@
 import { createDefaultZones } from "@/lib/compass/constants";
+import { isObserved } from "@/lib/models/inputContract";
 import type { ClinicalState, Prostate3DInputV1, ZoneMap } from "@/types/patient";
 import type { LesionRow } from "@/types/lesion";
 
@@ -115,17 +116,26 @@ export function buildProstateRecord(
       decipher_score: S.dec,
     },
     staging: {
-      epe: !!S.mri_epe,
-      svi: !!S.mri_svi,
+      // null survives the round-trip: an unperformed MRI must not serialize as
+      // an assessed-negative MRI.
+      epe: isObserved(S.mri_epe) ? !!S.mri_epe : null,
+      svi: isObserved(S.mri_svi) ? !!S.mri_svi : null,
       max_pirads: S.pirads,
       max_suv: S.suv || null,
       lesion_size_cm: S.mri_size > 0 ? S.mri_size : null,
-      abutment: S.mri_abutment >= 0 ? S.mri_abutment : null,
-      adc_mean: S.mri_adc > 0 ? S.mri_adc : null,
+      abutment:
+        isObserved(S.mri_abutment) && S.mri_abutment >= 0
+          ? S.mri_abutment
+          : null,
+      adc_mean: isObserved(S.mri_adc) && S.mri_adc > 0 ? S.mri_adc : null,
       epe_mus: !!S.mus_ece,
       svi_mus: !!S.mus_svi,
       psma_epe: !!S.psma_epe,
-      lymph_nodes_psma: S.psma_ln ? "positive" : undefined,
+      lymph_nodes_psma: isObserved(S.psma_ln)
+        ? S.psma_ln
+          ? "positive"
+          : "negative"
+        : undefined,
     },
     zones,
     lesions,

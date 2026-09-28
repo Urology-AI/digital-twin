@@ -194,8 +194,15 @@ export interface Prostate3DInputV1 {
     decipher_score?: number | null;
   };
   staging: {
-    epe: boolean;
-    svi: boolean;
+    /**
+     * MRI extracapsular extension call. `null` = MRI not performed or EPE not
+     * assessed; `false` = assessed and negative. Widened from plain `boolean`
+     * in Phase 1A so an absent MRI no longer round-trips as a negative MRI.
+     * Reading older records is unaffected: they carry true/false.
+     */
+    epe: boolean | null;
+    /** MRI seminal vesicle invasion call. `null` = not assessed. */
+    svi: boolean | null;
     max_pirads?: number | null;
     max_suv?: number | null;
     lesion_size_cm?: number | null;
@@ -218,15 +225,42 @@ export interface Prostate3DInputV1 {
   >;
 }
 
+/**
+ * A clinical predictor that may be genuinely unavailable.
+ *
+ * `null` means the test was not performed or the value was not recorded.
+ * `0` means the test WAS performed and the finding was negative/zero.
+ * These two states must never collapse into each other: the vNext model locks
+ * substitute a frozen training-cohort imputation mean for `null`, which is not
+ * 0 for any predictor. See `src/lib/models/inputContract.ts`.
+ */
+export type OptionalPredictor = number | null;
+
 export interface ClinicalState {
   age: number;
   bmi: number;
+  /** REQUIRED for vNext oncologic endpoints; must be > 0. */
   psa: number;
+  /** REQUIRED for vNext oncologic endpoints; must be > 0. */
   vol: number;
   psad: number;
+  /** REQUIRED for vNext oncologic endpoints; biopsy grade group 1–5. */
   gg: number;
-  cores: number;
-  maxcore: number;
+  /**
+   * Whether each REQUIRED input was actually present in the source record.
+   *
+   * `psa`, `vol` and `gg` stay plain numbers because the entire v22 runtime and
+   * UI read them unconditionally, and Phase 1A is not permitted to change what
+   * v22 computes. When a record omits one, the parser still seeds the historical
+   * default (PSA 6.5, volume 45, GG 1) so v22 output is bit-identical, and
+   * records the omission here. `validateVNextRequiredInputs` reads this, so the
+   * vNext runtime can refuse to predict rather than quietly inventing a PSAD.
+   *
+   * Phases 2–7 make this the only consulted source for required-input presence.
+   */
+  required_present: { psa: boolean; vol: boolean; gg: boolean };
+  cores: OptionalPredictor;
+  maxcore: OptionalPredictor;
   linear_mm: number;
   pct45: number;
   cribriform_bx: number;
@@ -234,9 +268,9 @@ export interface ClinicalState {
   pni_bx: number;
   bilateral: number;
   laterality: "left" | "right" | "bilateral";
-  pirads: number;
-  mri_epe: number;
-  mri_svi: number;
+  pirads: OptionalPredictor;
+  mri_epe: OptionalPredictor;
+  mri_svi: OptionalPredictor;
   primus: number;
   mus_ece: number;
   mus_svi: number;
@@ -244,7 +278,7 @@ export interface ClinicalState {
   suv: number;
   psma_epe: number;
   psma_svi: number;
-  psma_ln: number;
+  psma_ln: OptionalPredictor;
   dec: number | null;
   decipher: string;
   shim: number;
@@ -262,8 +296,13 @@ export interface ClinicalState {
   leftMaxScore: number;
   rightMaxScore: number;
   mri_size: number;
-  mri_abutment: number;
-  mri_adc: number;
+  /**
+   * Capsular abutment grade. Historically -1 was an in-band sentinel for
+   * "not assessed"; vNext uses `null` for that and reserves numeric values
+   * for real observations.
+   */
+  mri_abutment: OptionalPredictor;
+  mri_adc: OptionalPredictor;
   psma_lesion_count: number;
   psma_multifocal: number;
   psma_at_base: number;
@@ -353,6 +392,7 @@ export function defaultClinicalState(): ClinicalState {
     vol: 45,
     psad: 0.144,
     gg: 2,
+    required_present: { psa: true, vol: true, gg: true },
     cores: 4,
     maxcore: 40,
     linear_mm: 0,
@@ -390,8 +430,8 @@ export function defaultClinicalState(): ClinicalState {
     leftMaxScore: 0,
     rightMaxScore: 0,
     mri_size: 0,
-    mri_abutment: -1,
-    mri_adc: 0,
+    mri_abutment: null,
+    mri_adc: null,
     psma_lesion_count: 0,
     psma_multifocal: 0,
     psma_at_base: 0,

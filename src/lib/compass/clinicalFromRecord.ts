@@ -1,10 +1,18 @@
 import {
   defaultClinicalState,
   type ClinicalState,
+  type OptionalPredictor,
   type Prostate3DInputV1,
 } from "@/types/patient";
 
-function parsePsmaLn(staging: Prostate3DInputV1["staging"]): number {
+/**
+ * PSMA nodal status. Returns null when no PSMA nodal assessment is present in
+ * the record at all, so "no PSMA scan" stays distinct from "PSMA scan, nodes
+ * negative".
+ */
+function parsePsmaLn(
+  staging: Prostate3DInputV1["staging"],
+): OptionalPredictor {
   const lnPsma = staging.lymph_nodes_psma;
   if (Array.isArray(lnPsma)) {
     return lnPsma.some(
@@ -18,7 +26,8 @@ function parsePsmaLn(staging: Prostate3DInputV1["staging"]): number {
     return /positive|suspicious|avid|uptake/i.test(lnPsma) ? 1 : 0;
   }
   if (lnPsma === 1 || lnPsma === true) return 1;
-  return 0;
+  if (lnPsma === 0 || lnPsma === false) return 0;
+  return null;
 }
 
 /** Build clinical state from imported `prostate-3d-input-v1` (mirrors `loadPatientData`). */
@@ -32,8 +41,11 @@ export function clinicalStateFromRecord(
   S.vol = 45;
   S.psad = 0.144;
   S.gg = 1;
-  S.cores = 0;
-  S.maxcore = 0;
+  // Absent optional predictors stay null. Pre-Phase-1A these were seeded with
+  // plausible numbers (0 cores, 0% max core, PI-RADS 2, MRI negative), which
+  // made "not recorded" indistinguishable from "recorded as negative".
+  S.cores = null;
+  S.maxcore = null;
   S.linear_mm = 0;
   S.pct45 = 0;
   S.cribriform_bx = 0;
@@ -41,9 +53,9 @@ export function clinicalStateFromRecord(
   S.pni_bx = 0;
   S.bilateral = 0;
   S.laterality = "bilateral";
-  S.pirads = 2;
-  S.mri_epe = 0;
-  S.mri_svi = 0;
+  S.pirads = null;
+  S.mri_epe = null;
+  S.mri_svi = null;
   S.primus = 0;
   S.mus_ece = 0;
   S.mus_svi = 0;
@@ -61,8 +73,8 @@ export function clinicalStateFromRecord(
   S.linear_left = 0;
   S.linear_right = 0;
   S.mri_size = 0;
-  S.mri_abutment = -1;
-  S.mri_adc = 0;
+  S.mri_abutment = null;
+  S.mri_adc = null;
 
   const pat = P.patient;
   const bx = P.biopsy;
@@ -70,11 +82,20 @@ export function clinicalStateFromRecord(
   const st = P.staging;
 
   if (pat.age !== null && pat.age !== undefined) S.age = pat.age;
-  if (pat.psa !== null && pat.psa !== undefined) S.psa = pat.psa;
-  if (pr.volume_cc !== null && pr.volume_cc !== undefined) S.vol = pr.volume_cc;
+
+  // Required inputs. The historical defaults above (PSA 6.5, volume 45, GG 1)
+  // are left in place so the v22 runtime is unchanged, but the omission is
+  // recorded so vNext can block execution instead of inventing a PSAD.
+  S.required_present = {
+    psa: pat.psa !== null && pat.psa !== undefined,
+    vol: pr.volume_cc !== null && pr.volume_cc !== undefined,
+    gg: bx.max_grade_group !== null && bx.max_grade_group !== undefined,
+  };
+  if (S.required_present.psa) S.psa = pat.psa as number;
+  if (S.required_present.vol) S.vol = pr.volume_cc as number;
   S.psad = S.psa / S.vol;
-  if (bx.max_grade_group !== null && bx.max_grade_group !== undefined)
-    S.gg = bx.max_grade_group;
+  if (S.required_present.gg) S.gg = bx.max_grade_group as number;
+
   if (bx.total_positive_cores !== null && bx.total_positive_cores !== undefined)
     S.cores = bx.total_positive_cores;
   if (
@@ -94,8 +115,9 @@ export function clinicalStateFromRecord(
   if (bx.has_idc !== null && bx.has_idc !== undefined) S.idc_bx = bx.has_idc;
   if (bx.has_pni !== null && bx.has_pni !== undefined) S.pni_bx = bx.has_pni;
   S.bilateral = bx.laterality === "bilateral" ? 1 : 0;
-  S.mri_epe = st.epe ? 1 : 0;
-  S.mri_svi = st.svi ? 1 : 0;
+  // null (MRI not performed / EPE-SVI not assessed) stays null.
+  S.mri_epe = st.epe === null || st.epe === undefined ? null : st.epe ? 1 : 0;
+  S.mri_svi = st.svi === null || st.svi === undefined ? null : st.svi ? 1 : 0;
   if (st.lesion_size_cm) S.mri_size = st.lesion_size_cm;
   if (st.abutment !== null && st.abutment !== undefined)
     S.mri_abutment = st.abutment;
@@ -146,14 +168,18 @@ export function clinicalStateFromRecord(
     (S.laterality === "right" || S.laterality === "bilateral")
   )
     S.gg_right = S.gg;
-  if (!S.mc_left && S.gg_left > 0) S.mc_left = S.maxcore;
-  if (!S.mc_right && S.gg_right > 0) S.mc_right = S.maxcore;
+  if (!S.mc_left && S.gg_left > 0) S.mc_left = S.maxcore ?? 0;
+  if (!S.mc_right && S.gg_right > 0) S.mc_right = S.maxcore ?? 0;
   if (!S.linear_left && S.gg_left > 0) S.linear_left = S.linear_mm;
   if (!S.linear_right && S.gg_right > 0) S.linear_right = S.linear_mm;
 
-  let maxPirads = 2;
+  // PI-RADS is only "observed" if a lesion or the staging block actually
+  // carries one. Pre-Phase-1A this seeded 2, which is indistinguishable from a
+  // real PI-RADS 2 and also happens to be the model-layer floor.
+  let maxPirads: OptionalPredictor = null;
   for (const l of P.lesions || []) {
-    if (l.pirads && l.pirads > maxPirads) maxPirads = l.pirads;
+    if (l.pirads && (maxPirads === null || l.pirads > maxPirads))
+      maxPirads = l.pirads;
   }
   S.pirads = maxPirads;
 
@@ -178,7 +204,8 @@ export function clinicalStateFromRecord(
     S.suv = maxSuv;
   }
 
-  if (st.max_pirads && st.max_pirads > S.pirads) S.pirads = st.max_pirads;
+  if (st.max_pirads && (S.pirads === null || st.max_pirads > S.pirads))
+    S.pirads = st.max_pirads;
   if (st.max_suv && st.max_suv > S.suv) {
     S.suv = st.max_suv;
     S.psma_avail = 1;

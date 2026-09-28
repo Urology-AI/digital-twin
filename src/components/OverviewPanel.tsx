@@ -1,3 +1,4 @@
+import { isObserved } from "@/lib/models/inputContract";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePatientStore } from "@/store/patientStore";
 import { useUiStore, type DesktopTab } from "@/store/uiStore";
@@ -134,8 +135,8 @@ export function OverviewPanel({ tab }: { tab: DesktopTab }) {
         <Row label="PSA" value={S.psa > 0 ? `${S.psa} ng/mL` : "—"}
              note={psad ? `PSAD ${psad.toFixed(3)} ng/mL/cc · ${S.vol} cc gland` : undefined} />
         <Row label="Grade group" value={S.gg > 0 ? `GG ${S.gg}` : "—"}
-             note={S.cores > 0 ? `${S.cores} positive core${S.cores === 1 ? "" : "s"}` : undefined} />
-        <Row label="PI-RADS" value={S.pirads > 0 ? `${S.pirads}` : "—"} />
+             note={isObserved(S.cores) && S.cores > 0 ? `${S.cores} positive core${S.cores === 1 ? "" : "s"}` : undefined} />
+        <Row label="PI-RADS" value={isObserved(S.pirads) && S.pirads > 0 ? `${S.pirads}` : "—"} />
         <Row label="Lesions mapped" value={`${entry.lesionRows.length}`} />
         <Row label="Baseline function" value={`SHIM ${S.shim} · IPSS ${S.ipss}`} />
       </>

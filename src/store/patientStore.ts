@@ -79,7 +79,16 @@ interface PatientState {
   updateLesionRows: (rows: LesionRow[]) => void;
   addLesion: () => void;
   removeLesion: (id: string) => void;
-  updateClinicalForm: (patch: Partial<import("@/types/patient").ClinicalState>) => void;
+  /**
+   * Patch the active record from a form. `psa`, `vol` and `gg` accept null so a
+   * cleared REQUIRED field writes null to the record instead of a silent
+   * default; `clinicalStateFromRecord` then reports it via `required_present`.
+   */
+  updateClinicalForm: (
+    patch: Partial<
+      Omit<import("@/types/patient").ClinicalState, "psa" | "vol" | "gg">
+    > & { psa?: number | null; vol?: number | null; gg?: number | null },
+  ) => void;
   /** Wholesale-replaces one patient's record + lesions — used by patient view's "reset to original" after local-only edits (e.g. Modifiable Factors exploration). */
   restorePatientRecord: (id: string, record: Prostate3DInputV1, lesionRows: LesionRow[]) => void;
   setPreopReview: (review: Prostate3DInputV1["preop_review"]) => void;
@@ -668,12 +677,12 @@ export function hydratePatientsFromCaseLog(): void {
     if (!raw) return;
     const cases = JSON.parse(raw) as Array<{
       id: string; date: string; notes?: string;
-      psa: number; vol: number; gg: number; cores: number;
-      maxcore: number; linear: number; pirads: number; laterality: string;
-      gg_left: number; gg_right: number; mri_epe: number; mri_svi: number;
-      mri_size: number; mri_abutment: number; mri_adc: number;
+      psa: number; vol: number; gg: number; cores: number | null;
+      maxcore: number | null; linear: number; pirads: number | null; laterality: string;
+      gg_left: number; gg_right: number; mri_epe: number | null; mri_svi: number | null;
+      mri_size: number; mri_abutment: number | null; mri_adc: number | null;
       mus_ece: number; mus_svi: number; suv: number;
-      psma_ln: number; psma_svi: number;
+      psma_ln: number | null; psma_svi: number;
     }>;
     if (!cases.length) return;
     const { patients } = usePatientStore.getState();
@@ -701,11 +710,13 @@ export function hydratePatientsFromCaseLog(): void {
             linear_left: null, linear_right: null, decipher_score: null,
           },
           staging: {
-            epe: !!c.mri_epe, svi: !!c.mri_svi, max_pirads: c.pirads,
+            epe: c.mri_epe == null ? null : !!c.mri_epe,
+            svi: c.mri_svi == null ? null : !!c.mri_svi,
+            max_pirads: c.pirads,
             max_suv: c.suv || null,
             lesion_size_cm: c.mri_size > 0 ? c.mri_size : null,
-            abutment: c.mri_abutment >= 0 ? c.mri_abutment : null,
-            adc_mean: c.mri_adc > 0 ? c.mri_adc : null,
+            abutment: c.mri_abutment != null && c.mri_abutment >= 0 ? c.mri_abutment : null,
+            adc_mean: c.mri_adc != null && c.mri_adc > 0 ? c.mri_adc : null,
             epe_mus: !!c.mus_ece, svi_mus: !!c.mus_svi,
             psma_epe: false, psma_svi: !!c.psma_svi,
             lymph_nodes_psma: c.psma_ln ? "positive" : undefined,

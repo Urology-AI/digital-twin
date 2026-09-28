@@ -1,4 +1,5 @@
 import { zoneKeyToSide } from "@/lib/utils/helpers";
+import { isObserved, v22Absent } from "@/lib/models/inputContract";
 import type { LesionRow } from "@/types/lesion";
 import type { ClinicalState, Prostate3DInputV1 } from "@/types/patient";
 
@@ -152,7 +153,7 @@ export function deriveClinicalFromLesions(
 
   if (mriRows.length > 0) {
     const lesionPirads = Math.max(...mriRows.map((l) => Math.min(parseInt(l.score, 10) || 2, 5)));
-    next.pirads = Math.max(base.pirads, lesionPirads);
+    next.pirads = Math.max(v22Absent(base.pirads, 2), lesionPirads);
     next.mri_epe = (base.mri_epe || mriRows.some((l) => l.epe)) ? 1 : 0;
     next.mri_svi = (base.mri_svi || mriRows.some((l) => l.svi)) ? 1 : 0;
     const lesionSizes = mriRows.map((l) => (l.mriSize ?? 0) / 10).filter((v) => v > 0);
@@ -161,12 +162,24 @@ export function deriveClinicalFromLesions(
     const abVals = mriRows
       .map((l) => l.mriAbutment)
       .filter((v): v is number => v !== undefined && v >= 0);
+    // Absent abutment/ADC migrate from the v22 in-band sentinels (-1 and 0) to
+    // null. The model-layer shim maps null back to those sentinels, so the
+    // `>= 0` / `> 0` guards downstream behave exactly as before.
     next.mri_abutment =
-      abVals.length > 0 ? Math.max(...abVals) : (base.mri_abutment >= 0 ? base.mri_abutment : -1);
+      abVals.length > 0
+        ? Math.max(...abVals)
+        : isObserved(base.mri_abutment) && base.mri_abutment >= 0
+          ? base.mri_abutment
+          : null;
     const adcVals = mriRows
       .map((l) => l.mriAdc)
       .filter((v): v is number => v !== undefined && v > 0);
-    next.mri_adc = adcVals.length > 0 ? Math.min(...adcVals) : (base.mri_adc > 0 ? base.mri_adc : 0);
+    next.mri_adc =
+      adcVals.length > 0
+        ? Math.min(...adcVals)
+        : isObserved(base.mri_adc) && base.mri_adc > 0
+          ? base.mri_adc
+          : null;
   }
 
   if (musRows.length > 0) {
