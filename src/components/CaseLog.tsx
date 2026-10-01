@@ -60,9 +60,9 @@ export interface CaseRecord {
   ev_base: number;
   lesion_count: number;
   // predictions
-  pred_ece: number;
-  pred_ece_l: number;
-  pred_ece_r: number;
+  pred_ece: number | null;
+  pred_ece_l: number | null;
+  pred_ece_r: number | null;
   pred_svi: number;
   pred_upgrade: number;
   pred_psm: number;
@@ -289,9 +289,9 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       ev_lesions: S.ev_n_lesions,
       ev_base: S.ev_at_base,
       lesion_count: entry.lesionRows.length,
-      pred_ece: Math.round(predictions.ece * 100),
-      pred_ece_l: Math.round(predictions.eceL * 100),
-      pred_ece_r: Math.round(predictions.eceR * 100),
+      pred_ece: Number.isFinite(predictions.ece) ? Math.round(predictions.ece * 100) : null,
+      pred_ece_l: Number.isFinite(predictions.eceL) ? Math.round(predictions.eceL * 100) : null,
+      pred_ece_r: Number.isFinite(predictions.eceR) ? Math.round(predictions.eceR * 100) : null,
       pred_svi: Math.round(predictions.svi * 100),
       pred_upgrade: Math.round(predictions.upgrade * 100),
       pred_psm: Math.round(predictions.psm * 100),
@@ -442,9 +442,9 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
   const total = cases.length;
   const withPath = cases.filter((c) => c.path_ece !== null).length;
   const eceAccuracy = (() => {
-    const evaled = cases.filter((c) => c.path_ece !== null);
+    const evaled = cases.filter((c) => c.path_ece !== null && c.pred_ece !== null);
     if (evaled.length === 0) return null;
-    const correct = evaled.filter((c) => (c.pred_ece >= 50 ? 1 : 0) === c.path_ece).length;
+    const correct = evaled.filter((c) => ((c.pred_ece ?? 0) >= 50 ? 1 : 0) === c.path_ece).length;
     return Math.round((correct / evaled.length) * 100);
   })();
 
@@ -724,7 +724,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
                     { l: "LNI", v: c.pred_lni, p: c.path_lni },
                   ].map((pr) => {
                     const match =
-                      pr.p !== null && pr.p !== undefined
+                      pr.p !== null && pr.p !== undefined && pr.v !== null
                         ? (pr.v >= 50 ? 1 : 0) === pr.p
                           ? " ✔"
                           : " ✘"
@@ -735,7 +735,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
                         className="rounded border border-border/60 bg-muted/30 px-2 py-0.5 text-[10px]"
                       >
                         <span className="text-muted-foreground">{pr.l} </span>
-                        <span className={cn("font-bold", riskCls(pr.v))}>{pr.v}%</span>
+                        <span className={cn("font-bold", pr.v !== null && riskCls(pr.v))}>{pr.v === null ? "—" : `${pr.v}%`}</span>
                         {match && (
                           <span className={match.includes("✔") ? "text-emerald-500" : "text-red-500"}>
                             {match}

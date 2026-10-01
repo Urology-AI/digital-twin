@@ -1,3 +1,4 @@
+import { MissingInputsNotice } from "@/components/MissingInputsNotice";
 import { isObserved } from "@/lib/models/inputContract";
 import { Card, CardContent } from "@/components/ui/card";
 import { usePatientStore } from "@/store/patientStore";
@@ -83,9 +84,11 @@ export function OverviewPanel({ tab }: { tab: DesktopTab }) {
 
   if (!entry || !S || !predictions) {
     return (
-      <div className="mx-auto w-full max-w-2xl p-6 text-center text-sm text-muted-foreground">
-        No case loaded.
-      </div>
+      (entry && <MissingInputsNotice className="m-6" />) || (
+        <div className="mx-auto w-full max-w-2xl p-6 text-center text-sm text-muted-foreground">
+          No case loaded.
+        </div>
+      )
     );
   }
 
