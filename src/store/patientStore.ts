@@ -99,6 +99,10 @@ interface PatientState {
   restorePatientRecord: (id: string, record: Prostate3DInputV1, lesionRows: LesionRow[]) => void;
   setPreopReview: (review: Prostate3DInputV1["preop_review"]) => void;
   newCase: () => void;
+  setImagingAvailability: (
+    modality: "mri" | "exactvu" | "psma",
+    status: "performed" | "not_performed" | "unknown",
+  ) => void;
   /** Load a read-only demo template, replacing any existing copy of it. */
   loadDemoCase: (demo: import("@/data/demoCases").DemoCase) => void;
   /** Offline app first-run: add editable copies of every demo case as saved patients. */
@@ -484,6 +488,21 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       );
       set({ patients: next });
       get().recompute();
+    },
+
+    setImagingAvailability: (modality, status) => {
+      const { activeId, patients } = get();
+      if (!activeId) return;
+      set({
+        patients: patients.map((p) => {
+          if (p.id !== activeId) return p;
+          const record = clone(p.record);
+          record.staging.availability = { ...(record.staging.availability ?? {}), [modality]: status };
+          return { ...p, record };
+        }),
+      });
+      get().recompute();
+      get().pushHistory();
     },
 
     newCase: () => {

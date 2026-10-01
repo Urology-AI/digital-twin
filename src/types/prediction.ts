@@ -31,6 +31,8 @@ export interface CompassPredictions {
   sviR: number;
   nsDetailL: NsSideDetail;
   nsDetailR: NsSideDetail;
+  /** Regional evidence per side and region; null when ECE cannot be computed. */
+  regional?: ReturnType<typeof import("@/lib/compass/regionalEvidence").computeRegionalEvidence>;
   inflammation: InflammationRisk;
   plan: SurgicalPlan;
 }
@@ -117,6 +119,8 @@ export interface ThreeZoneRuntime {
   subregion: string;
   cancer: number;
   ece: number;
+  /** Regional evidence state for the ECE view (vNext); replaces zone ECE %. */
+  eceState?: "Direct_EPE_concern" | "Localized_signal" | "No_localized_signal" | "Indeterminate";
   svi: number;
   psm: number;
   /** recommended NS grade for this zone (1–3), for the "plan" overlay */

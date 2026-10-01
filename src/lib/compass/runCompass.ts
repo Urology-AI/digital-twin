@@ -5,6 +5,7 @@ import { getNsGradeZoneAware } from "@/lib/compass/nsGrade";
 import { buildSurgicalPlan } from "@/lib/compass/surgicalPlan";
 import { predictBcrPreop } from "@/lib/models/bcr";
 import { predictEceVNext } from "@/lib/models/vnext/ece";
+import { computeRegionalEvidence, type Region } from "@/lib/compass/regionalEvidence";
 import {
   exactvuOnSideFromRecord,
   sideBiopsyGgFromRecord,
@@ -96,8 +97,14 @@ export function runCompassModels(
     mergedLesions,
   );
 
+  // Formal NS grade comes from side EPE only (<10% G1, 10-<30% G2, >=30% G3).
+  // Regional imaging adds caution flags; it never changes the grade.
+  const nsFromSide = (p: number) => (p < 0.1 ? 1 : p < 0.3 ? 2 : 3);
+  nsDetailL.nsGrade = nsFromSide(eceL);
+  nsDetailR.nsGrade = nsFromSide(eceR);
   const nsL = nsDetailL.nsGrade;
   const nsR = nsDetailR.nsGrade;
+  const regional = computeRegionalEvidence(S, lesionRows, { left: eceL, right: eceR });
   const psm = clamp(predictPsm(S), 0.05, 0.8);
 
   const bcr = clamp(predictBcrPreop(S), 0.03, 0.75);
@@ -129,11 +136,25 @@ export function runCompassModels(
     sviR,
     nsDetailL,
     nsDetailR,
+    regional,
     inflammation,
     plan,
   };
 
   mapZoneDataToThree(P.zones, threeZones, predictions);
+
+  // 3D ECE view: color each zone by its region's evidence state, not by an
+  // invented regional percentage. Values only drive the existing color scale.
+  if (regional) {
+    const SHADE = { Direct_EPE_concern: 0.6, Localized_signal: 0.2, No_localized_signal: 0.03, Indeterminate: 0.03 } as const;
+    for (const z of threeZones) {
+      const a = ZONE_ANATOMY[z.id];
+      const r = a && regional[a.side === "L" ? "left" : "right"][a.zone as Region];
+      if (!r) continue;
+      z.eceState = r.evidenceState;
+      z.ece = SHADE[r.evidenceState];
+    }
+  }
 
   return predictions;
 }

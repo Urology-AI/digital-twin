@@ -1,3 +1,4 @@
+import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { useState, useEffect, useCallback } from "react";
 import { Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -987,6 +988,9 @@ export function ZoneInputWizard() {
               </div>
             </div>
 
+            {/* Imaging performed: a negative finding only counts if the study was done */}
+            <ImagingStatusRow />
+
             {/* BMI section — enter directly or via height + weight */}
             <div className="space-y-2 rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -1328,5 +1332,46 @@ export function ZoneInputWizard() {
 
     </div>
     </TooltipProvider>
+  );
+}
+
+function ImagingStatusRow() {
+  const patients = usePatientStore((st) => st.patients);
+  const activeId = usePatientStore((st) => st.activeId);
+  const setAvail = usePatientStore((st) => st.setImagingAvailability);
+  const entry = patients.find((p) => p.id === activeId);
+  if (!entry) return null;
+  const S = clinicalStateFromRecord({ ...entry.record, lesions: entry.lesionRows });
+  const opts = [
+    { v: "performed", l: "Done" },
+    { v: "not_performed", l: "Not done" },
+    { v: "unknown", l: "Unknown" },
+  ] as const;
+  return (
+    <div className="space-y-2 rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-3">
+      <span className="text-sm font-semibold text-foreground">Imaging performed</span>
+      <div className="grid grid-cols-1 gap-1.5">
+        {(["mri", "exactvu", "psma"] as const).map((m) => (
+          <div key={m} className="flex items-center justify-between gap-2">
+            <span className="w-20 text-sm text-muted-foreground">{m === "mri" ? "MRI" : m === "exactvu" ? "ExactVu" : "PSMA PET"}</span>
+            <div className="flex overflow-hidden rounded-md border border-input/80 text-xs">
+              {opts.map((o) => (
+                <button
+                  key={o.v}
+                  type="button"
+                  onClick={() => setAvail(m, o.v)}
+                  className={cn(
+                    "w-20 whitespace-nowrap px-2 py-1.5 transition-colors",
+                    S.imaging_availability[m] === o.v ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted",
+                  )}
+                >
+                  {o.l}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }

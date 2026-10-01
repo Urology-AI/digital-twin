@@ -1,3 +1,4 @@
+import type { Region } from "@/lib/compass/regionalEvidence";
 import { MissingInputsNotice } from "@/components/MissingInputsNotice";
 import { Button } from "@/components/ui/button";
 import {
@@ -99,6 +100,14 @@ function NsGradeTag({ grade }: { grade: number }) {
   );
 }
 
+
+const REGION_STATE = {
+  Direct_EPE_concern: { label: "EPE concern", full: "Direct EPE concern", dot: "bg-red-500", text: "text-red-500" },
+  Localized_signal: { label: "Signal", full: "Localized signal", dot: "bg-amber-500", text: "text-amber-500" },
+  No_localized_signal: { label: "No signal", full: "No localized signal", dot: "bg-emerald-500", text: "text-emerald-500" },
+  Indeterminate: { label: "Limited data", full: "Indeterminate: too little data to reassure", dot: "bg-muted-foreground/50", text: "text-muted-foreground" },
+} as const;
+
 export function PredictionPanel() {
   const predictions = usePatientStore((s) => s.predictions);
   const missingRequired = usePatientStore((s) => s.missingRequired);
@@ -146,8 +155,6 @@ export function PredictionPanel() {
   ] as const;
 
   // NS zone detail
-  const L = predictions.nsDetailL ?? { nsGrade: predictions.nsL, zones: {}, alerts: [], has_zone_data: false };
-  const R = predictions.nsDetailR ?? { nsGrade: predictions.nsR, zones: {}, alerts: [], has_zone_data: false };
   const zones5 = [
     { k: "posterolateral", l: "Posterolateral" },
     { k: "base", l: "Base" },
@@ -155,12 +162,6 @@ export function PredictionPanel() {
     { k: "anterior", l: "Anterior" },
     { k: "bladder_neck", l: "Bladder Neck" },
   ];
-  let lHasZones = L.has_zone_data;
-  let rHasZones = R.has_zone_data;
-  zones5.forEach((z) => {
-    if ((L.zones?.[z.k] ?? 0) > 0) lHasZones = true;
-    if ((R.zones?.[z.k] ?? 0) > 0) rHasZones = true;
-  });
 
   const gradesToShow =
     predictions.nsL === predictions.nsR
@@ -263,7 +264,7 @@ export function PredictionPanel() {
             {/* Left: Nerve Sparing 5-zone */}
             <div data-tutorial="ns-grades">
               <div className="mb-2 flex items-center gap-1.5 text-sm font-semibold uppercase tracking-wide text-primary">
-                Nerve sparing — 5-zone
+                Nerve sparing
                 <EvidenceInfo entries={[NS_BASE_MODEL]} title="Nerve sparing — 5-zone" />
               </div>
               <table className="w-full border-collapse text-sm">
@@ -296,17 +297,30 @@ export function PredictionPanel() {
                     </tr>
                   )}
                   {zones5.map((z) => {
-                    const lv = (L.zones?.[z.k] ?? 0) as number;
-                    const rv = (R.zones?.[z.k] ?? 0) as number;
+                    const cell = (side: "left" | "right") => {
+                      const r = predictions.regional?.[side]?.[z.k as Region];
+                      if (!r) return <span className="text-muted-foreground/40">—</span>;
+                      const st = REGION_STATE[r.evidenceState];
+                      return (
+                        <span className="inline-flex flex-col leading-tight" title={`${st.full}. Confidence: ${r.confidence.toLowerCase()}.`}>
+                          <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap font-medium", st.text)}>
+                            <span className={cn("inline-block h-2 w-2 rounded-full", st.dot)} />
+                            {st.label}
+                          </span>
+                          {r.localizedSources.length > 0 && (
+                            <span className="whitespace-nowrap pl-3.5 text-[10px] text-muted-foreground">
+                              {r.localizedSources.map((m) => (m === "Biopsy" ? "Bx" : m === "ExactVu" ? "EV" : m)).join("·")}
+                              {`, ${r.confidence === "Moderate" ? "mod" : r.confidence.toLowerCase()}`}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    };
                     return (
                       <tr key={z.k} className="border-b border-border/40 text-muted-foreground">
-                        <td className="py-1.5">{z.l}</td>
-                        <td className={cn("px-2 py-1.5", lHasZones ? riskCls(lv) : "")}>
-                          {lHasZones ? (lv > 0 && lv < 0.005 ? "< 1%" : `${Math.round(lv * 100)}%`) : <span className="text-muted-foreground/40">—</span>}
-                        </td>
-                        <td className={cn("px-2 py-1.5", rHasZones ? riskCls(rv) : "")}>
-                          {rHasZones ? (rv > 0 && rv < 0.005 ? "< 1%" : `${Math.round(rv * 100)}%`) : <span className="text-muted-foreground/40">—</span>}
-                        </td>
+                        <td className="py-1.5 align-top">{z.l}</td>
+                        <td className="px-2 py-1.5">{cell("left")}</td>
+                        <td className="px-2 py-1.5">{cell("right")}</td>
                       </tr>
                     );
                   })}
@@ -315,6 +329,25 @@ export function PredictionPanel() {
                     <td className="px-2 py-1.5"><NsGradeTag grade={predictions.nsL} /></td>
                     <td className="px-2 py-1.5"><NsGradeTag grade={predictions.nsR} /></td>
                   </tr>
+                  <tr>
+                    <td colSpan={3} className="pt-1 text-[11px] text-muted-foreground">
+                      Grade from side ECE: under 10% Grade 1, 10 to 30% Grade 2, 30% and over Grade 3.
+                    </td>
+                  </tr>
+                  {(["left", "right"] as const).flatMap((side) =>
+                    zones5
+                      .filter((z) => predictions.regional?.[side]?.[z.k as Region]?.evidenceState === "Direct_EPE_concern")
+                      .map((z) => {
+                        const r = predictions.regional![side][z.k as Region];
+                        return (
+                          <tr key={`${side}-${z.k}-caution`}>
+                            <td colSpan={3} className="pt-1.5 text-xs font-medium text-red-500">
+                              {side === "left" ? "Left" : "Right"} {z.l.toLowerCase()}: EPE called on {r.directEpeSources.join(" and ")}. Consider a wider plane locally.
+                            </td>
+                          </tr>
+                        );
+                      }),
+                  )}
                 </tbody>
               </table>
             </div>

@@ -1,7 +1,7 @@
 import type { ClinicalState, CompassZoneKey, ZoneMap } from "@/types/patient";
 import type { LesionRow } from "@/types/lesion";
 
-interface LesionMapInput {
+export interface LesionMapInput {
   side: "L" | "R";
   level: string;
   position: string;
@@ -28,7 +28,7 @@ function lesionToZone(les: LesionMapInput): CompassZoneKey {
   return s === "L" ? "5p" : "10p";
 }
 
-function lesionToZones(les: LesionMapInput): CompassZoneKey[] {
+export function lesionToZones(les: LesionMapInput): CompassZoneKey[] {
   const s = les.side;
   const lv = les.level;
   const ps = les.position || "";
