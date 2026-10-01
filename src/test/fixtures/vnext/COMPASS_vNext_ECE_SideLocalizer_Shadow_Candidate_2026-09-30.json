@@ -1,0 +1,206 @@
+{
+  "model_name": "COMPASS vNext ECE Side-Localization Shadow Candidate",
+  "version": "vNext-ece-side-shadow-candidate-2026-09-30",
+  "status": "SHADOW RESEARCH CANDIDATE \u2014 not part of the frozen global ECE model; not externally validated",
+  "purpose": "Localize frozen patient-level vNext ECE risk to left/right sides for regional surgical-planning context.",
+  "architecture": {
+    "model": "L2-regularized logistic regression",
+    "C": 1.0,
+    "unit": "prostate side",
+    "grouping": "patient-grouped cross-validation",
+    "missingness": "training-mean imputation; missing ExactVu localization is neutral, not negative",
+    "standardization": "training-set z-score after imputation",
+    "formula": "logit = intercept + sum(beta_k * z_k); probability = sigmoid(logit)"
+  },
+  "feature_order": [
+    "global_vnext_ece_logit",
+    "side_biopsy_gg",
+    "exactvu_on_side"
+  ],
+  "intercept": -1.5990305373807367,
+  "coefficients_standardized": {
+    "global_vnext_ece_logit": 0.7385535433615661,
+    "side_biopsy_gg": 0.3789206772466316,
+    "exactvu_on_side": 0.315089035317817
+  },
+  "imputation": {
+    "global_vnext_ece_logit": -1.344681565639764,
+    "side_biopsy_gg": 2.2031063321385904,
+    "exactvu_on_side": 0.5355603448275862
+  },
+  "scaler_mean": {
+    "global_vnext_ece_logit": -1.344681565639764,
+    "side_biopsy_gg": 2.203106332138592,
+    "exactvu_on_side": 0.5355603448275812
+  },
+  "scaler_scale": {
+    "global_vnext_ece_logit": 1.3700432869882329,
+    "side_biopsy_gg": 1.784021471333397,
+    "exactvu_on_side": 0.43640682247593315
+  },
+  "performance": {
+    "cohort": {
+      "patients": 606,
+      "side_observations": 1212,
+      "side_epe_events": 241
+    },
+    "repeated_10x5_grouped_cv": {
+      "auc_mean": 0.73623676,
+      "brier_mean": 0.13784234,
+      "calibration_intercept_mean": -0.15327601,
+      "calibration_slope_mean": 0.87748186
+    },
+    "comparison_global_plus_side_gg_only": {
+      "auc_mean": 0.73043917,
+      "paired_delta_auc_mean": 0.00579759,
+      "paired_delta_auc_2_5_to_97_5_percent_range": [
+        0.00364363,
+        0.00835292
+      ]
+    },
+    "comparison_4feature_with_exactvu_epe_term": {
+      "four_feature_auc_mean": 0.73574875,
+      "three_minus_four_delta_auc_mean": 0.00048801,
+      "three_minus_four_delta_auc_2_5_to_97_5_percent_range": [
+        -0.00040917,
+        0.00264133
+      ]
+    },
+    "temporal_2024_2025": {
+      "n_side_observations": 630,
+      "events": 115,
+      "auc": 0.69276488,
+      "brier": 0.13599623,
+      "calibration_intercept": -0.03984049,
+      "calibration_slope": 0.83053199
+    }
+  },
+  "bootstrap_300_patient_resamples": {
+    "global_vnext_ece_logit": {
+      "median_beta": 0.72238922,
+      "ci95": [
+        0.52177549,
+        0.95279991
+      ],
+      "positive_sign_stability": 1.0
+    },
+    "side_biopsy_gg": {
+      "median_beta": 0.3739516,
+      "ci95": [
+        0.14257592,
+        0.61877106
+      ],
+      "positive_sign_stability": 1.0
+    },
+    "exactvu_on_side": {
+      "median_beta": 0.32100376,
+      "ci95": [
+        0.14402311,
+        0.47150996
+      ],
+      "positive_sign_stability": 1.0
+    }
+  },
+  "missing_exactvu": {
+    "localization_observed_side_rows": 928,
+    "localization_missing_side_rows": 284,
+    "auc_when_localization_observed": 0.74939921,
+    "auc_when_localization_missing": 0.69537037,
+    "brier_when_localization_missing": 0.1393011,
+    "rule": "If ExactVu side localization is unavailable, impute the frozen training mean; do not encode unavailable as 0/negative.",
+    "incorrect_zero_encoding_mean_absolute_probability_shift_in_missing_rows": 0.02837855
+  },
+  "era_availability": {
+    "2022": 0.8052,
+    "2023": 0.6967,
+    "2024": 0.3043,
+    "2025": 0.8959
+  },
+  "nerve_sparing_translation": {
+    "thresholds": {
+      "grade1_context": "<10%",
+      "grade2_context": "10-<30%",
+      "grade3_context": ">=30%"
+    },
+    "spearman_with_actual_ns_grade": 0.4364,
+    "exact_grade_1_2_3_agreement": 0.5419,
+    "within_one_grade_agreement": 0.9706,
+    "quadratic_weighted_kappa": 0.4165,
+    "threshold_10_percent_vs_actual_grade2plus": {
+      "agreement": 0.7148,
+      "sensitivity": 0.8081,
+      "specificity": 0.4679
+    },
+    "threshold_30_percent_vs_actual_grade3plus": {
+      "agreement": 0.7978,
+      "sensitivity": 0.4762,
+      "specificity": 0.884
+    },
+    "note": "Actual surgeon NS grade is not a pure ground-truth label for EPE; it also reflects functional goals, anatomy, plane quality, frozen section and intraoperative judgment."
+  },
+  "psm_axis": {
+    "role": "Separate downstream surgical consequence axis, not an EPE predictor.",
+    "spearman_side_epe_vs_side_psm_probability": 0.3551,
+    "cross_classification": {
+      "ece_ge30_and_psm_ge15": 55,
+      "ece_ge30_and_psm_lt15": 180,
+      "ece_lt30_and_psm_ge15": 48,
+      "neither_high": 929
+    },
+    "interpretation": "Only moderate correlation; PSM supplies nonredundant surgical-planning information."
+  },
+  "governance": {
+    "global_ece_lock_unchanged": true,
+    "MRI_and_PSMA_remain_regional_evidence": true,
+    "regional_probabilities_not_claimed_calibrated": true,
+    "not_for_clinical_deployment": true
+  },
+  "regression_cases": {
+    "mean_reference": {
+      "inputs": {
+        "global_vnext_ece_logit": -1.344681565639764,
+        "side_biopsy_gg": 2.203106332138592,
+        "exactvu_on_side": null
+      },
+      "expected_logit": -1.5990305373807332,
+      "expected_probability": 0.1681171542546048
+    },
+    "low_GG1_exactvu_negative": {
+      "inputs": {
+        "global_vnext_ece_logit": -2.2,
+        "side_biopsy_gg": 1,
+        "exactvu_on_side": 0
+      },
+      "expected_logit": -2.7023244532144126,
+      "expected_probability": 0.06283633464465889
+    },
+    "moderate_GG2_exactvu_missing": {
+      "inputs": {
+        "global_vnext_ece_logit": -1.0,
+        "side_biopsy_gg": 2,
+        "exactvu_on_side": null
+      },
+      "expected_logit": -1.4563611224937685,
+      "expected_probability": 0.18902451306978915
+    },
+    "moderate_GG2_exactvu_on_side": {
+      "inputs": {
+        "global_vnext_ece_logit": -1.0,
+        "side_biopsy_gg": 2,
+        "exactvu_on_side": 1
+      },
+      "expected_logit": -1.1210321693821663,
+      "expected_probability": 0.2458198769250964
+    },
+    "high_GG4_exactvu_on_side": {
+      "inputs": {
+        "global_vnext_ece_logit": 0.2,
+        "side_biopsy_gg": 4,
+        "exactvu_on_side": 1
+      },
+      "expected_logit": -0.04935054258956462,
+      "expected_probability": 0.48766486774426393
+    }
+  },
+  "sha256_canonical_without_hash_field": "ffe264fb3ec9c10fbbc8a0350f8af0eb0af11aec39665b2cc242e8ccdc341f8d"
+}

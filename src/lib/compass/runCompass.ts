@@ -6,8 +6,11 @@ import { buildSurgicalPlan } from "@/lib/compass/surgicalPlan";
 import { predictBcrPreop } from "@/lib/models/bcr";
 import { predictEceVNext } from "@/lib/models/vnext/ece";
 import {
-  clampEceSide,
-  predictEceSide,
+  exactvuOnSideFromRecord,
+  sideBiopsyGgFromRecord,
+  sideEpeFromInputs,
+} from "@/lib/models/vnext/sideEpe";
+import {
   predictExtensiveEce,
 } from "@/lib/models/ece";
 import { predictLni } from "@/lib/models/lni";
@@ -46,17 +49,24 @@ export function runCompassModels(
   const lni = clamp(predictLni(S), 0.005, 0.95);
   const extensive = clamp(predictExtensiveEce(S), 0.1, 0.9);
 
-  const lat = P.biopsy.laterality || "bilateral";
-
-  const eceL =
-    S.gg_left > 0 || lat === "left" || lat === "bilateral"
-      ? clampEceSide(predictEceSide(S, "left", uiLesions, recordLesions))
-      : clamp(ece * 0.3, 0.02, 0.15);
-
-  const eceR =
-    S.gg_right > 0 || lat === "right" || lat === "bilateral"
-      ? clampEceSide(predictEceSide(S, "right", uiLesions, recordLesions))
-      : clamp(ece * 0.3, 0.02, 0.15);
+  // vNext side EPE (shadow candidate 2026-09-30): global ECE logit + side
+  // biopsy GG + ExactVu on side. Replaces the v22 side model, its clamps and
+  // the invented "ece * 0.3" fallback. NaN when global ECE cannot be computed.
+  const sideEpe = (side: "left" | "right") =>
+    eceV.ok
+      ? sideEpeFromInputs({
+          globalLogit: eceV.logit,
+          sideBiopsyGg: sideBiopsyGgFromRecord(P, side),
+          exactvuOnSide: exactvuOnSideFromRecord(
+            P,
+            lesionRows,
+            S.imaging_availability.exactvu,
+            side,
+          ),
+        }).probability
+      : NaN;
+  const eceL = sideEpe("left");
+  const eceR = sideEpe("right");
 
   const sviL = clamp(
     predictSviSide(S, "left", uiLesions, recordLesions),

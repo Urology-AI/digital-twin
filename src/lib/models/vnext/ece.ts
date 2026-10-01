@@ -49,6 +49,8 @@ export type EceVNextResult =
   | {
       ok: true;
       probability: number;
+      /** Linear predictor; the side-EPE model takes this as its first input. */
+      logit: number;
       tier: { index: number; label: string };
       /** Inputs that were missing and replaced by the training-cohort average. */
       imputed: string[];
@@ -74,6 +76,7 @@ export function predictEceVNext(S: ClinicalState): EceVNextResult {
   return {
     ok: true,
     probability,
+    logit,
     tier: assignTier(probability, ECE_TIER_CUTOFFS, ECE_TIER_LABELS),
     imputed,
   };
