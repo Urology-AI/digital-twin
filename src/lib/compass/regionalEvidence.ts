@@ -116,3 +116,42 @@ export function computeRegionalEvidence(
 
   return { left: side("L", sideEpe.left), right: side("R", sideEpe.right) };
 }
+
+export const REGION_LABELS: Record<Region, string> = {
+  posterolateral: "Posterolateral",
+  base: "Base",
+  apex: "Apex",
+  anterior: "Anterior",
+  bladder_neck: "Bladder neck",
+};
+
+/**
+ * One display entry per side × region. A region with a finding (EPE on imaging,
+ * or tumor localized there) shows that side's EPE probability; others show no
+ * number. The number is always the side model output, never a regional split.
+ * The nerve-sparing table and the 3D legend both read this, so they agree.
+ */
+export type RegionDisplay = {
+  side: "left" | "right";
+  region: Region;
+  level: "epe" | "tumor" | "none";
+  sidePct: number | null;
+};
+
+export function regionDisplays(
+  regional: { left: SideRegional; right: SideRegional } | null | undefined,
+  eceL: number,
+  eceR: number,
+): RegionDisplay[] {
+  if (!regional) return [];
+  const out: RegionDisplay[] = [];
+  for (const side of ["left", "right"] as const) {
+    const p = side === "left" ? eceL : eceR;
+    for (const region of REGIONS) {
+      const st = regional[side][region].evidenceState;
+      const level = st === "Direct_EPE_concern" ? "epe" : st === "Localized_signal" ? "tumor" : "none";
+      out.push({ side, region, level, sidePct: level === "none" ? null : Math.round(p * 100) });
+    }
+  }
+  return out;
+}

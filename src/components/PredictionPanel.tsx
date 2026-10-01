@@ -1,4 +1,4 @@
-import type { Region } from "@/lib/compass/regionalEvidence";
+import { REGION_LABELS, regionDisplays, type Region } from "@/lib/compass/regionalEvidence";
 import { MissingInputsNotice } from "@/components/MissingInputsNotice";
 import { Button } from "@/components/ui/button";
 import {
@@ -148,6 +148,7 @@ export function PredictionPanel() {
   ] as const;
 
   // NS zone detail
+  const regionRows = regionDisplays(predictions.regional, predictions.eceL, predictions.eceR);
   const zones5 = [
     { k: "posterolateral", l: "Posterolateral" },
     { k: "base", l: "Base" },
@@ -289,6 +290,30 @@ export function PredictionPanel() {
                       </td>
                     </tr>
                   )}
+                  {(Object.keys(REGION_LABELS) as Region[]).map((rg) => {
+                    const cell = (side: "left" | "right") => {
+                      const d = regionRows.find((x) => x.side === side && x.region === rg);
+                      if (!d) return <span className="text-muted-foreground/40">—</span>;
+                      if (d.level === "none")
+                        return <span className="inline-block h-2 w-2 rounded-full bg-emerald-500/70" title="No finding in this region" />;
+                      return (
+                        <span
+                          className={cn("inline-flex items-center gap-1.5 font-semibold", d.level === "epe" ? "text-red-500" : "text-amber-500")}
+                          title={d.level === "epe" ? "EPE seen on imaging here; side ECE shown" : "Tumor localized here; side ECE shown"}
+                        >
+                          <span className={cn("inline-block h-2 w-2 rounded-full", d.level === "epe" ? "bg-red-500" : "bg-amber-500")} />
+                          {d.sidePct}%
+                        </span>
+                      );
+                    };
+                    return (
+                      <tr key={rg} className="border-b border-border/40 text-muted-foreground">
+                        <td className="py-1.5">{REGION_LABELS[rg]}</td>
+                        <td className="px-2 py-1.5">{cell("left")}</td>
+                        <td className="px-2 py-1.5">{cell("right")}</td>
+                      </tr>
+                    );
+                  })}
                   <tr>
                     <td className="py-1.5 font-bold">NS grade</td>
                     <td className="px-2 py-1.5"><NsGradeTag grade={predictions.nsL} /></td>

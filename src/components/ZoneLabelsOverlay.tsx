@@ -1,3 +1,4 @@
+import { REGION_LABELS, regionDisplays } from "@/lib/compass/regionalEvidence";
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useUiStore } from "@/store/uiStore";
@@ -28,6 +29,7 @@ export function ZoneLabelsOverlay() {
   const labelsVisible = useUiStore((s) => s.labelsVisible);
   const heatmapVisible = useUiStore((s) => s.heatmapVisible);
   const threeZones = usePatientStore((s) => s.threeZones);
+  const predictions = usePatientStore((s) => s.predictions);
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
   const entry = patients.find((p) => p.id === activeId);
@@ -36,9 +38,35 @@ export function ZoneLabelsOverlay() {
 
   if (!heatmapVisible || !labelsVisible) return null;
 
+  // ECE view: same regions and numbers as the nerve-sparing table, findings only.
+  if (overlay === "ece") {
+    const rows = regionDisplays(predictions?.regional, predictions?.eceL ?? NaN, predictions?.eceR ?? NaN)
+      .filter((d) => d.level !== "none")
+      .sort((a, b) => (a.level === b.level ? 0 : a.level === "epe" ? -1 : 1));
+    return (
+      <div className="glass pointer-events-auto absolute right-2 top-[calc(4.5rem+0.5rem)] z-10 w-44 rounded-xl px-3 py-2 shadow-xl lg:top-16">
+        <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-primary">ECE findings</div>
+        {rows.length === 0 ? (
+          <p className="text-[10px] text-muted-foreground">No regional findings</p>
+        ) : (
+          <ul className="max-h-40 space-y-1 overflow-y-auto">
+            {rows.map((d) => (
+              <li key={`${d.side}-${d.region}`} className="flex items-center justify-between text-[11px]">
+                <span className="flex items-center gap-1.5 text-muted-foreground/90">
+                  <span className={cn("inline-block h-1.5 w-1.5 rounded-full", d.level === "epe" ? "bg-red-500" : "bg-amber-500")} />
+                  {d.side === "left" ? "L" : "R"} {REGION_LABELS[d.region].toLowerCase()}
+                </span>
+                <span className={cn("font-bold tabular-nums", d.level === "epe" ? "text-red-400" : "text-amber-400")}>{d.sidePct}%</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
   const overlayName =
     overlay === "cancer" ? "csPCa"
-    : overlay === "ece" ? "ECE"
     : overlay === "svi" ? "SVI"
     : "PSM";
 
@@ -46,12 +74,11 @@ export function ZoneLabelsOverlay() {
     .map((z) => {
       const val =
         overlay === "cancer" ? z.cancer
-        : overlay === "ece" ? z.ece
         : overlay === "svi" ? z.svi
         : z.psm;
-      return { name: LABELS[z.id] ?? z.id, pct: Math.round((val ?? 0) * 100), v: val ?? 0, state: z.eceState };
+      return { name: LABELS[z.id] ?? z.id, pct: Math.round((val ?? 0) * 100), v: val ?? 0 };
     })
-    .filter((x) => (overlay === "ece" && x.state ? x.state === "Direct_EPE_concern" : x.v > 0.05))
+    .filter((x) => x.v > 0.05)
     .sort((a, b) => b.v - a.v);
 
   return (
@@ -75,7 +102,7 @@ export function ZoneLabelsOverlay() {
       {!collapsed && (
         <div className="px-3 pb-3">
           {items.length === 0 ? (
-            <p className="text-[10px] text-muted-foreground">{overlay === "ece" ? "No EPE on imaging" : "No zones above 5%"}</p>
+            <p className="text-[10px] text-muted-foreground">No zones above 5%</p>
           ) : (
             <ul className="space-y-1.5">
               {items.map((item) => (
@@ -90,9 +117,7 @@ export function ZoneLabelsOverlay() {
                         : "text-red-400",
                       )}
                     >
-                      {overlay === "ece" && item.state
-                        ? "EPE"
-                        : `${item.pct}% ${overlayName}`}
+                      {item.pct}% {overlayName}
                     </span>
                   </div>
                   {/* Mini progress bar */}
