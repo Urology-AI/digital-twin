@@ -33,10 +33,10 @@ const LEGEND: Record<OverlayType, { title: string; gradient: string; low: string
     note: "Green <10% · Amber 10–25% · Red >25%",
   },
   ece: {
-    title: "ECE risk",
+    title: "ECE",
     gradient: "linear-gradient(to right,#22c55e,#f59e0b,#ef4444)",
     low: "Low", high: "High",
-    note: "Green <10% · Amber 10–25% · Red >25%",
+    note: "Red: EPE on imaging · Amber: tumor",
   },
   svi: {
     title: "SVI risk",

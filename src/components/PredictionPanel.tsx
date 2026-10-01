@@ -101,13 +101,6 @@ function NsGradeTag({ grade }: { grade: number }) {
 }
 
 
-const REGION_STATE = {
-  Direct_EPE_concern: { label: "EPE concern", full: "Direct EPE concern", dot: "bg-red-500", text: "text-red-500" },
-  Localized_signal: { label: "Signal", full: "Localized signal", dot: "bg-amber-500", text: "text-amber-500" },
-  No_localized_signal: { label: "No signal", full: "No localized signal", dot: "bg-emerald-500", text: "text-emerald-500" },
-  Indeterminate: { label: "Limited data", full: "Indeterminate: too little data to reassure", dot: "bg-muted-foreground/50", text: "text-muted-foreground" },
-} as const;
-
 export function PredictionPanel() {
   const predictions = usePatientStore((s) => s.predictions);
   const missingRequired = usePatientStore((s) => s.missingRequired);
@@ -296,43 +289,10 @@ export function PredictionPanel() {
                       </td>
                     </tr>
                   )}
-                  {zones5.map((z) => {
-                    const cell = (side: "left" | "right") => {
-                      const r = predictions.regional?.[side]?.[z.k as Region];
-                      if (!r) return <span className="text-muted-foreground/40">—</span>;
-                      const st = REGION_STATE[r.evidenceState];
-                      return (
-                        <span className="inline-flex flex-col leading-tight" title={`${st.full}. Confidence: ${r.confidence.toLowerCase()}.`}>
-                          <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap font-medium", st.text)}>
-                            <span className={cn("inline-block h-2 w-2 rounded-full", st.dot)} />
-                            {st.label}
-                          </span>
-                          {r.localizedSources.length > 0 && (
-                            <span className="whitespace-nowrap pl-3.5 text-[10px] text-muted-foreground">
-                              {r.localizedSources.map((m) => (m === "Biopsy" ? "Bx" : m === "ExactVu" ? "EV" : m)).join("·")}
-                              {`, ${r.confidence === "Moderate" ? "mod" : r.confidence.toLowerCase()}`}
-                            </span>
-                          )}
-                        </span>
-                      );
-                    };
-                    return (
-                      <tr key={z.k} className="border-b border-border/40 text-muted-foreground">
-                        <td className="py-1.5 align-top">{z.l}</td>
-                        <td className="px-2 py-1.5">{cell("left")}</td>
-                        <td className="px-2 py-1.5">{cell("right")}</td>
-                      </tr>
-                    );
-                  })}
                   <tr>
                     <td className="py-1.5 font-bold">NS grade</td>
                     <td className="px-2 py-1.5"><NsGradeTag grade={predictions.nsL} /></td>
                     <td className="px-2 py-1.5"><NsGradeTag grade={predictions.nsR} /></td>
-                  </tr>
-                  <tr>
-                    <td colSpan={3} className="pt-1 text-[11px] text-muted-foreground">
-                      Grade from side ECE: under 10% Grade 1, 10 to 30% Grade 2, 30% and over Grade 3.
-                    </td>
                   </tr>
                   {(["left", "right"] as const).flatMap((side) =>
                     zones5
@@ -342,7 +302,7 @@ export function PredictionPanel() {
                         return (
                           <tr key={`${side}-${z.k}-caution`}>
                             <td colSpan={3} className="pt-1.5 text-xs font-medium text-red-500">
-                              {side === "left" ? "Left" : "Right"} {z.l.toLowerCase()}: EPE called on {r.directEpeSources.join(" and ")}. Consider a wider plane locally.
+                              {side === "left" ? "Left" : "Right"} {z.l.toLowerCase()}: EPE on {r.directEpeSources.join(" + ")}, consider wider plane
                             </td>
                           </tr>
                         );

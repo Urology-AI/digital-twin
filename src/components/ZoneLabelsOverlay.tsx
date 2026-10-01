@@ -51,7 +51,7 @@ export function ZoneLabelsOverlay() {
         : z.psm;
       return { name: LABELS[z.id] ?? z.id, pct: Math.round((val ?? 0) * 100), v: val ?? 0, state: z.eceState };
     })
-    .filter((x) => (overlay === "ece" && x.state ? x.state !== "No_localized_signal" : x.v > 0.05))
+    .filter((x) => (overlay === "ece" && x.state ? x.state === "Direct_EPE_concern" : x.v > 0.05))
     .sort((a, b) => b.v - a.v);
 
   return (
@@ -75,7 +75,7 @@ export function ZoneLabelsOverlay() {
       {!collapsed && (
         <div className="px-3 pb-3">
           {items.length === 0 ? (
-            <p className="text-[10px] text-muted-foreground">{overlay === "ece" ? "No regional signal" : "No zones above 5%"}</p>
+            <p className="text-[10px] text-muted-foreground">{overlay === "ece" ? "No EPE on imaging" : "No zones above 5%"}</p>
           ) : (
             <ul className="space-y-1.5">
               {items.map((item) => (
@@ -91,7 +91,7 @@ export function ZoneLabelsOverlay() {
                       )}
                     >
                       {overlay === "ece" && item.state
-                        ? ({ Direct_EPE_concern: "EPE concern", Localized_signal: "Signal", No_localized_signal: "No signal", Indeterminate: "Limited data" } as const)[item.state]
+                        ? "EPE"
                         : `${item.pct}% ${overlayName}`}
                     </span>
                   </div>
