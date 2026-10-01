@@ -39,6 +39,13 @@ function riskCls(v: number) {
   return "text-red-500";
 }
 
+/** Side ECE colors use the nerve-sparing grade cutoffs: <10% G1, 10-<30% G2, >=30% G3. */
+function nsCls(v: number) {
+  if (v < 0.1) return "text-emerald-500";
+  if (v < 0.3) return "text-amber-500";
+  return "text-red-500";
+}
+
 function riskBarCls(v: number) {
   if (v < 0.15) return "bg-emerald-500";
   if (v < 0.3) return "bg-amber-500";
@@ -149,13 +156,6 @@ export function PredictionPanel() {
 
   // NS zone detail
   const regionRows = regionDisplays(predictions.regional, predictions.eceL, predictions.eceR);
-  const zones5 = [
-    { k: "posterolateral", l: "Posterolateral" },
-    { k: "base", l: "Base" },
-    { k: "apex", l: "Apex" },
-    { k: "anterior", l: "Anterior" },
-    { k: "bladder_neck", l: "Bladder Neck" },
-  ];
 
   const gradesToShow =
     predictions.nsL === predictions.nsR
@@ -272,24 +272,14 @@ export function PredictionPanel() {
                 <tbody>
                   <tr className="border-b border-border/60">
                     <td className="py-1.5 font-medium">Side ECE</td>
-                    <td className={cn("py-1.5 px-2", riskCls(predictions.eceL))}>{Math.round(predictions.eceL * 100)}%</td>
-                    <td className={cn("py-1.5 px-2", riskCls(predictions.eceR))}>{Math.round(predictions.eceR * 100)}%</td>
+                    <td className={cn("py-1.5 px-2", nsCls(predictions.eceL))}>{Math.round(predictions.eceL * 100)}%</td>
+                    <td className={cn("py-1.5 px-2", nsCls(predictions.eceR))}>{Math.round(predictions.eceR * 100)}%</td>
                   </tr>
                   <tr className="border-b border-border/60">
                     <td className="py-1.5 font-medium">Side SVI</td>
                     <td className={cn("py-1.5 px-2", riskCls(predictions.sviL))}>{Math.round(predictions.sviL * 100)}%</td>
                     <td className={cn("py-1.5 px-2", riskCls(predictions.sviR))}>{Math.round(predictions.sviR * 100)}%</td>
                   </tr>
-                  {predictions.ece >= 0.05 && (
-                    <tr className="border-b border-border/60 text-muted-foreground">
-                      <td className="py-1.5">If ECE</td>
-                      <td colSpan={2} className="px-2 py-1.5">
-                        <span className="text-emerald-500">{Math.round((1 - predictions.extensive) * 100)}% focal</span>
-                        {" · "}
-                        <span className={predictions.extensive >= 0.5 ? "text-red-500" : "text-amber-500"}>{Math.round(predictions.extensive * 100)}% extensive</span>
-                      </td>
-                    </tr>
-                  )}
                   {(Object.keys(REGION_LABELS) as Region[]).map((rg) => {
                     const cell = (side: "left" | "right") => {
                       const d = regionRows.find((x) => x.side === side && x.region === rg);
@@ -298,11 +288,11 @@ export function PredictionPanel() {
                         return <span className="inline-block h-2 w-2 rounded-full bg-emerald-500/70" title="No finding in this region" />;
                       return (
                         <span
-                          className={cn("inline-flex items-center gap-1.5 font-semibold", d.level === "epe" ? "text-red-500" : "text-amber-500")}
-                          title={d.level === "epe" ? "EPE seen on imaging here; side ECE shown" : "Tumor localized here; side ECE shown"}
+                          className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", d.level === "epe" ? "text-red-500" : "text-amber-500")}
+                          title={d.level === "epe" ? "EPE seen on imaging in this region" : "Tumor localized to this region"}
                         >
                           <span className={cn("inline-block h-2 w-2 rounded-full", d.level === "epe" ? "bg-red-500" : "bg-amber-500")} />
-                          {d.sidePct}%
+                          {d.level === "epe" ? "EPE" : "Tumor"}
                         </span>
                       );
                     };
@@ -319,20 +309,6 @@ export function PredictionPanel() {
                     <td className="px-2 py-1.5"><NsGradeTag grade={predictions.nsL} /></td>
                     <td className="px-2 py-1.5"><NsGradeTag grade={predictions.nsR} /></td>
                   </tr>
-                  {(["left", "right"] as const).flatMap((side) =>
-                    zones5
-                      .filter((z) => predictions.regional?.[side]?.[z.k as Region]?.evidenceState === "Direct_EPE_concern")
-                      .map((z) => {
-                        const r = predictions.regional![side][z.k as Region];
-                        return (
-                          <tr key={`${side}-${z.k}-caution`}>
-                            <td colSpan={3} className="pt-1.5 text-xs font-medium text-red-500">
-                              {side === "left" ? "Left" : "Right"} {z.l.toLowerCase()}: EPE on {r.directEpeSources.join(" + ")}, consider wider plane
-                            </td>
-                          </tr>
-                        );
-                      }),
-                  )}
                 </tbody>
               </table>
             </div>
