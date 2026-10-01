@@ -92,9 +92,9 @@ describe("ExactVu on side: missing is never negative", () => {
     expect(exactvuOnSideFromRecord(P, [mus("L", "2")], "performed", "left")).toBe(0);
   });
   it("unscored blank row does not count; unscored localized lesion does", () => {
-    const blank = mus("L", "");
+    const blank = { ...mus("L", ""), zone: "", level: "" as const };
     expect(exactvuOnSideFromRecord(P, [blank], "performed", "left")).toBe(0);
-    const localized = { ...mus("L", ""), level: "Apex" as const };
+    const localized = { ...mus("L", ""), zone: "", level: "Apex" as const };
     expect(exactvuOnSideFromRecord(P, [localized], "performed", "left")).toBe(1);
   });
   it("lesion with no side recorded: ambiguous, null", () => {
