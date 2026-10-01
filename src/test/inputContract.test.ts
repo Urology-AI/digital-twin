@@ -360,3 +360,55 @@ describe("5. shim helpers", () => {
     expect(v22Absent(null, 2)).toBe(2);
   });
 });
+
+describe("6. study-level imaging status (MRI / ExactVu / PSMA)", () => {
+  it("a legacy record with epe:false, svi:false, PI-RADS 2 and no MRI data is MRI 'unknown', not a negative MRI", () => {
+    const rec = bareRecord();
+    rec.staging = { epe: false, svi: false, max_pirads: 2 };
+    const S = clinicalStateFromRecord(rec);
+    expect(S.imaging_availability.mri).toBe("unknown");
+    expect(S.mri_epe).toBeNull();
+    expect(S.mri_svi).toBeNull();
+    expect(S.pirads).toBeNull();
+  });
+
+  it("legacy false is trusted as a negative once MRI data shows the study was done", () => {
+    const rec = bareRecord();
+    rec.staging = { epe: false, svi: false, max_pirads: 4 };
+    const S = clinicalStateFromRecord(rec);
+    expect(S.imaging_availability.mri).toBe("performed");
+    expect(S.mri_epe).toBe(0);
+    expect(S.pirads).toBe(4);
+  });
+
+  it("an explicitly performed MRI with no findings keeps its negatives", () => {
+    const rec = bareRecord();
+    rec.staging = { epe: false, svi: false, availability: { mri: "performed" } };
+    const S = clinicalStateFromRecord(rec);
+    expect(S.mri_epe).toBe(0);
+    expect(S.mri_svi).toBe(0);
+  });
+
+  it("no PSMA read means PSMA 'unknown' and nodal status null", () => {
+    const S = clinicalStateFromRecord(bareRecord());
+    expect(S.imaging_availability.psma).toBe("unknown");
+    expect(S.psma_ln).toBeNull();
+  });
+
+  it("'not performed' plus recorded findings is a conflict and blocks vNext", () => {
+    const rec = bareRecord();
+    rec.staging = { epe: true, svi: false, availability: { mri: "not_performed" } };
+    const S = clinicalStateFromRecord(rec);
+    expect(S.imaging_conflicts).toEqual(["mri"]);
+    const v = validateVNextRequiredInputs(S);
+    expect(v.ok === false && v.problems).toContain("imaging_status_conflict");
+  });
+
+  it("explicit status survives a save and reload", () => {
+    const rec = bareRecord();
+    rec.staging = { epe: false, svi: false, availability: { mri: "performed", exactvu: "not_performed", psma: "unknown" } };
+    const back = clinicalStateFromRecord(buildProstateRecord(clinicalStateFromRecord(rec), []));
+    expect(back.imaging_availability).toEqual({ mri: "performed", exactvu: "not_performed", psma: "unknown" });
+    expect(back.mri_epe).toBe(0);
+  });
+});

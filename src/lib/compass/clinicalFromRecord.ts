@@ -1,3 +1,4 @@
+import { resolveImagingAvailability } from "@/lib/compass/imagingAvailability";
 import {
   defaultClinicalState,
   type ClinicalState,
@@ -231,6 +232,20 @@ export function clinicalStateFromRecord(
   }
 
   S.psma_ln = parsePsmaLn(st);
+
+  // A negative finding only counts if the study is known to have been done.
+  // Legacy records stored epe/svi as plain false even with no MRI, and seeded
+  // PI-RADS 2; under "unknown" those become null rather than observed negatives.
+  const avail = resolveImagingAvailability(P);
+  S.imaging_availability = avail.status;
+  S.imaging_conflicts = avail.conflicts;
+  if (avail.status.mri !== "performed") {
+    if (S.mri_epe === 0) S.mri_epe = null;
+    if (S.mri_svi === 0) S.mri_svi = null;
+    if (S.pirads === 2 && !(P.lesions || []).some((l) => l.source === "MRI"))
+      S.pirads = null;
+  }
+  if (avail.status.psma !== "performed" && S.psma_ln === 0) S.psma_ln = null;
 
   if (pr.median_lobe_grade !== null && pr.median_lobe_grade !== undefined)
     S.median_lobe_grade = pr.median_lobe_grade;

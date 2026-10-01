@@ -214,6 +214,11 @@ export interface Prostate3DInputV1 {
     psma_svi?: boolean;
     max_primus?: number | null;
     lymph_nodes_psma?: unknown;
+    /**
+     * Explicit study status. Optional: when absent it is inferred
+     * conservatively at read time (see lib/compass/imagingAvailability.ts).
+     */
+    availability?: Partial<ImagingAvailability> | null;
   };
   zones: ZoneMap;
   lesions: import("./lesion").LesionRow[];
@@ -235,6 +240,11 @@ export interface Prostate3DInputV1 {
  * 0 for any predictor. See `src/lib/models/inputContract.ts`.
  */
 export type OptionalPredictor = number | null;
+
+/** Was an imaging study done? "unknown" is never treated as a negative study. */
+export type ModalityStatus = "performed" | "not_performed" | "unknown";
+export type ImagingModality = "mri" | "exactvu" | "psma";
+export type ImagingAvailability = Record<ImagingModality, ModalityStatus>;
 
 export interface ClinicalState {
   age: number;
@@ -259,6 +269,10 @@ export interface ClinicalState {
    * Phases 2–7 make this the only consulted source for required-input presence.
    */
   required_present: { psa: boolean; vol: boolean; gg: boolean };
+  /** Resolved study status for MRI / ExactVu / PSMA. */
+  imaging_availability: ImagingAvailability;
+  /** Modalities marked not_performed that nonetheless carry data; blocks vNext. */
+  imaging_conflicts: ImagingModality[];
   cores: OptionalPredictor;
   maxcore: OptionalPredictor;
   linear_mm: number;
@@ -393,6 +407,8 @@ export function defaultClinicalState(): ClinicalState {
     psad: 0.144,
     gg: 2,
     required_present: { psa: true, vol: true, gg: true },
+    imaging_availability: { mri: "performed", exactvu: "unknown", psma: "unknown" },
+    imaging_conflicts: [],
     cores: 4,
     maxcore: 40,
     linear_mm: 0,

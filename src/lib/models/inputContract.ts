@@ -68,7 +68,8 @@ export type RequiredInputProblem =
   | "volume_missing"
   | "volume_not_positive"
   | "grade_group_missing"
-  | "grade_group_out_of_range";
+  | "grade_group_out_of_range"
+  | "imaging_status_conflict";
 
 export type VNextInputValidation =
   | { ok: true }
@@ -88,7 +89,7 @@ function finitePositive(v: unknown): boolean {
  */
 export function validateVNextRequiredInputs(
   S: Pick<ClinicalState, "psa" | "vol" | "gg"> &
-    Partial<Pick<ClinicalState, "required_present">>,
+    Partial<Pick<ClinicalState, "required_present" | "imaging_conflicts">>,
 ): VNextInputValidation {
   const problems: RequiredInputProblem[] = [];
   // Absent when the source record omitted it, even though a historical default
@@ -108,6 +109,9 @@ export function validateVNextRequiredInputs(
   else if (!Number.isInteger(S.gg) || S.gg < 1 || S.gg > 5)
     problems.push("grade_group_out_of_range");
 
+  if (S.imaging_conflicts && S.imaging_conflicts.length > 0)
+    problems.push("imaging_status_conflict");
+
   return problems.length === 0 ? { ok: true } : { ok: false, problems };
 }
 
@@ -119,4 +123,6 @@ export const REQUIRED_INPUT_MESSAGES: Record<RequiredInputProblem, string> = {
   volume_not_positive: "Prostate volume must be greater than 0.",
   grade_group_missing: "Biopsy grade group is required and was not recorded.",
   grade_group_out_of_range: "Biopsy grade group must be an integer from 1 to 5.",
+  imaging_status_conflict:
+    "An imaging study is marked not performed but has findings recorded. Correct one or the other.",
 };

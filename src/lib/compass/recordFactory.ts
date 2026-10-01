@@ -131,6 +131,7 @@ export function buildProstateRecord(
       epe_mus: !!S.mus_ece,
       svi_mus: !!S.mus_svi,
       psma_epe: !!S.psma_epe,
+      availability: S.imaging_availability,
       lymph_nodes_psma: isObserved(S.psma_ln)
         ? S.psma_ln
           ? "positive"
