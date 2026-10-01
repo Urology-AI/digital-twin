@@ -272,8 +272,6 @@ export function clinicalStateFromRecord(
       v === undefined ? null : v;
     S.plan_ns_override_l = pl.ns_override_l ?? null;
     S.plan_ns_override_r = pl.ns_override_r ?? null;
-    if (pl.hood) S.plan_hood = pl.hood;
-    S.plan_bnp = tri(pl.bladder_neck_preservation);
     S.plan_sv_preservation_l = tri(pl.sv_preservation_l);
     S.plan_sv_preservation_r = tri(pl.sv_preservation_r);
     S.plan_hydrodissection_l = tri(pl.hydrodissection_l);

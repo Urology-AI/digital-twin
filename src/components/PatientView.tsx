@@ -513,13 +513,6 @@ function SurgeryExplainer() {
             : "Your estimated chance of cancer in the lymph nodes is low, so your surgeon may not need to remove them. Ask about this at your visit.")}
         </p>
       </Card>
-      {plan.bladderNeckPreservation.value && (
-        <Card title="Bladder control">
-          <p className="text-[15px] text-foreground">
-            {t("Your surgeon plans to preserve the bladder neck (the muscle where the bladder meets the urethra), which may help you regain bladder control sooner.")}
-          </p>
-        </Card>
-      )}
     </div>
   );
 }

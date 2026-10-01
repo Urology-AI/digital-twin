@@ -418,8 +418,6 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       const PL = (record.plan ??= {});
       if (patch.plan_ns_override_l !== undefined) PL.ns_override_l = patch.plan_ns_override_l;
       if (patch.plan_ns_override_r !== undefined) PL.ns_override_r = patch.plan_ns_override_r;
-      if (patch.plan_hood !== undefined) PL.hood = patch.plan_hood;
-      if (patch.plan_bnp !== undefined) PL.bladder_neck_preservation = patch.plan_bnp;
       if (patch.plan_sv_preservation_l !== undefined) PL.sv_preservation_l = patch.plan_sv_preservation_l;
       if (patch.plan_sv_preservation_r !== undefined) PL.sv_preservation_r = patch.plan_sv_preservation_r;
       if (patch.plan_hydrodissection_l !== undefined) PL.hydrodissection_l = patch.plan_hydrodissection_l;

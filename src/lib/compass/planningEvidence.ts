@@ -402,30 +402,8 @@ export const PIPS_GATES = ev(
 );
 
 /* ================================================================== */
-/* Hood / bladder-neck / SV / hydrodissection decision rules           */
+/* SV / hydrodissection decision rules           */
 /* ================================================================== */
-
-export const HOOD_DECISION = ev(
-  { anteriorApexEceMax: 0.15 },
-  "literature",
-  "Anterior hood (Retzius-sparing) candidacy",
-  "Anterior compartment / puboprostatic preservation supports early continence " +
-    "(Tewari AK et al., anatomic restoration of the continence mechanism and " +
-    "puboprostatic collar, Urology 2007); Retzius-sparing early-continence data " +
-    "(Rosenberg JE et al., Cochrane 2020; Galfano A et al. 2013). Offered when " +
-    "anterior / apical ECE risk is low and planes are not obliterated.",
-);
-
-export const BNP_DECISION = ev(
-  { maxMedianLobe: 2, maxBnEce: 0.1, maxVolumeCc: 120 },
-  "literature",
-  "Bladder-neck preservation candidacy",
-  "Bladder-neck preservation / anatomic vesico-urethral reconstruction improves " +
-    "time to continence (Tewari AK et al., anatomic restoration, Urology 2007; " +
-    "Ma X et al., meta-analysis 2016; Nyarangi-Dix JN et al., RCT 2013). Not " +
-    "feasible with a large median lobe, high bladder-neck ECE, or a very large " +
-    "gland.",
-);
 
 export const SV_PRESERVATION = ev(
   { maxSideSvi: 0.1 },
@@ -466,9 +444,6 @@ export const FUNCTIONAL_OUTCOMES_MODEL = ev(
 /** pp deltas added to the potency / continence timelines. */
 export const PLAN_DELTAS = ev(
   {
-    hood_bilateral: { contEarly: 12, cont: 4, pot: 2 },
-    hood_unilateral: { contEarly: 6, cont: 2, pot: 1 },
-    bladder_neck_preservation: { contEarly: 6, cont: 3, pot: 0 },
     hydrodissection: { pot: 4, cont: 0, contEarly: 0 },
     sv_non_preservation: { pot: -3, cont: 0, contEarly: 0 },
     inflammation_moderate: { pot: -4, cont: -2, contEarly: -3 },
@@ -476,9 +451,7 @@ export const PLAN_DELTAS = ev(
   },
   "literature",
   "Operative-choice effect on functional recovery",
-  "Anterior / bladder-neck preservation → early continence (Tewari AK et al., " +
-    "anatomic restoration, Urology 2007; Ma X et al. 2016; Rosenberg JE et al., " +
-    "Cochrane 2020). Nerve-sparing grade → potency (Srivastava & Tewari, Eur " +
+  "Nerve-sparing grade → potency (Srivastava & Tewari, Eur " +
     "Urol 2013). Inflammation penalties are expert priors.",
 );
 

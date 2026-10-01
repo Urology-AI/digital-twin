@@ -1,22 +1,18 @@
 /**
  * Turns the zone-aware NS grade + inflammation risk into an actionable operative
  * plan: per-side plane and zone grades, hydrodissection candidacy, SV
- * preservation, and the overall anterior "hood" (Retzius-sparing) and
- * bladder-neck-preservation calls.
+ * preservation.
  *
  * Every recommendation is advisory. Surgeon overrides are tri-state — `null` /
  * `"auto"` means "follow the model", an explicit value (including a deliberate
  * "no") wins over the recommendation.
  */
 import {
-  BNP_DECISION,
-  HOOD_DECISION,
   HYDRODISSECTION_THRESHOLD,
   NS_ZONE_THRESHOLDS,
   PLANE_TECHNIQUE,
   SV_PRESERVATION,
 } from "@/lib/compass/planningEvidence";
-import type { InflammationRisk } from "@/lib/compass/inflammationRisk";
 import { predictPlaneHostility } from "@/lib/compass/planeHostility";
 import { applyDeferGate, checkPipsGates, epeTier, planeDecisionMatrix } from "@/lib/compass/planeDecisionMatrix";
 import type { ClinicalState } from "@/types/patient";
@@ -165,7 +161,6 @@ export function buildSurgicalPlan(
   nsDetailR: NsSideDetail,
   sviL: number,
   sviR: number,
-  infl: InflammationRisk,
   eceL: number,
   eceR: number,
 ): SurgicalPlan {
@@ -173,59 +168,5 @@ export function buildSurgicalPlan(
   const left = buildSide("left", S, nsDetailL, sviL, psmaSvi, eceL);
   const right = buildSide("right", S, nsDetailR, sviR, psmaSvi, eceR);
 
-  const wideSides = [left, right].filter((s) => s.nsGrade >= 3).length;
-  const anteriorApexEce = Math.max(
-    nsDetailL.zones.anterior ?? 0,
-    nsDetailR.zones.anterior ?? 0,
-    nsDetailL.zones.apex ?? 0,
-    nsDetailR.zones.apex ?? 0,
-  );
-  const hoodMaxEce = HOOD_DECISION.value.anteriorApexEceMax;
-  const bnpCut = BNP_DECISION.value;
-  const bigMedianLobe = S.median_lobe_grade >= bnpCut.maxMedianLobe;
-
-  let hoodRec: "none" | "unilateral" | "bilateral";
-  let hoodRecWhy: string;
-  if (wideSides === 0 && anteriorApexEce < hoodMaxEce && infl.tier !== "high" && !bigMedianLobe) {
-    hoodRec = "bilateral";
-    hoodRecWhy = "Low anterior/apical ECE, planes intact — favours early continence.";
-  } else if (wideSides === 1 && anteriorApexEce < hoodMaxEce && !bigMedianLobe) {
-    hoodRec = "unilateral";
-    hoodRecWhy = "Contralateral side only — one side needs wide excision.";
-  } else {
-    hoodRec = "none";
-    hoodRecWhy = bigMedianLobe
-      ? "Large median lobe — hood not feasible."
-      : infl.tier === "high"
-        ? "Obliterated planes — standard anterior approach."
-        : "Bilateral high-risk disease — standard anterior approach.";
-  }
-
-  const hoodValue = S.plan_hood === "auto" ? hoodRec : S.plan_hood;
-  const hood: SurgicalPlan["hood"] = {
-    value: hoodValue,
-    rationale:
-      S.plan_hood === "auto" || S.plan_hood === hoodRec
-        ? hoodRecWhy
-        : `Set to ${hoodValue} — model recommends ${hoodRec}.`,
-  };
-
-  const bnEce = Math.max(
-    nsDetailL.zones.bladder_neck ?? 0,
-    nsDetailR.zones.bladder_neck ?? 0,
-  );
-  const bnpRec =
-    S.median_lobe_grade < bnpCut.maxMedianLobe &&
-    bnEce < bnpCut.maxBnEce &&
-    S.vol < bnpCut.maxVolumeCc;
-  const bnpRationale = bnpRec
-    ? "Supports early continence — no large median lobe, low BN-zone ECE."
-    : bnEce >= bnpCut.maxBnEce
-      ? `BN-zone ECE ~${Math.round(bnEce * 100)}% — wider bladder-neck margin.`
-      : S.median_lobe_grade >= bnpCut.maxMedianLobe
-        ? "Large median lobe — reconstruct rather than preserve."
-        : "Very large gland — preservation may not be achievable.";
-  const bnp = resolveTri(S.plan_bnp, bnpRec, bnpRationale);
-
-  return { left, right, hood, bladderNeckPreservation: bnp, gates: checkPipsGates(S) };
+  return { left, right, gates: checkPipsGates(S) };
 }

@@ -79,7 +79,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
       "Anatomic restoration technique of continence mechanism and preservation of puboprostatic collar: a novel modification to achieve early urinary continence in men undergoing robotic prostatectomy.",
     source: "Urology. 2007;69(4):726-31.",
     group: "tewari",
-    usedFor: ["Anterior hood candidacy", "Bladder-neck preservation candidacy", "Plan functional deltas"],
+    usedFor: ["Plan functional deltas"],
     verified: false,
   },
   {
@@ -121,47 +121,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
       "Retzius-sparing versus standard robot-assisted radical prostatectomy for clinically localised prostate cancer.",
     source: "Cochrane Database Syst Rev. 2020;8(8):CD013641.",
     group: "external",
-    usedFor: ["Anterior hood candidacy", "Plan functional deltas"],
-    verified: false,
-  },
-  {
-    key: "dalela2017",
-    authors: "Dalela D, Jeong W, Prasad MA, et al.",
-    title:
-      "A pragmatic randomized controlled trial examining the impact of the Retzius-sparing approach on early urinary continence recovery after robot-assisted radical prostatectomy.",
-    source: "Eur Urol. 2017;72(5):677-685.",
-    group: "external",
-    usedFor: ["Anterior hood candidacy"],
-    verified: false,
-  },
-  {
-    key: "galfano2013",
-    authors: "Galfano A, Di Trapani D, Sozzi F, et al.",
-    title:
-      "Beyond the learning curve of the Retzius-sparing approach for robot-assisted radical prostatectomy: oncologic and functional results of the first 200 patients with ≥1 year of follow-up.",
-    source: "Eur Urol. 2013;64(6):974-80.",
-    group: "external",
-    usedFor: ["Anterior hood candidacy"],
-    verified: false,
-  },
-  {
-    key: "ma2016",
-    authors: "Ma X, Tang K, Yang C, et al.",
-    title:
-      "Bladder neck preservation improves time to continence after radical prostatectomy: a systematic review and meta-analysis.",
-    source: "Oncotarget. 2016;7(41):67463-67475.",
-    group: "external",
-    usedFor: ["Bladder-neck preservation candidacy", "Plan functional deltas"],
-    verified: false,
-  },
-  {
-    key: "nyarangidix2013",
-    authors: "Nyarangi-Dix JN, Radtke JP, Hadaschik B, et al.",
-    title:
-      "Impact of complete bladder neck preservation on urinary continence, quality of life and surgical margins after radical prostatectomy: a randomized, controlled, single blind trial.",
-    source: "J Urol. 2013;189(3):891-8.",
-    group: "external",
-    usedFor: ["Bladder-neck preservation candidacy"],
+    usedFor: ["Plan functional deltas"],
     verified: false,
   },
   {

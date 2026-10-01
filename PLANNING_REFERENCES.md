@@ -37,10 +37,6 @@ Bibliography for the effect sizes and decision rules in
 | Key | Citation | Used for |
 |---|---|---|
 | rosenberg2020 | Rosenberg JE, Jung JH, Edgerton Z, et al. Retzius-sparing versus standard robot-assisted radical prostatectomy… *Cochrane Database Syst Rev.* 2020;8(8):CD013641. | Anterior hood candidacy; plan functional deltas |
-| dalela2017 | Dalela D, Jeong W, Prasad MA, et al. A pragmatic RCT examining the impact of the Retzius-sparing approach on early urinary continence recovery after RARP. *Eur Urol.* 2017;72(5):677-685. | Anterior hood candidacy |
-| galfano2013 | Galfano A, Di Trapani D, Sozzi F, et al. Beyond the learning curve of the Retzius-sparing approach… *Eur Urol.* 2013;64(6):974-80. | Anterior hood candidacy |
-| ma2016 | Ma X, Tang K, Yang C, et al. Bladder neck preservation improves time to continence after radical prostatectomy: a systematic review and meta-analysis. *Oncotarget.* 2016;7(41):67463-67475. | Bladder-neck preservation; plan functional deltas |
-| nyarangidix2013 | Nyarangi-Dix JN, Radtke JP, Hadaschik B, et al. Impact of complete bladder neck preservation on urinary continence, QoL and surgical margins after RP: a randomized controlled single-blind trial. *J Urol.* 2013;189(3):891-8. | Bladder-neck preservation |
 | kowalczyk2011 | Kowalczyk KJ, Huang AC, Hevelone ND, et al. Stepwise approach for nerve sparing without countertraction during RARP: technique and outcomes. *Eur Urol.* 2011;60(3):536-47. | Hydrodissection |
 | john2000 | John H, Hauri D. Seminal vesicle-sparing radical prostatectomy: a novel concept to restore early urinary continence. *Urology.* 2000;55(6):820-4. | Seminal-vesicle tip-sparing |
 | han2003 | Han M, Partin AW, Zahurak M, et al. Biochemical (PSA) recurrence probability following radical prostatectomy for clinically localized prostate cancer. *J Urol.* 2003;169(2):517-23. | BCR event-timing fractions |

@@ -451,8 +451,6 @@ export function likelyOutcomes(S: ClinicalState, P: CompassPredictions | null): 
     nsR: grade(P.plan.right.nsGrade),
     ...lifestyleInputs(S),
     plan: {
-      hood: P.plan.hood.value,
-      bnPreservation: P.plan.bladderNeckPreservation.value,
       svPreservationL: P.plan.left.svPreservation.value,
       svPreservationR: P.plan.right.svPreservation.value,
       hydrodissectionL: P.plan.left.hydrodissection.value,

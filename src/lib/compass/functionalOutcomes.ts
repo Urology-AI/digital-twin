@@ -31,14 +31,11 @@ export type SmokingStatus = 'never' | 'former' | 'current';
 export type Pde5Regimen = 'none' | 'prn' | 'daily';
 export type AlcoholLevel = 'none' | 'moderate' | 'heavy';
 
-export type HoodPlan = 'none' | 'unilateral' | 'bilateral';
 export type InflammationTierInput = 'low' | 'moderate' | 'high';
 export type HealerTier = 'super' | 'healer' | 'delayed' | 'non-recovery';
 
 /** Optional operative-plan modifiers applied on top of the NS-grade base rates. */
 export interface PlanModifiers {
-  hood: HoodPlan;
-  bnPreservation: boolean;
   svPreservationL: boolean;
   svPreservationR: boolean;
   hydrodissectionL: boolean;
@@ -164,9 +161,6 @@ function planDeltas(p: PlanModifiers | undefined): {
     cont += d.cont;
     contEarly += d.contEarly;
   };
-  if (p.hood === "bilateral") apply(D.hood_bilateral);
-  else if (p.hood === "unilateral") apply(D.hood_unilateral);
-  if (p.bnPreservation) apply(D.bladder_neck_preservation);
   if (p.hydrodissectionL) apply(D.hydrodissection);
   if (p.hydrodissectionR) apply(D.hydrodissection);
   if (!p.svPreservationL) apply(D.sv_non_preservation);
@@ -292,7 +286,7 @@ export function computeFunctionalOutcomes(inputs: FunctionalInputs): FunctionalO
   if (htn) { pA += MF.comorbid.htn.pot; cA += MF.comorbid.htn.cont; }
   if (cad) { pA += MF.comorbid.cad.pot; cA += MF.comorbid.cad.cont; }
 
-  // Operative-plan modifiers (hood / bladder-neck / hydrodissection / SV / inflammation)
+  // Operative-plan modifiers (hydrodissection / SV / inflammation)
   const pdel = planDeltas(inputs.plan);
   pA += pdel.pot;
   cA += pdel.cont;

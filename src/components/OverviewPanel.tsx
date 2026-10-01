@@ -104,8 +104,6 @@ export function OverviewPanel({ tab }: { tab: DesktopTab }) {
     diet: toDiet(S.diet),
     dm: S.dm, htn: S.htn, cad: S.cad,
     plan: {
-      hood: plan.hood.value,
-      bnPreservation: plan.bladderNeckPreservation.value,
       svPreservationL: plan.left.svPreservation.value,
       svPreservationR: plan.right.svPreservation.value,
       hydrodissectionL: plan.left.hydrodissection.value,
@@ -171,8 +169,6 @@ export function OverviewPanel({ tab }: { tab: DesktopTab }) {
       <>
         <Row label="Nerve sparing — left" value={`Grade ${nsL}`} note={PLANE[nsL]} />
         <Row label="Nerve sparing — right" value={`Grade ${nsR}`} note={PLANE[nsR]} />
-        <Row label="Anterior hood" value={plan.hood.value} />
-        <Row label="Bladder-neck preservation" value={plan.bladderNeckPreservation.value ? "yes" : "no"} />
         <Row label="Inflammation risk" value={inflammation.tier}
              tone={inflammation.tier === "low" ? "good" : inflammation.tier === "moderate" ? "warn" : "bad"}
              note={inflammation.reviewMri ? "review MRI before the plane decision" : undefined} />

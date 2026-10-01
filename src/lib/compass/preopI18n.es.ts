@@ -494,9 +494,6 @@ export const ES: Record<string, string> = {
     "Es probable que su cirujano también quite ganglios linfáticos cerca de la próstata para ver si el cáncer se ha extendido. Esto agrega un poco de tiempo y un pequeño riesgo de que se acumule líquido en la pelvis.",
   "Your estimated chance of cancer in the lymph nodes is low, so your surgeon may not need to remove them. Ask about this at your visit.":
     "Su probabilidad estimada de cáncer en los ganglios es baja, así que quizá su cirujano no necesite quitarlos. Pregunte sobre esto en su consulta.",
-  "Bladder control": "Control de la vejiga",
-  "Your surgeon plans to preserve the bladder neck (the muscle where the bladder meets the urethra), which may help you regain bladder control sooner.":
-    "Su cirujano planea conservar el cuello de la vejiga (el músculo donde la vejiga se une a la uretra), lo que puede ayudarle a recuperar antes el control de la vejiga.",
 
   // ── What I can change ──
   "Your recovery at 12 months": "Su recuperación a los 12 meses",
