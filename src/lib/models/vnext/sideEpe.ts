@@ -89,8 +89,8 @@ function primusOf(l: LesionRow): number | null {
 /**
  * ExactVu lesion localized to this side: 1 / 0 / null.
  *   - ExactVu not known to be performed: null (neutral, never negative).
- *   - performed with a suspicious lesion (PRI-MUS >= 3, or an entered lesion
- *     without a score) on this side: 1.
+ *   - performed with a suspicious lesion on this side: 1. Suspicious means
+ *     PRI-MUS 3-5, or an unscored lesion with an explicit zone or level.
  *   - performed, nothing on this side: 0, unless a lesion has no side recorded,
  *     in which case laterality is ambiguous and this side is null.
  */
@@ -105,9 +105,12 @@ export function exactvuOnSideFromRecord(
   if (!performed) return null;
 
   const target = side === "left" ? "L" : "R";
+  // PRI-MUS 3-5 is positive, 1-2 negative. An unscored lesion counts only if
+  // it is explicitly localized (zone or level recorded); a blank row does not.
   const suspicious = (l: LesionRow) => {
     const p = primusOf(l);
-    return p === null || p >= 3;
+    if (p !== null) return p >= 3;
+    return Boolean(l.zone) || Boolean(l.level);
   };
   if (rows.some((l) => l.side === target && suspicious(l))) return 1;
   for (const [zone, z] of Object.entries(P.zones ?? {})) {
