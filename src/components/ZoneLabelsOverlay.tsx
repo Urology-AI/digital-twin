@@ -29,6 +29,10 @@ function sideCls(p: number) {
   return p < 0.1 ? "text-emerald-400" : p < 0.3 ? "text-amber-400" : "text-red-400";
 }
 
+function sideDot(p: number) {
+  return p < 0.1 ? "bg-emerald-400" : p < 0.3 ? "bg-amber-400" : "bg-red-400";
+}
+
 export function ZoneLabelsOverlay() {
   const overlay = useUiStore((s) => s.overlay);
   const labelsVisible = useUiStore((s) => s.labelsVisible);
@@ -51,12 +55,7 @@ export function ZoneLabelsOverlay() {
     return (
       <div className="glass pointer-events-auto absolute right-2 top-[calc(4.5rem+0.5rem)] z-10 w-44 rounded-xl px-3 py-2 shadow-xl lg:top-16">
         <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-primary">ECE findings</div>
-        {predictions && Number.isFinite(predictions.eceL) && (
-          <div className="mb-1.5 flex justify-between border-b border-foreground/10 pb-1.5 text-[11px] text-muted-foreground">
-            <span>Left <b className={sideCls(predictions.eceL)}>{Math.round(predictions.eceL * 100)}%</b></span>
-            <span>Right <b className={sideCls(predictions.eceR)}>{Math.round(predictions.eceR * 100)}%</b></span>
-          </div>
-        )}
+
         {rows.length === 0 ? (
           <p className="text-[10px] text-muted-foreground">No regional findings</p>
         ) : (
@@ -64,10 +63,10 @@ export function ZoneLabelsOverlay() {
             {rows.map((d) => (
               <li key={`${d.side}-${d.region}`} className="flex items-center justify-between text-[11px]">
                 <span className="flex items-center gap-1.5 text-muted-foreground/90">
-                  <span className={cn("inline-block h-1.5 w-1.5 rounded-full", d.level === "epe" ? "bg-red-500" : "bg-amber-500")} />
+                  <span className={cn("inline-block h-1.5 w-1.5 rounded-full", sideDot((d.sidePct ?? 0) / 100))} />
                   {d.side === "left" ? "L" : "R"} {REGION_LABELS[d.region].toLowerCase()}
                 </span>
-                <span className={cn("font-semibold", d.level === "epe" ? "text-red-400" : "text-amber-400")}>{d.level === "epe" ? "EPE" : "Tumor"}</span>
+                <span className={cn("font-bold tabular-nums", sideCls((d.sidePct ?? 0) / 100))}>{d.sidePct}%</span>
               </li>
             ))}
           </ul>

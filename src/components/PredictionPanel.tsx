@@ -46,6 +46,12 @@ function nsCls(v: number) {
   return "text-red-500";
 }
 
+function nsDot(v: number) {
+  if (v < 0.1) return "bg-emerald-500";
+  if (v < 0.3) return "bg-amber-500";
+  return "bg-red-500";
+}
+
 function riskBarCls(v: number) {
   if (v < 0.15) return "bg-emerald-500";
   if (v < 0.3) return "bg-amber-500";
@@ -288,11 +294,11 @@ export function PredictionPanel() {
                         return <span className="inline-block h-2 w-2 rounded-full bg-emerald-500/70" title="No finding in this region" />;
                       return (
                         <span
-                          className={cn("inline-flex items-center gap-1.5 text-xs font-semibold", d.level === "epe" ? "text-red-500" : "text-amber-500")}
-                          title={d.level === "epe" ? "EPE seen on imaging in this region" : "Tumor localized to this region"}
+                          className={cn("inline-flex items-center gap-1.5 font-semibold", nsCls((d.sidePct ?? 0) / 100))}
+                          title={d.level === "epe" ? "EPE seen on imaging in this region; side ECE shown" : "Tumor localized to this region; side ECE shown"}
                         >
-                          <span className={cn("inline-block h-2 w-2 rounded-full", d.level === "epe" ? "bg-red-500" : "bg-amber-500")} />
-                          {d.level === "epe" ? "EPE" : "Tumor"}
+                          <span className={cn("inline-block h-2 w-2 rounded-full", nsDot((d.sidePct ?? 0) / 100))} />
+                          {d.sidePct}%
                         </span>
                       );
                     };
