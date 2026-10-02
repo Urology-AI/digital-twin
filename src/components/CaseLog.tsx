@@ -64,7 +64,7 @@ export interface CaseRecord {
   pred_ece_l: number | null;
   pred_ece_r: number | null;
   pred_svi: number;
-  pred_upgrade: number;
+  pred_upgrade: number | null;
   pred_psm: number;
   pred_bcr: number;
   pred_lni: number;
@@ -293,7 +293,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       pred_ece_l: Number.isFinite(predictions.eceL) ? Math.round(predictions.eceL * 100) : null,
       pred_ece_r: Number.isFinite(predictions.eceR) ? Math.round(predictions.eceR * 100) : null,
       pred_svi: Math.round(predictions.svi * 100),
-      pred_upgrade: Math.round(predictions.upgrade * 100),
+      pred_upgrade: Number.isFinite(predictions.upgrade) ? Math.round(predictions.upgrade * 100) : null,
       pred_psm: Math.round(predictions.psm * 100),
       pred_bcr: Math.round(predictions.bcr * 100),
       pred_lni: Math.round(predictions.lni * 100),
