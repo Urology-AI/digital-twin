@@ -50,7 +50,7 @@ function Seg<T extends string | number>({
           type="button"
           onClick={() => onChange(o.value)}
           className={cn(
-            "flex-1 px-2 py-2 text-xs font-semibold transition-colors",
+            "min-w-0 flex-1 px-2 py-2 text-xs font-semibold leading-tight transition-colors",
             value === o.value
               ? "bg-primary text-primary-foreground"
               : "bg-card text-muted-foreground hover:bg-muted/60",
@@ -304,7 +304,7 @@ export function PlanningInputsPanel() {
               onChange={(v) => updateClinicalForm({ prior_pelvic_surgery: v })}
               options={[
                 { label: "None", value: "none" },
-                { label: "Bladder/fracture/urethroplasty", value: "bladder_fracture_urethroplasty" },
+                { label: "Bladder, fracture, urethroplasty", value: "bladder_fracture_urethroplasty" },
                 { label: "Rectal @ Denonvilliers", value: "rectal_denonvilliers" },
               ]}
             />
