@@ -56,27 +56,20 @@ function Eyebrow({ children }: { children: ReactNode }) {
 
 const rowKey = (x: { label: string; points: number }) => `${x.label}|${x.points}`;
 
-/** One contributor line with its evidence tag, points and a faint bar. */
-function ContributorRow({ x, maxPts, bar }: { x: SideCounseling["contributors"][number]; maxPts: number; bar: string }) {
+/** One contributor line: label, evidence tag, points. */
+function ContributorRow({ x }: { x: SideCounseling["contributors"][number] }) {
   return (
-    <li className="py-2">
-      <div className="flex items-start gap-2 text-xs">
-        <span className="min-w-0 flex-1 break-words leading-snug text-foreground/90">{x.label}</span>
-        <span
-          className={cn("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset", EVIDENCE_TONE[x.evidence].cls)}
-          title={EVIDENCE_TONE[x.evidence].hint}
-        >
-          {EVIDENCE_TONE[x.evidence].label}
-        </span>
-        <span className="w-12 shrink-0 text-right font-medium tabular-nums text-foreground/80">
-          {x.points === 0 ? <span className="font-normal text-muted-foreground">context</span> : `+${x.points.toFixed(2)}`}
-        </span>
-      </div>
-      {x.points > 0 && (
-        <div className="mt-1.5 h-0.5 overflow-hidden rounded-full bg-muted">
-          <div className={cn("h-full rounded-full opacity-70", bar)} style={{ width: `${(x.points / maxPts) * 100}%` }} />
-        </div>
-      )}
+    <li className="flex items-start gap-2 py-2 text-xs">
+      <span className="min-w-0 flex-1 break-words leading-snug text-foreground/90">{x.label}</span>
+      <span
+        className={cn("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ring-1 ring-inset", EVIDENCE_TONE[x.evidence].cls)}
+        title={EVIDENCE_TONE[x.evidence].hint}
+      >
+        {EVIDENCE_TONE[x.evidence].label}
+      </span>
+      <span className="w-12 shrink-0 text-right font-medium tabular-nums text-foreground/80">
+        {x.points === 0 ? <span className="font-normal text-muted-foreground">context</span> : `+${x.points.toFixed(2)}`}
+      </span>
     </li>
   );
 }
@@ -85,8 +78,11 @@ function SideColumn({
   c,
   sharedKeys,
   sharedCounseling,
+  combinedWith,
 }: {
   c: SideCounseling;
+  /** when both sides score identically, render one card for both instead of two copies */
+  combinedWith?: SideCounseling;
   /** contributors identical on both sides: shown once above, not repeated here */
   sharedKeys: Set<string>;
   /** counseling answers identical on both sides: shown once below, not repeated here */
@@ -95,22 +91,26 @@ function SideColumn({
   const conf = CONF_TONE[c.confidence.level];
   const tone = TIER_TONE[c.hostilityTier];
   const own = c.contributors.filter((x) => !sharedKeys.has(rowKey(x)));
-  const maxPts = Math.max(0.01, ...c.contributors.map((x) => x.points));
+  const perSide = (f: (x: SideCounseling) => string) =>
+    combinedWith ? `Left: ${f(c.side === "left" ? c : combinedWith)}\nRight: ${f(c.side === "right" ? c : combinedWith)}` : f(c);
   const rows = [
     {
-      q: "Chance this bundle can be preserved oncologically",
-      a: `${pct(c.preservableOncologically)} (1 − PIPS-EPE)`,
+      q: combinedWith ? "Chance each bundle can be preserved oncologically" : "Chance this bundle can be preserved oncologically",
+      a: combinedWith
+        ? `Left ${pct((c.side === "left" ? c : combinedWith).preservableOncologically)} · Right ${pct((c.side === "right" ? c : combinedWith).preservableOncologically)} (1 − PIPS-EPE)`
+        : `${pct(c.preservableOncologically)} (1 − PIPS-EPE)`,
       mono: true,
     },
-    ...(sharedCounseling.reduction ? [] : [{ q: "Will intended nerve sparing be reduced intra-operatively?", a: c.planReduction.text, mono: false }]),
-    ...(sharedCounseling.change ? [] : [{ q: "Could findings or frozen sections change the plan?", a: c.intraopChange.text, mono: false }]),
+    // In the combined card the identical answers belong inside it, not in a separate block.
+    ...(sharedCounseling.reduction && !combinedWith ? [] : [{ q: "Will intended nerve sparing be reduced intra-operatively?", a: sharedCounseling.reduction ? c.planReduction.text : perSide((x) => x.planReduction.text), mono: false }]),
+    ...(sharedCounseling.change && !combinedWith ? [] : [{ q: "Could findings or frozen sections change the plan?", a: sharedCounseling.change ? c.intraopChange.text : perSide((x) => x.intraopChange.text), mono: false }]),
   ];
   return (
     <section className="flex flex-col rounded-xl border border-border bg-card/60 shadow-sm">
       <header className="space-y-3 p-4 pb-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <Eyebrow>{c.side} side · plane risk</Eyebrow>
+            <Eyebrow>{combinedWith ? "Both sides" : `${c.side} side`} · plane risk</Eyebrow>
             <div className="mt-1 flex items-baseline gap-2">
               <span className={cn("text-3xl font-semibold leading-none tabular-nums", tone.text)}>
                 {pct(c.technicallyDifficult)}
@@ -144,6 +144,7 @@ function SideColumn({
         )}
       </header>
 
+      {!combinedWith && (
       <div className="border-t border-border px-4 py-3">
         <Eyebrow>Specific to this side</Eyebrow>
         {own.length === 0 ? (
@@ -153,11 +154,12 @@ function SideColumn({
         ) : (
           <ul className="mt-2 divide-y divide-border/60">
             {own.map((x, i) => (
-              <ContributorRow key={i} x={x} maxPts={maxPts} bar={tone.bar} />
+              <ContributorRow key={i} x={x} />
             ))}
           </ul>
         )}
       </div>
+      )}
 
       <div className="border-t border-border px-4 py-3">
         <Eyebrow>Counseling</Eyebrow>
@@ -165,7 +167,7 @@ function SideColumn({
           {rows.map((r) => (
             <div key={r.q}>
               <dt className="font-medium text-foreground">{r.q}</dt>
-              <dd className={cn("mt-0.5 leading-snug text-muted-foreground", r.mono && "tabular-nums")}>{r.a}</dd>
+              <dd className={cn("mt-0.5 whitespace-pre-line leading-snug text-muted-foreground", r.mono && "tabular-nums")}>{r.a}</dd>
             </div>
           ))}
         </dl>
@@ -191,7 +193,12 @@ export function PeriprostaticRiskBySide({
   const rightKeys = new Set(counseling.right.contributors.map(rowKey));
   const shared = counseling.left.contributors.filter((x) => rightKeys.has(rowKey(x)));
   const sharedKeys = new Set(shared.map(rowKey));
-  const sharedMax = Math.max(0.01, ...shared.map((x) => x.points));
+  const own = (c: SideCounseling) => c.contributors.filter((x) => !sharedKeys.has(rowKey(x)));
+  const identical =
+    own(counseling.left).length === 0 &&
+    own(counseling.right).length === 0 &&
+    counseling.left.hostilityTier === counseling.right.hostilityTier &&
+    Math.abs(counseling.left.technicallyDifficult - counseling.right.technicallyDifficult) < 1e-9;
   const sharedCounseling = {
     reduction: counseling.left.planReduction.text === counseling.right.planReduction.text,
     change: counseling.left.intraopChange.text === counseling.right.intraopChange.text,
@@ -210,18 +217,22 @@ export function PeriprostaticRiskBySide({
             <Eyebrow>Shared factors · apply equally to both sides</Eyebrow>
             <ul className="mt-1 divide-y divide-border/60">
               {shared.map((x, i) => (
-                <ContributorRow key={i} x={x} maxPts={sharedMax} bar="bg-muted-foreground" />
+                <ContributorRow key={i} x={x} />
               ))}
             </ul>
           </section>
         )}
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <SideColumn c={counseling.left} sharedKeys={sharedKeys} sharedCounseling={sharedCounseling} />
-          <SideColumn c={counseling.right} sharedKeys={sharedKeys} sharedCounseling={sharedCounseling} />
-        </div>
+        {identical ? (
+          <SideColumn c={counseling.left} combinedWith={counseling.right} sharedKeys={sharedKeys} sharedCounseling={sharedCounseling} />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            <SideColumn c={counseling.left} sharedKeys={sharedKeys} sharedCounseling={sharedCounseling} />
+            <SideColumn c={counseling.right} sharedKeys={sharedKeys} sharedCounseling={sharedCounseling} />
+          </div>
+        )}
 
-        {(sharedCounseling.reduction || sharedCounseling.change) && (
+        {!identical && (sharedCounseling.reduction || sharedCounseling.change) && (
           <section className="rounded-xl border border-border bg-card/60 px-4 py-3 shadow-sm">
             <Eyebrow>Counseling · same for both sides</Eyebrow>
             <dl className="mt-2 space-y-3 text-xs">
