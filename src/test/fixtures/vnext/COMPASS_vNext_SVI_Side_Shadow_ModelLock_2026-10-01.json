@@ -1,0 +1,169 @@
+{
+  "model_name": "COMPASS vNext side-specific SVI shadow localizer",
+  "version": "vNext-svi-side-shadow-candidate-2026-10-01",
+  "status": "shadow research candidate only; not a replacement for frozen global SVI and not externally validated",
+  "upstream_global_svi": {
+    "version": "vNext-core-candidate-2026-09-24",
+    "core_lock_sha256": "be53aba453b2595cbb3e15a640d5017667beb41650425137e8b2334756127bd8",
+    "rule": "consume the frozen global SVI logit; do not refit or alter the global SVI model"
+  },
+  "cohort": {
+    "patients": 664,
+    "side_units": 1328,
+    "side_svi_events": 92,
+    "left_events": 44,
+    "right_events": 48,
+    "side_biopsy_gg_observed_units": 1098,
+    "side_biopsy_gg_missing_units": 230,
+    "side_biopsy_gg_zero_units": 289
+  },
+  "target": "pathologic seminal-vesicle invasion on the corresponding left/right side",
+  "features": [
+    "global_svi_logit",
+    "side_biopsy_gg"
+  ],
+  "side_biopsy_gg_semantics": {
+    "1_to_5": "observed side-specific biopsy Grade Group when available",
+    "0": "only when that side is explicitly documented as cancer-free / zero positive biopsy cores, including explicit unilateral cancer on the opposite side",
+    "unilateral_involved_side_fallback": "if unilateral cancer side is explicit but side GG is absent, use the overall biopsy GG on the involved side",
+    "missing": "unavailable/uncertain side-specific biopsy status; neutral mean imputation; never infer 0 from a blank field alone"
+  },
+  "model": {
+    "type": "L2-regularized logistic regression",
+    "C": 1.0,
+    "standardization": "population SD (sklearn StandardScaler, ddof=0) after mean imputation",
+    "intercept": -3.193339392651105,
+    "coefficients_standardized": {
+      "global_svi_logit": 1.2463490061038853,
+      "side_biopsy_gg": 0.17613883933319469
+    },
+    "imputation_means": {
+      "global_svi_logit": -2.901396321908463,
+      "side_biopsy_gg": 1.8406193078324227
+    },
+    "scaler_means": {
+      "global_svi_logit": -2.901396321908463,
+      "side_biopsy_gg": 1.8406193078324224
+    },
+    "scaler_scales": {
+      "global_svi_logit": 1.4337563120783088,
+      "side_biopsy_gg": 1.8854844178919803
+    },
+    "equation": "z=(x-mean)/scale; side_logit=intercept + beta_global*z(global_svi_logit) + beta_sidegg*z(side_biopsy_gg); p=sigmoid(side_logit)"
+  },
+  "evaluation": {
+    "repeated_grouped_cv": "10 repeats x 5 folds; StratifiedGroupKFold grouped by patient; seeds 42-51",
+    "global_logit_only": {
+      "mean_auc": 0.8350147741663149,
+      "mean_brier": 0.05567689551946995,
+      "mean_calibration_intercept": -0.09486705653639789,
+      "mean_calibration_slope": 0.959815838394001
+    },
+    "side_candidate": {
+      "mean_auc": 0.8414951808076543,
+      "auc_sd": 0.0038732366501404384,
+      "mean_brier": 0.055873675820441046,
+      "mean_calibration_intercept": -0.4279586574347915,
+      "mean_calibration_slope": 0.8090811482174395
+    },
+    "paired_delta_auc": {
+      "mean": 0.006480406641339531,
+      "repeat_2_5_percentile": 0.002240088996763806,
+      "repeat_97_5_percentile": 0.011586068312930875
+    },
+    "temporal_2024_2025": {
+      "global_only": {
+        "n": 744,
+        "events": 43,
+        "auc": 0.813605148790764,
+        "brier": 0.049750306361212505,
+        "calibration_intercept": 0.5928068419651897,
+        "calibration_slope": 1.1565257776456426,
+        "mean_predicted": 0.04885136324305831,
+        "observed": 0.05779569892473118
+      },
+      "side_candidate": {
+        "n": 744,
+        "events": 43,
+        "auc": 0.8138041999800948,
+        "brier": 0.049457962929575716,
+        "calibration_intercept": 0.6734104376732548,
+        "calibration_slope": 1.176096451253178,
+        "mean_predicted": 0.047648193144115815,
+        "observed": 0.05779569892473118
+      }
+    },
+    "unilateral_pathology_ranking": {
+      "patients": 34,
+      "correct_side_higher": 18,
+      "tie": 12,
+      "wrong_side_higher": 4,
+      "accuracy_among_non_ties": 0.8181818181818182
+    },
+    "bootstrap_coefficients_300_patient_cluster_resamples": {
+      "global_svi_logit": {
+        "median": 1.2223622022063405,
+        "p2_5": 0.8931843501228286,
+        "p97_5": 1.5458765022724816,
+        "positive_fraction": 1.0
+      },
+      "side_biopsy_gg": {
+        "median": 0.2886706806752316,
+        "p2_5": 0.062567117803374,
+        "p97_5": 0.6862889977733093,
+        "positive_fraction": 1.0
+      }
+    }
+  },
+  "interpretation": {
+    "primary": "The frozen global SVI probability remains the primary calibrated SVI output.",
+    "side_output": "Use this model as a shadow localization/ranking layer, not as a validated absolute left/right SVI probability.",
+    "reason": "Side GG adds modest repeatable discrimination, but repeated-CV calibration is materially weaker than the global SVI model and Brier score is not improved internally.",
+    "imaging": "MRI/ExactVu/PSMA SVI or base/SV localization remain evidence/concordance signals and do not alter this fitted side equation."
+  },
+  "pinned_regression_cases": [
+    {
+      "case_id": "MEAN_REFERENCE",
+      "global_svi_probability": 0.05208458105137436,
+      "side_biopsy_gg": 1.8406193078324224,
+      "expected_side_shadow_probability": 0.03941714402553232
+    },
+    {
+      "case_id": "LOW_GLOBAL_CLEAN_SIDE",
+      "global_svi_probability": 0.02,
+      "side_biopsy_gg": 0.0,
+      "expected_side_shadow_probability": 0.014396742072511891
+    },
+    {
+      "case_id": "LOW_GLOBAL_GG1",
+      "global_svi_probability": 0.02,
+      "side_biopsy_gg": 1.0,
+      "expected_side_shadow_probability": 0.01578423305681656
+    },
+    {
+      "case_id": "INTERMEDIATE_GLOBAL_GG2",
+      "global_svi_probability": 0.1,
+      "side_biopsy_gg": 2.0,
+      "expected_side_shadow_probability": 0.07133762501314365
+    },
+    {
+      "case_id": "HIGH_GLOBAL_GG4",
+      "global_svi_probability": 0.3,
+      "side_biopsy_gg": 4.0,
+      "expected_side_shadow_probability": 0.23040818273257083
+    },
+    {
+      "case_id": "VERY_HIGH_GLOBAL_GG5",
+      "global_svi_probability": 0.5,
+      "side_biopsy_gg": 5.0,
+      "expected_side_shadow_probability": 0.4070817465527092
+    },
+    {
+      "case_id": "MISSING_SIDE_GG",
+      "global_svi_probability": 0.1,
+      "side_biopsy_gg": null,
+      "expected_side_shadow_probability": 0.0703575182458655
+    }
+  ],
+  "canonical_sha256": "8c6462af6d2dcec2368e3f622b541b820c623cd09e0ce3e54b47cb426c65d137"
+}
