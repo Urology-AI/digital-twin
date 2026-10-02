@@ -218,54 +218,82 @@ export const NS_GRADE_ESCALATION = ev(
 export const INFLAMMATION_WEIGHTS = ev(
   {
     intercept: -1.9,
-    age_gt_70: 0.35,
+    age_gt_70: 0,
     volume_gt_80: 0.4,
     volume_gt_100: 0.35,
     prior_turp: 0.55,
-    prior_holep: 0.7,
+    prior_holep: 0.4, // below TURP: the pooled PSM elevation is confined to prior TURP, not HoLEP (Creta 2024)
     prior_greenlight: 0.6,
-    prior_urolift: 0.3,
-    prior_rezum: 0.25,
+    prior_urolift: 0, // no RP outcome data for minimally invasive BPH therapy (absence of evidence, not proven null)
+    prior_rezum: 0,
     prior_bph_cap: 1.4,
     prior_pelvic_radiation: 1.1,
     radiation_proctitis: 0.6,
-    urinary_retention: 0.4,
-    recurrent_uti: 0.35,
-    ipss_gt_19: 0.3,
-    pelvic_abscess: 0.9,
-    hernia_mesh: 0.7,
+    urinary_retention: 0, // never studied vs the RP plane; predicts continence, not plane difficulty
+    recurrent_uti: 0, // no RP plane evidence retrieved
+    ipss_gt_19: 0, // functional (continence) sub-model only
+    pelvic_abscess: 0, // no RP plane evidence retrieved (active abscess is a hard-stop gate instead)
+    hernia_mesh: 0.15, // OT +21 min and more conversion, but NS / margins / continence preserved: a difficulty-time term, not plane quality
     rectal_fistula: 0.9,
     ibd: 0.7,
-    diverticulitis: 0.45,
-    biopsy_inflammation: 0.4,
-    multiple_biopsies: 0.35,
-    treated_prostatitis: 0.5,
-    bmi_gt_30: 0.3,
+    diverticulitis: 0, // never studied in RP
+    biopsy_inflammation: 0, // histologic inflammation unrelated to margins; no plane endpoint
+    multiple_biopsies: 0,
+    treated_prostatitis: 0, // as above
+    bmi_gt_30: 0.15, // attenuated once pelvic geometry and prostate volume are entered (Yao 2026)
     mri_inflammation_equivocal: 0.5,
     mri_inflammation_present: 1.0,
     mri_fat_stranding: 0.4,
     intraop_per_grade: 1.0,
-    prior_pelvic_surgery_bladder: 0.6,
+    prior_pelvic_surgery_bladder: 0, // descriptive only ("more difficult"), no effect size
     prior_pelvic_surgery_denonvilliers: 0.9,
     reservoir_present: 0.3,
     reservoir_infected: 0.6,
-    catheter_prolonged: 0.3,
-    biopsy_recent_or_complicated: 0.3,
-    systemic_inflammatory_index_high: 0.3,
+    catheter_prolonged: 0, // no RP plane evidence
+    biopsy_recent_or_complicated: 0,
+    systemic_inflammatory_index_high: 0,
+    mri_post_biopsy_hemorrhage: 0.5,
+    radiation_brachytherapy_extra: 0.3,
+    bph_procedure_complicated: 0.3,
+    pvf_ge_1400: 0.3, // measured pelvic visceral fat >= 1400 cm3 prolongs OT independently of BMI (Uchida 2021); magnitude expert-set
+    neoadjuvant_adt: 0.15, // desmoplasia: weak, descriptive; not additive with prior radiation
+    prior_abdominal_surgery: 0, // validated null: adhesiolysis rises but OT, blood loss, margins, NS and complications do not (Siddiqui 2010, Ginzburg 2010, Ball 2015)
+    five_ari_long_term: 0, // direction uncertain: less vascularity short-term, more stromal fibrosis long-term; no RP plane endpoint
   },
   "provisional",
   "Periprostatic-inflammation risk weights",
   "Surgical-difficulty framing after Tewari A et al., competing goals during " +
-    "robotic RP (BJU Int 2008). Individual risk factors: prior BPH surgery and " +
-    "pelvic RT (Mandel P et al., salvage RP series), IBD / diverticular pelvic " +
-    "inflammation, obesity / periprostatic-fat inflammation, post-biopsy change. " +
-    "BPH-procedure sub-weights ranked by dissection burden. Prior pelvic " +
-    "surgery, penile-prosthesis reservoir, catheter exposure, recent/" +
-    "complicated biopsy, and systemic inflammatory index (hs-CRP > 3 mg/L or " +
-    "NLR > 3) are from the PIPS development framework's history and " +
-    "biomarker-framework domains (periprostatic-inflammation and plane-score " +
-    "research protocol, 2026). Expert priors pending fitting against whole-" +
-    "mount inflammation grade.",
+    "robotic RP (BJU Int 2008). Best-supported terms (plane or surgical-" +
+    "surrogate evidence): prior pelvic radiation (incl. brachytherapy extra; " +
+    "Ribeiro J Urol 2021, Gotto J Urol 2010), prior TURP/HoLEP/laser BPH " +
+    "surgery (Liao 2020, Creta 2024 meta-analyses; a complicated procedure " +
+    "scores extra; HoLEP weighted below TURP), prior rectal/Denonvilliers surgery, and post-biopsy " +
+    "hemorrhage on T1 MRI (Hong World J Urol 2010). Hernia mesh is down-" +
+    "weighted: harder Retzius dissection and longer OT, but nerve-sparing, " +
+    "margins and continence are preserved in most objective series " +
+    "(Picozzi 2015). BMI is halved because its independent effect largely " +
+    "disappears once pelvic geometry and prostate volume are modelled (Yao " +
+    "2026), so it must not be treated as additive to them. UroLift, Rezum, " +
+    "recurrent UTI and pelvic abscess are zero-weighted: no RP plane " +
+    "evidence (absence of evidence, not proven null). Transperineal vs " +
+    "transrectal biopsy route is a documented null (apical PSM OR 0.70, " +
+    "0.39-1.24; Al-Khanaty 2026) and is not scored. The penile-prosthesis " +
+    "reservoir is a descriptive visualization flag with no effect size. Age, hs-CRP/NLR, multiple biopsies and recent/complicated " +
+    "biopsy carry zero weight: no radical-prostatectomy study links them to " +
+    "plane difficulty (CRP/NLR track tumor biology; the Furman/Sotak SCI " +
+    "papers are general chronic-disease literature, not RP evidence). They " +
+    "are still shown as context. Remaining terms are PIPS-framework expert " +
+    "priors (penile-prosthesis reservoir, brachytherapy extra) kept scored " +
+    "but tagged unvalidated. Governance: terms with a studied null (general " +
+    "abdominal surgery, repeat/recent biopsy) are zero-weighted and tagged " +
+    "'validated null'; terms never studied in RP (retention, IPSS, catheter, " +
+    "diverticulitis, bladder surgery/fracture/urethroplasty, prostatitis, " +
+    "biopsy inflammation, abscess, UTI, MIST, contralateral ablation) are " +
+    "zero-weighted context. The intercept and tier cutoffs are expert-set, " +
+    "not fitted; pelvic visceral fat >= 1400 cm3 (measured) supersedes the " +
+    "BMI term; neoadjuvant ADT is a weak desmoplasia modifier that is not " +
+    "additive with prior radiation; only a prospective cohort with whole-mount fibrosis and a " +
+    "per-side plane-difficulty score can move any of these.",
 );
 
 export const INFLAMMATION_CUTS = ev(
@@ -296,7 +324,8 @@ export const PLANE_HOSTILITY_MRI_WEIGHTS = ev(
     fatStrandingPerLevel: 0.3, // 0 none .. 2 marked, this side
     focalAblationIpsilateral: 0.5, // ipsilateral focal (IRE/laser/PDT), this side
     focalAblationIpsilateralWholeGland: 1.0, // ipsilateral or whole-gland HIFU/cryo, this side
-    focalAblationContralateral: 0.25, // any ablation on the OTHER side (added once, per side)
+    focalAblationContralateral: 0, // true absence of evidence: no isolated untreated-side estimate exists
+    denonvilliersPerLevel: 0.3, // 0 normal .. 2 obliterated rectoprostatic angle (midline; applied to both sides)
   },
   "provisional",
   "PIPS-H MRI plane-phenotype weights",

@@ -32,6 +32,31 @@ describe("ClinicalState <-> Prostate3DInputV1 round trip", () => {
     expect(reloaded.pde5).toBe("prn");
   });
 
+  it("preserves the PIPS-H plane-evidence fields and Plane Difficulty Index across save and reload", () => {
+    const S = defaultClinicalState();
+    S.mri_post_biopsy_hemorrhage = true;
+    S.radiation_brachytherapy = true;
+    S.bph_procedure_complicated = true;
+    S.mri_denonvilliers = 2;
+    S.five_ari_long_term = true;
+    S.neoadjuvant_adt = true;
+    S.pelvic_visceral_fat_cm3 = 1550;
+    S.plane_difficulty_l[0] = 3;
+    S.plane_difficulty_l[11] = 1;
+    S.plane_difficulty_r[4] = 2;
+
+    const reloaded = clinicalStateFromRecord(buildProstateRecord(S, []));
+    expect(reloaded.mri_post_biopsy_hemorrhage).toBe(true);
+    expect(reloaded.radiation_brachytherapy).toBe(true);
+    expect(reloaded.bph_procedure_complicated).toBe(true);
+    expect(reloaded.mri_denonvilliers).toBe(2);
+    expect(reloaded.five_ari_long_term).toBe(true);
+    expect(reloaded.neoadjuvant_adt).toBe(true);
+    expect(reloaded.pelvic_visceral_fat_cm3).toBe(1550);
+    expect(reloaded.plane_difficulty_l).toEqual(S.plane_difficulty_l);
+    expect(reloaded.plane_difficulty_r).toEqual(S.plane_difficulty_r);
+  });
+
   it("round-trips a daily PDE5 regimen too", () => {
     const S = defaultClinicalState();
     S.pde5 = "daily";

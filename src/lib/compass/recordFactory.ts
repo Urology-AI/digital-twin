@@ -1,4 +1,5 @@
 import { createDefaultZones } from "@/lib/compass/constants";
+import { pdiTotal } from "@/lib/compass/planeDifficultyIndex";
 import { isObserved } from "@/lib/models/inputContract";
 import type { ClinicalState, Prostate3DInputV1, ZoneMap } from "@/types/patient";
 import type { LesionRow } from "@/types/lesion";
@@ -77,6 +78,15 @@ export function buildProstateRecord(
       penile_prosthesis_reservoir: S.penile_prosthesis_reservoir,
       catheter_prolonged_or_traumatic: S.catheter_prolonged_or_traumatic,
       biopsy_recent_or_complicated: S.biopsy_recent_or_complicated,
+      mri_post_biopsy_hemorrhage: S.mri_post_biopsy_hemorrhage,
+      radiation_brachytherapy: S.radiation_brachytherapy,
+      bph_procedure_complicated: S.bph_procedure_complicated,
+      five_ari_long_term: S.five_ari_long_term,
+      mri_denonvilliers: S.mri_denonvilliers || null,
+      plane_difficulty_l: pdiTotal(S.plane_difficulty_l) > 0 ? S.plane_difficulty_l : null,
+      plane_difficulty_r: pdiTotal(S.plane_difficulty_r) > 0 ? S.plane_difficulty_r : null,
+      pelvic_visceral_fat_cm3: S.pelvic_visceral_fat_cm3,
+      neoadjuvant_adt: S.neoadjuvant_adt,
       crp: S.crp,
       nlr: S.nlr,
       flag_active_infection: S.flag_active_infection,

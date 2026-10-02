@@ -21,7 +21,7 @@
  * (`PLANE_HOSTILITY_MRI_WEIGHTS`, `PLANE_HOSTILITY_CUTS`).
  */
 import { PLANE_HOSTILITY_CUTS, PLANE_HOSTILITY_MRI_WEIGHTS, INFLAMMATION_WEIGHTS } from "@/lib/compass/planningEvidence";
-import { preopHistoryPoints } from "@/lib/compass/inflammationRisk";
+import { preopHistoryPoints, type EvidenceTier, type RiskContributor } from "@/lib/compass/inflammationRisk";
 import { clamp, sigmoid } from "@/lib/utils/math";
 import type { ClinicalState } from "@/types/patient";
 
@@ -31,17 +31,11 @@ export interface PlaneHostility {
   side: "left" | "right";
   score: number; // 0..1
   tier: HostilityTier;
-  contributors: { label: string; points: number }[];
+  contributors: RiskContributor[];
 }
 
 export function predictPlaneHostility(S: ClinicalState, side: "left" | "right"): PlaneHostility {
   const W = PLANE_HOSTILITY_MRI_WEIGHTS.value;
-  const { points: historyPoints, contributors: historyContributors } = preopHistoryPoints(S);
-  const contributors = [...historyContributors];
-  const add = (level: number, perLevel: number, label: string) => {
-    if (level > 0) contributors.push({ label, points: level * perLevel });
-  };
-
   const sfx = side === "left" ? "_l" : "_r";
   const otherSfx = side === "left" ? "_r" : "_l";
   const field = (name: string, s: string) => (S as unknown as Record<string, number>)[`${name}${s}`] ?? 0;
@@ -53,6 +47,21 @@ export function predictPlaneHostility(S: ClinicalState, side: "left" | "right"):
   const ownAblation = field("prior_focal_ablation", sfx);
   const otherAblation = field("prior_focal_ablation", otherSfx);
 
+  // A side-specific MRI read supersedes the whole-gland read of the same
+  // finding, so a single radiologist observation is never scored twice.
+  const { points: historyPoints, contributors: historyContributors } = preopHistoryPoints(S, {
+    skipGlobalMri: { inflammation: nonmassSignal > 0, fatStranding: fatStranding > 0 },
+  });
+  const contributors = [...historyContributors];
+  // The side-specific MRI plane phenotype is validated against EPE and
+  // surgical-plan change, not against intra-operative difficulty or whole-mount
+  // fibrosis: scored, tagged "unvalidated" (provisional research input).
+  const add = (level: number, perLevel: number, label: string, evidence: EvidenceTier = "unvalidated") => {
+    if (level > 0) contributors.push({ label, points: level * perLevel, evidence });
+  };
+
+  const denonvilliers = S.mri_denonvilliers;
+  add(denonvilliers, W.denonvilliersPerLevel, `Denonvilliers fascia / rectoprostatic angle, grade ${denonvilliers}/2`, "surrogate");
   add(capsuleInterface, W.capsuleInterfacePerLevel, `Capsule–fat interface, grade ${capsuleInterface}/3`);
   add(nvbPlane, W.nvbPlanePerLevel, `NVB corridor plane, grade ${nvbPlane}/2`);
   add(postTreatment, W.postTreatmentDistortionPerLevel, `Post-treatment distortion, grade ${postTreatment}/2`);
@@ -64,21 +73,22 @@ export function predictPlaneHostility(S: ClinicalState, side: "left" | "right"):
     nvbPlane * W.nvbPlanePerLevel +
     postTreatment * W.postTreatmentDistortionPerLevel +
     nonmassSignal * W.nonmassInflammatorySignalPerLevel +
-    fatStranding * W.fatStrandingPerLevel;
+    fatStranding * W.fatStrandingPerLevel +
+    denonvilliers * W.denonvilliersPerLevel;
 
   // Prior focal/whole-gland ablation: ipsilateral counts by severity; any
   // ablation on the other side adds a smaller "contralateral" bump (the PIPS
   // calculator's own simplification — the near side is more affected, but a
   // whole-gland ablative course leaves some mark on both).
   if (ownAblation === 1) {
-    contributors.push({ label: "Prior ipsilateral focal ablation (IRE/laser/PDT)", points: W.focalAblationIpsilateral });
+    contributors.push({ label: "Prior ipsilateral focal ablation (IRE/laser/PDT)", points: W.focalAblationIpsilateral, evidence: "surrogate" });
     mriPoints += W.focalAblationIpsilateral;
   } else if (ownAblation >= 2) {
-    contributors.push({ label: "Prior ipsilateral/whole-gland ablation (HIFU/cryo)", points: W.focalAblationIpsilateralWholeGland });
+    contributors.push({ label: "Prior ipsilateral/whole-gland ablation (HIFU/cryo)", points: W.focalAblationIpsilateralWholeGland, evidence: "surrogate" });
     mriPoints += W.focalAblationIpsilateralWholeGland;
   }
   if (otherAblation > 0) {
-    contributors.push({ label: "Prior contralateral focal/ablative therapy", points: W.focalAblationContralateral });
+    contributors.push({ label: "Prior contralateral focal/ablative therapy", points: W.focalAblationContralateral, evidence: "none" });
     mriPoints += W.focalAblationContralateral;
   }
 

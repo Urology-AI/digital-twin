@@ -45,6 +45,8 @@ Bibliography for the effect sizes and decision rules in
 | hofman2020 | Hofman MS, Lawrentschuk N, Francis RJ, et al. PSMA PET-CT in high-risk prostate cancer before curative-intent surgery or radiotherapy (proPSMA)… *Lancet.* 2020;395(10231):1208-1216. | PSMA-at-base ECE rate |
 | preisser2019 | Preisser F, et al. Positive surgical margin length / grade and biochemical recurrence after radical prostatectomy. 2019 *(verify)*. | Per-zone thresholds; dissection alerts |
 | mandel2016 | Mandel P, Steuber T, Ahyai S, et al. Salvage radical prostatectomy for recurrent prostate cancer: verification of EAU guideline criteria. *BJU Int.* 2016;117(1):55-61. | Inflammation-risk weights (prior pelvic radiation) |
+| furman2019sci | Furman D, Campisi J, Verdin E, et al. Chronic inflammation in the etiology of disease across the life span. *Nat Med.* 2019;25(12):1822-1832. *(unverified)* | Inflammation-risk weights (systemic CRP/NLR, BMI framing) |
+| sotak2025obesity | Soták M, Clark M, Suur BE, Börgeson E. Inflammation and resolution in obesity. *Nat Rev Endocrinol.* 2025;21(1):45-61. *(unverified)* | Inflammation-risk weights (BMI framing) |
 | ball2015 | Ball MW, et al. Extent of extraprostatic extension and biochemical recurrence after radical prostatectomy. *Urology* 2015 *(verify)*. | Zonal ECE distribution |
 | ficarra2012 | Ficarra V, Novara G, Ahlering TE, et al. Systematic review and meta-analysis of studies reporting potency rates after robot-assisted radical prostatectomy. *Eur Urol.* 2012;62(3):418-30. | Functional-outcome nomogram (recovery trajectory) |
 

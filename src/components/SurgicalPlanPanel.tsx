@@ -22,6 +22,9 @@ import {
 import { bcrByPlan } from "@/lib/compass/bcrByPlan";
 import { useUiStore } from "@/store/uiStore";
 import { MODIFIABLE_BCR } from "@/lib/compass/planningEvidence";
+import { PeriprostaticRiskBySide } from "@/components/PipsCounselingCard";
+import { buildPipsCounseling } from "@/lib/compass/pipsCounseling";
+import { PDI_ITEMS, PDI_MAX, pdiTotal } from "@/lib/compass/planeDifficultyIndex";
 import type { ClinicalState } from "@/types/patient";
 import type { SidePlan } from "@/types/prediction";
 import { cn } from "@/lib/utils";
@@ -592,7 +595,9 @@ export function SurgicalPlanPanel() {
       },
     );
 
-    return { baseline, withPlan, bcr };
+    const counseling = buildPipsCounseling(S, plan, predictions.eceL, predictions.eceR, base);
+
+    return { baseline, withPlan, bcr, counseling };
   }, [predictions, S]);
 
   if (!predictions || !entry || !S || !computed) {
@@ -606,7 +611,7 @@ export function SurgicalPlanPanel() {
   }
 
   const { plan, inflammation } = predictions;
-  const { baseline, withPlan, bcr } = computed;
+  const { baseline, withPlan, bcr, counseling } = computed;
 
   const tierTone =
     inflammation.tier === "high"
@@ -614,8 +619,6 @@ export function SurgicalPlanPanel() {
       : inflammation.tier === "moderate"
         ? { text: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", bar: "bg-amber-500" }
         : { text: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", bar: "bg-emerald-500" };
-
-  const maxPts = Math.max(1, ...inflammation.contributors.map((c) => c.points));
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 pb-12">
@@ -671,6 +674,39 @@ export function SurgicalPlanPanel() {
             </p>
           </div>
         </div>
+      )}
+
+      {!plan.gates.activeInfection && (
+        <PeriprostaticRiskBySide
+          counseling={counseling}
+          title={
+            <div className="flex items-center gap-1.5">
+              <SectionTitle icon={<TriangleAlert className="h-4 w-4" />}>
+                Periprostatic inflammation risk, by side
+              </SectionTitle>
+              <EvidenceInfo title="Periprostatic inflammation risk" tags={INFLAMMATION_SOURCES} />
+            </div>
+          }
+          wholePatient={
+            <div className="space-y-2 rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-foreground">Whole-patient estimate (used for outcome adjustments)</span>
+                <span className={cn("rounded-full px-2.5 py-0.5 font-bold uppercase", tierTone.bg, tierTone.text)}>
+                  {inflammation.tier} · {pct(inflammation.score)}
+                </span>
+              </div>
+              {inflammation.reviewMri && (
+                <div className="flex gap-2 rounded-lg bg-amber-500/10 p-2 text-amber-700 dark:text-amber-300">
+                  <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  Review the MRI for tell-tale signs of periprostatic inflammation or fatty change
+                  (reticular fat stranding, effaced fat planes, dilated venous plexus) before finalising
+                  the plan.
+                </div>
+              )}
+              {inflammation.intraopObserved && <p>Estimate driven by the recorded intra-operative inflammation grade.</p>}
+            </div>
+          }
+        />
       )}
 
       {/* ── Impact ─────────────────────────────────────────────── */}
@@ -782,75 +818,10 @@ export function SurgicalPlanPanel() {
         />
       </div>
 
-      {/* ── Inflammation risk ──────────────────────────────────── */}
+      {/* ── Intra-operative record ─────────────────────────────── */}
       <Card>
         <CardContent className="space-y-3 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <SectionTitle icon={<TriangleAlert className="h-4 w-4" />}>
-                Periprostatic inflammation risk
-              </SectionTitle>
-              <EvidenceInfo title="Periprostatic inflammation risk" tags={INFLAMMATION_SOURCES} />
-            </div>
-            <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold uppercase", tierTone.bg, tierTone.text)}>
-              {inflammation.tier} · {pct(inflammation.score)}
-            </span>
-          </div>
-
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
-            <div className={cn("h-full rounded-full", tierTone.bar)} style={{ width: `${inflammation.score * 100}%` }} />
-          </div>
-
-          {inflammation.tier === "high" && (
-            <p className={cn("text-xs font-medium", tierTone.text)}>
-              Planes likely obliterated — NS grade raised one step.
-            </p>
-          )}
-          {inflammation.tier === "moderate" && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              Flagged — a wider plane may be safer; grade left to surgeon judgement.
-            </p>
-          )}
-
-          {inflammation.reviewMri && (
-            <div className="flex gap-2 rounded-lg bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-300">
-              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Review the MRI for tell-tale signs of periprostatic inflammation or fatty change
-              (reticular fat stranding, effaced fat planes, dilated venous plexus) before finalising
-              the plan.
-            </div>
-          )}
-          {inflammation.intraopObserved && (
-            <p className="text-xs text-muted-foreground">
-              Estimate driven by the recorded intra-operative inflammation grade.
-            </p>
-          )}
-
-
-          {inflammation.contributors.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No risk factors recorded.</p>
-          ) : (
-            <div className="space-y-1.5">
-              {inflammation.contributors.map((c, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs">
-                  <span className="w-52 shrink-0 truncate text-muted-foreground" title={c.label}>
-                    {c.label}
-                  </span>
-                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                    <span
-                      className={cn("block h-full rounded-full", tierTone.bar)}
-                      style={{ width: `${(c.points / maxPts) * 100}%` }}
-                    />
-                  </span>
-                  <span className="w-10 shrink-0 text-right tabular-nums text-muted-foreground">
-                    +{c.points.toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-2 border-t border-border pt-3">
+          <div className="space-y-2">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Intra-op inflammation grade (overrides the estimate)
             </div>
@@ -888,6 +859,27 @@ export function SurgicalPlanPanel() {
               );
             })}
           </div>
+
+          <details className="space-y-2 border-t border-border pt-3">
+            <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Plane Difficulty Index (reference standard — recorded, not scored)
+            </summary>
+            <p className="pt-2 text-[11px] leading-snug text-muted-foreground">
+              Score each item 0 (none) to 3 (severe) per side after dissection. No model reads these;
+              they are collected so PIPS-H weights can later be fitted against a structured outcome.
+            </p>
+            <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1 text-xs">
+              <span />
+              <span className="text-center font-semibold text-muted-foreground">L</span>
+              <span className="text-center font-semibold text-muted-foreground">R</span>
+              {PDI_ITEMS.map((item, i) => (
+                <PdiRow key={item} index={i} label={item} S={S} onChange={updateClinicalForm} />
+              ))}
+              <span className="font-semibold text-foreground">Total (of {PDI_MAX})</span>
+              <span className="text-center font-semibold tabular-nums">{pdiTotal(S.plane_difficulty_l)}</span>
+              <span className="text-center font-semibold tabular-nums">{pdiTotal(S.plane_difficulty_r)}</span>
+            </div>
+          </details>
         </CardContent>
       </Card>
 
@@ -909,5 +901,45 @@ export function SurgicalPlanPanel() {
         Evidence &amp; sources →
       </button>
     </div>
+  );
+}
+
+/** One Plane Difficulty Index item: a 0–3 score for each side. */
+function PdiRow({
+  index,
+  label,
+  S,
+  onChange,
+}: {
+  index: number;
+  label: string;
+  S: ClinicalState;
+  onChange: (patch: Partial<ClinicalState>) => void;
+}) {
+  const set = (side: "l" | "r", n: number) => {
+    const key = side === "l" ? "plane_difficulty_l" : "plane_difficulty_r";
+    const next = [...S[key]];
+    next[index] = n;
+    onChange({ [key]: next } as Partial<ClinicalState>);
+  };
+  return (
+    <>
+      <span className="text-muted-foreground">{label}</span>
+      {(["l", "r"] as const).map((side) => (
+        <select
+          key={side}
+          aria-label={`${label} (${side === "l" ? "left" : "right"})`}
+          value={(side === "l" ? S.plane_difficulty_l : S.plane_difficulty_r)[index]}
+          onChange={(e) => set(side, Number(e.target.value))}
+          className="h-7 rounded-md border border-border bg-card px-1 text-xs"
+        >
+          {[0, 1, 2, 3].map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      ))}
+    </>
   );
 }

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { defaultClinicalState } from "@/types/patient";
 import { predictInflammationRisk } from "@/lib/compass/inflammationRisk";
 import { predictPlaneHostility } from "@/lib/compass/planeHostility";
+import { buildPipsCounseling, sideConfidence } from "@/lib/compass/pipsCounseling";
+import { PDI_ITEM_COUNT, normalizePdi, pdiTotal } from "@/lib/compass/planeDifficultyIndex";
 import { buildSurgicalPlan } from "@/lib/compass/surgicalPlan";
 import { bcrByPlan } from "@/lib/compass/bcrByPlan";
 import { computeFunctionalOutcomes } from "@/lib/compass/functionalOutcomes";
@@ -275,9 +277,10 @@ describe("predictPlaneHostility (PIPS-H)", () => {
     const ipsi = predictPlaneHostility(S, "left");
     const contra = predictPlaneHostility(S, "right");
     expect(ipsi.score).toBeGreaterThan(contra.score);
-    // the untouched side still moves up slightly — "contralateral focal only"
+    // contralateral ablation has no isolated estimate in the literature: zero weight, shown as context
     const baseline = predictPlaneHostility(defaultClinicalState(), "right");
-    expect(contra.score).toBeGreaterThan(baseline.score);
+    expect(contra.score).toBe(baseline.score);
+    expect(contra.contributors.some((c) => c.label.includes("contralateral") && c.points === 0 && c.evidence === "none")).toBe(true);
   });
 
   it("whole-gland ablation (HIFU/cryo) scores higher than focal ablation on the same side", () => {
@@ -288,20 +291,132 @@ describe("predictPlaneHostility (PIPS-H)", () => {
     expect(predictPlaneHostility(wholeGland, "left").score).toBeGreaterThan(predictPlaneHostility(focal, "left").score);
   });
 
-  it("prior pelvic surgery, penile-prosthesis reservoir, catheter exposure, recent/complicated biopsy, and a high systemic inflammatory index each raise hostility on both sides", () => {
+  it("prior rectal surgery, penile-prosthesis reservoir, post-biopsy hemorrhage, brachytherapy modality and a complicated BPH procedure each raise hostility on both sides", () => {
     const baseline = predictPlaneHostility(defaultClinicalState(), "left").score;
     const cases: Partial<ReturnType<typeof defaultClinicalState>>[] = [
       { prior_pelvic_surgery: "rectal_denonvilliers" },
       { penile_prosthesis_reservoir: "prior_infection_or_revision" },
-      { catheter_prolonged_or_traumatic: true },
-      { biopsy_recent_or_complicated: true },
-      { crp: 5 },
-      { nlr: 5 },
+      { mri_post_biopsy_hemorrhage: true },
+      { prior_pelvic_radiation: true, radiation_brachytherapy: true },
+      { prior_turp: true, bph_procedure_complicated: true },
+      { mri_denonvilliers: 2 },
     ];
     for (const patch of cases) {
       const S = { ...defaultClinicalState(), ...patch };
       expect(predictPlaneHostility(S, "left").score).toBeGreaterThan(baseline);
+      expect(predictPlaneHostility(S, "right").score).toBeGreaterThan(baseline);
     }
+  });
+
+  it("evidence-free factors (age, hs-CRP/NLR, biopsy count, recent/complicated biopsy) are shown as context but do not move the score", () => {
+    const baseline = defaultClinicalState();
+    const base = predictPlaneHostility(baseline, "left");
+    const cases: Partial<ReturnType<typeof defaultClinicalState>>[] = [
+      { age: 80 },
+      { crp: 8 },
+      { nlr: 6 },
+      { biopsy_sessions: 4 },
+      { biopsy_recent_or_complicated: true },
+      { five_ari_long_term: true },
+    ];
+    for (const patch of cases) {
+      const S = { ...baseline, ...patch };
+      const out = predictPlaneHostility(S, "left");
+      expect(out.score).toBe(base.score);
+      expect(out.contributors.some((c) => c.points === 0 && (c.evidence === "none" || c.evidence === "null"))).toBe(true);
+    }
+  });
+
+  it("UroLift, Rezum, recurrent UTI and pelvic abscess (no RP plane evidence) show as context but do not move the score", () => {
+    const base = predictPlaneHostility(defaultClinicalState(), "left").score;
+    for (const patch of [{ prior_urolift: true }, { prior_rezum: true }, { recurrent_uti: true }, { pelvic_abscess: true }]) {
+      const out = predictPlaneHostility({ ...defaultClinicalState(), ...patch }, "left");
+      expect(out.score).toBe(base);
+      expect(out.contributors.some((c) => c.points === 0 && (c.evidence === "none" || c.evidence === "null"))).toBe(true);
+    }
+  });
+
+  it("never-studied history items (retention, IPSS, catheter, diverticulitis, bladder surgery/fracture, prostatitis, biopsy inflammation) and the validated-null general abdominal surgery do not move the score", () => {
+    const base = predictPlaneHostility(defaultClinicalState(), "left").score;
+    const cases: Partial<ReturnType<typeof defaultClinicalState>>[] = [
+      { urinary_retention: true },
+      { ipss: 25 },
+      { catheter_prolonged_or_traumatic: true },
+      { diverticulitis: true },
+      { prior_pelvic_surgery: "bladder_fracture_urethroplasty" },
+      { treated_prostatitis: true },
+      { biopsy_shows_inflammation: true },
+      { prior_abdominal_surgery: true },
+    ];
+    for (const patch of cases) {
+      expect(predictPlaneHostility({ ...defaultClinicalState(), ...patch }, "left").score).toBe(base);
+    }
+    const out = predictPlaneHostility({ ...defaultClinicalState(), prior_abdominal_surgery: true }, "left");
+    expect(out.contributors.find((c) => c.label.includes("abdominal"))?.evidence).toBe("null");
+  });
+
+  it("measured pelvic visceral fat >= 1400 cm3 raises hostility and supersedes the BMI term (never both scored)", () => {
+    const base = predictPlaneHostility(defaultClinicalState(), "left").score;
+    const obese = { ...defaultClinicalState(), bmi: 34 };
+    const obeseLowFat = { ...obese, pelvic_visceral_fat_cm3: 900 };
+    const obeseHighFat = { ...obese, pelvic_visceral_fat_cm3: 1600 };
+    expect(predictPlaneHostility(obese, "left").score).toBeGreaterThan(base); // BMI term while fat is unmeasured
+    expect(predictPlaneHostility(obeseLowFat, "left").score).toBe(base); // measured low fat: BMI superseded
+    expect(predictPlaneHostility(obeseHighFat, "left").score).toBeGreaterThan(base);
+    const out = predictPlaneHostility(obeseHighFat, "left");
+    expect(out.contributors.filter((c) => c.label.startsWith("BMI") && c.points > 0)).toHaveLength(0);
+  });
+
+  it("neoadjuvant ADT adds a small term but is not additive with prior radiation", () => {
+    const base = predictPlaneHostility(defaultClinicalState(), "left").score;
+    const adt = predictPlaneHostility({ ...defaultClinicalState(), neoadjuvant_adt: true }, "left").score;
+    const rt = predictPlaneHostility({ ...defaultClinicalState(), prior_pelvic_radiation: true }, "left").score;
+    const both = predictPlaneHostility({ ...defaultClinicalState(), prior_pelvic_radiation: true, neoadjuvant_adt: true }, "left").score;
+    expect(adt).toBeGreaterThan(base);
+    expect(adt).toBeLessThan(rt);
+    expect(both).toBe(rt);
+  });
+
+  it("HoLEP is weighted below TURP (the margin elevation is confined to prior TURP)", () => {
+    const turp = predictPlaneHostility({ ...defaultClinicalState(), prior_turp: true }, "left").score;
+    const holep = predictPlaneHostility({ ...defaultClinicalState(), prior_holep: true }, "left").score;
+    expect(holep).toBeLessThan(turp);
+    expect(holep).toBeGreaterThan(predictPlaneHostility(defaultClinicalState(), "left").score);
+  });
+
+  it("a side-specific MRI read supersedes the whole-gland read of the same finding (no double counting)", () => {
+    const wholeGlandOnly = { ...defaultClinicalState(), mri_periprostatic_inflammation: "present" as const, mri_periprostatic_fat_stranding: true };
+    const both = { ...wholeGlandOnly, mri_nonmass_inflammatory_signal_l: 2, mri_fat_stranding_l: 2 };
+    const sideOnly = { ...defaultClinicalState(), mri_nonmass_inflammatory_signal_l: 2, mri_fat_stranding_l: 2 };
+    expect(predictPlaneHostility(both, "left").score).toBe(predictPlaneHostility(sideOnly, "left").score);
+    // the whole-gland read still counts on a side with no side-specific read
+    expect(predictPlaneHostility(both, "right").score).toBeGreaterThan(predictPlaneHostility(defaultClinicalState(), "right").score);
+    expect(predictPlaneHostility(wholeGlandOnly, "left").score).toBeGreaterThan(predictPlaneHostility(defaultClinicalState(), "left").score);
+  });
+
+  it("tags every contributor with an evidence tier; prior radiation is direct, hernia mesh is surrogate", () => {
+    const S = { ...defaultClinicalState(), prior_pelvic_radiation: true, hernia_mesh: true, mri_capsule_interface_l: 2 };
+    const out = predictPlaneHostility(S, "left");
+    const tierOf = (needle: string) => out.contributors.find((c) => c.label.includes(needle))?.evidence;
+    expect(tierOf("Prior pelvic radiation")).toBe("direct");
+    expect(tierOf("hernia mesh")).toBe("surrogate");
+    expect(tierOf("Capsule")).toBe("unvalidated");
+  });
+});
+
+describe("Plane Difficulty Index", () => {
+  it("normalizes to 12 clamped 0–3 scores and totals them", () => {
+    expect(normalizePdi(undefined)).toEqual(Array(PDI_ITEM_COUNT).fill(0));
+    const n = normalizePdi([5, -2, 1.4, "x"]);
+    expect(n.slice(0, 4)).toEqual([3, 0, 1, 0]);
+    expect(n).toHaveLength(PDI_ITEM_COUNT);
+    expect(pdiTotal(n)).toBe(4);
+  });
+
+  it("is recorded only: scoring it does not change any prediction", () => {
+    const S = { ...defaultClinicalState(), plane_difficulty_l: Array(PDI_ITEM_COUNT).fill(3) };
+    expect(predictPlaneHostility(S, "left").score).toBe(predictPlaneHostility(defaultClinicalState(), "left").score);
+    expect(predictInflammationRisk(S).score).toBe(predictInflammationRisk(defaultClinicalState()).score);
   });
 });
 
@@ -460,5 +575,67 @@ describe("computeFunctionalOutcomes — healer tiers + plan deltas", () => {
       },
     });
     expect(inflamed.potency12!).toBeLessThan(clean.potency12!);
+  });
+});
+
+describe("PIPS counseling output and per-side confidence", () => {
+  const fbase = (S: ReturnType<typeof defaultClinicalState>) => ({
+    age: S.age, shim: S.shim, ipss: S.ipss, bmi: S.bmi,
+    pfmt: "none" as const, exercise: "light" as const, smoking: "never" as const,
+    pde5: "prn" as const, alcohol: "moderate" as const, dm: false, htn: false, cad: false,
+  });
+
+  it("confidence is high with no flags and a history-driven score", () => {
+    const S = defaultClinicalState();
+    expect(sideConfidence(S, "left")).toEqual({ level: "high", reasons: [] });
+  });
+
+  it("MRI artifact or missing data reduces confidence; discordance or active infection makes it low", () => {
+    const S = defaultClinicalState();
+    expect(sideConfidence({ ...S, flag_mri_artifact: true }, "left").level).toBe("reduced");
+    expect(sideConfidence({ ...S, flag_key_data_missing: true }, "right").level).toBe("reduced");
+    expect(sideConfidence({ ...S, flag_imaging_discordant: true }, "left").level).toBe("low");
+    expect(sideConfidence({ ...S, flag_active_infection: true }, "left").level).toBe("low");
+  });
+
+  it("a side whose score rests mainly on unvalidated MRI grades has reduced confidence; the other side does not", () => {
+    const S = { ...defaultClinicalState(), mri_capsule_interface_l: 3, mri_nvb_plane_l: 2 };
+    const left = sideConfidence(S, "left");
+    expect(left.level).toBe("reduced");
+    expect(left.reasons.join(" ")).toMatch(/not yet validated/i);
+    expect(sideConfidence(S, "right").level).toBe("high");
+  });
+
+  it("builds separate per-side statements and four recovery scenarios that fall as nerve sparing is lost", () => {
+    const S = defaultClinicalState();
+    S.shim = 22;
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, 0.1, 0.4);
+    const c = buildPipsCounseling(S, plan, 0.1, 0.4, fbase(S));
+    expect(c.left.preservableOncologically).toBeCloseTo(0.9);
+    expect(c.right.preservableOncologically).toBeCloseTo(0.6);
+    expect(c.left.technicallyDifficult).toBe(plan.left.hostilityScore);
+    expect(c.recovery.map((r) => r.label)).toEqual(["Bilateral nerve sparing", "Left only", "Right only", "No nerve sparing"]);
+    const [p0, p1, , p3] = c.recovery.map((r) => r.potency12 as number);
+    expect(p0).toBeGreaterThanOrEqual(p1!);
+    expect(p1).toBeGreaterThanOrEqual(p3!);
+    expect(p0).toBeGreaterThan(p3!);
+  });
+
+  it("the intra-operative plan-reduction statement is qualitative, and deferred surgery is not assessed", () => {
+    const S = defaultClinicalState();
+    S.flag_active_infection = true;
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, 0.1, 0.1);
+    const c = buildPipsCounseling(S, plan, 0.1, 0.1, fbase(S));
+    expect(c.left.planReduction.likelihood).toBe("not-assessed");
+    const ok = buildSurgicalPlan(defaultClinicalState(), nsDetail(1), nsDetail(1), 0.02, 0.02, 0.02, 0.02);
+    expect(buildPipsCounseling(defaultClinicalState(), ok, 0.02, 0.02, fbase(S)).left.planReduction.text).toMatch(/qualitative/i);
+  });
+
+  it("flags prior treatment and provisional weights among the sources of uncertainty", () => {
+    const S = { ...defaultClinicalState(), prior_pelvic_radiation: true };
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, 0.1, 0.1);
+    const u = buildPipsCounseling(S, plan, 0.1, 0.1, fbase(S)).uncertainty.join(" ");
+    expect(u).toMatch(/pelvic radiation/);
+    expect(u).toMatch(/provisional/);
   });
 });
