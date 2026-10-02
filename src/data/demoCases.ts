@@ -16,17 +16,6 @@
  * live in code, never in `patients.json` or the saved library, so a presenter
  * can edit a loaded copy freely and reload to get the pristine version back
  * (`usePatientStore.loadDemoCase` replaces any existing copy).
- *
- * The last four cases ("planning scenarios") are the one exception to the
- * paragraph above, and are labelled as such in their name and blurb. The
- * cohort rows carry no surgical history, so none of the cases above has any;
- * rather than assigning history to a cohort row as if it were data, each
- * scenario takes an existing demo case's record unchanged and layers on ONE
- * exposure, so the Planning tab can be demonstrated and the exposure's effect
- * isolated. The exposure is a scenario definition, not cohort data; the
- * published work that documents its consequence at prostatectomy is cited
- * beside it. No expert-prior flag (brachytherapy modality, "complicated"
- * BPH procedure) is used, only exposures with a published effect.
  */
 import type { Prostate3DInputV1 } from "@/types/patient";
 import type { LesionRow } from "@/types/lesion";
@@ -482,67 +471,5 @@ export const DEMO_CASES: DemoCase[] = [
     ],
   },
 ];
-
-/* ------------------------------------------------------------------ *
- * Planning scenarios — one illustrative exposure layered on an        *
- * existing demo case (see file header). Not cohort data.              *
- * ------------------------------------------------------------------ */
-function scenario(
-  baseId: string,
-  id: string,
-  name: string,
-  blurb: string,
-  history: NonNullable<Prostate3DInputV1["history"]>,
-): DemoCase {
-  const base = DEMO_CASES.find((d) => d.id === baseId);
-  if (!base) throw new Error(`demo scenario base case not found: ${baseId}`);
-  return {
-    id,
-    name,
-    blurb: `Illustrative scenario · ${blurb}`,
-    record: { ...structuredClone(base.record), history },
-    lesionRows: structuredClone(base.lesionRows),
-  };
-}
-
-DEMO_CASES.push(
-  // Stephenson, J Urol 2004;172:2239 (salvage RP after radiation: higher complication and incontinence
-  // rates, 30% anastomotic stricture); Gotto, J Urol 2010;184:136 (adjusted complication risk after prior
-  // radiation, incl. rectal injury); Ribeiro, J Urol 2021;205:791 (complications 34% after radiation vs 5% after focal therapy).
-  scenario(
-    "gg2-unilateral",
-    "plan-prior-radiation",
-    "Prior pelvic radiation (scenario)",
-    "radiation fibrosis on 'GG2 left only' — the strongest plane-hostility exposure (Stephenson 2004; Gotto 2010; Ribeiro 2021)",
-    { prior_pelvic_radiation: true },
-  ),
-  // Liao, World J Urol 2020;38:1919 (13 studies: lower nerve-sparing rate OR 0.30, more positive margins
-  // OR 1.31, more bladder-neck reconstruction); Creta, Prostate Cancer Prostatic Dis 2024;27:367.
-  scenario(
-    "gg2-unilateral",
-    "plan-prior-turp",
-    "Prior TURP (scenario)",
-    "prior outlet surgery on 'GG2 left only' — fewer nerve-sparing procedures, more margins (Liao 2020; Creta 2024)",
-    { prior_turp: true },
-  ),
-  // Hong, World J Urol 2010;28:721 (154 men: T1 MRI post-biopsy hemorrhage score independently associated
-  // with operative time p=0.039 and blood loss p=0.023).
-  scenario(
-    "gg2-right-small-gland",
-    "plan-biopsy-hemorrhage",
-    "Post-biopsy hemorrhage on MRI (scenario)",
-    "hemorrhage on T1 MRI on 'Right-sided GG2' — longer, bloodier dissection (Hong 2010)",
-    { mri_post_biopsy_hemorrhage: true },
-  ),
-  // Cella, Front Oncol 2026;16:1711853 (salvage RARP after targeted HIFU: no conversions, bilateral nerve
-  // sparing in 87%); Ribeiro 2021 (focal-therapy salvage is far less morbid than radiation salvage).
-  scenario(
-    "gg2-unilateral",
-    "plan-prior-hifu-left",
-    "Prior left HIFU (scenario)",
-    "left hemi-gland HIFU on 'GG2 left only' — side-specific ablation fibrosis (Cella 2026; Ribeiro 2021)",
-    { prior_focal_ablation_l: 2 },
-  ),
-);
 
 export const DEMO_CASE_IDS = new Set(DEMO_CASES.map((d) => d.id));
