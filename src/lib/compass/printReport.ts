@@ -306,7 +306,7 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
     lesionsFromRows(entry.lesionRows),
   );
 
-  const pct = (v: number) => Math.round(v * 100) + "%";
+  const pct = (v: number) => (Number.isFinite(v) ? Math.round(v * 100) + "%" : "N/A");
 
   const riskColor = (v: number) =>
     v >= 0.3 ? "#922B21" : v >= 0.15 ? "#7D6608" : "#1A6B2F";
