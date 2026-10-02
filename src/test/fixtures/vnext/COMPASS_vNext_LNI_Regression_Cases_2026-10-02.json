@@ -1,0 +1,78 @@
+{
+  "version": "vNext-lni-3feature-candidate-2026-10-02",
+  "endpoint": "LNI",
+  "tolerance": 1e-12,
+  "note": "Deterministic software regression fixtures generated from the finalized exact equation; not validation patients.",
+  "cases": [
+    {
+      "caseId": "LOW_GG2_PSMA_NEG",
+      "input": {
+        "psa": 4.5,
+        "prostateVolume": 50,
+        "biopsyGradeGroup": 2,
+        "psmaLnPositive": 0
+      },
+      "expected": {
+        "linearPredictor": -4.399294960577271,
+        "probability": 0.012136885204787035,
+        "tier": "Low"
+      }
+    },
+    {
+      "caseId": "INTERMEDIATE_GG3_PSMA_NEG",
+      "input": {
+        "psa": 8.0,
+        "prostateVolume": 40,
+        "biopsyGradeGroup": 3,
+        "psmaLnPositive": 0
+      },
+      "expected": {
+        "linearPredictor": -3.8371662923177747,
+        "probability": 0.021099796746827423,
+        "tier": "Intermediate"
+      }
+    },
+    {
+      "caseId": "HIGH_GG5_PSMA_POS",
+      "input": {
+        "psa": 20.0,
+        "prostateVolume": 30,
+        "biopsyGradeGroup": 5,
+        "psmaLnPositive": 1
+      },
+      "expected": {
+        "linearPredictor": -0.397606728410667,
+        "probability": 0.40188748467119995,
+        "tier": "High"
+      }
+    },
+    {
+      "caseId": "HIGH_GG4_PSMA_POS",
+      "input": {
+        "psa": 10.0,
+        "prostateVolume": 40,
+        "biopsyGradeGroup": 4,
+        "psmaLnPositive": 1
+      },
+      "expected": {
+        "linearPredictor": -1.0880850348778246,
+        "probability": 0.2519790502998686,
+        "tier": "High"
+      }
+    },
+    {
+      "caseId": "MISSING_PSMA_NEUTRAL",
+      "input": {
+        "psa": 7.0,
+        "prostateVolume": 45,
+        "biopsyGradeGroup": 3,
+        "psmaLnPositive": null
+      },
+      "expected": {
+        "linearPredictor": -3.8038212109690273,
+        "probability": 0.02179963678559703,
+        "tier": "Intermediate"
+      }
+    }
+  ]
+}
