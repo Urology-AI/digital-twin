@@ -15,7 +15,7 @@ import {
 import {
   predictExtensiveEce,
 } from "@/lib/models/ece";
-import { predictLni } from "@/lib/models/lni";
+import { predictLniVNext } from "@/lib/models/vnext/lni";
 import { predictPsm } from "@/lib/models/psm";
 import { predictUpgrade } from "@/lib/models/upgrade";
 import { clamp } from "@/lib/utils/math";
@@ -49,7 +49,9 @@ export function runCompassModels(
   const svi = sviV.ok ? sviV.probability : NaN;
   const upgrade =
     S.gg >= 1 ? clamp(predictUpgrade(S), 0.05, 0.85) : 0.05;
-  const lni = clamp(predictLni(S), 0.005, 0.95);
+  // vNext LNI (lni lock 2026-10-02). No clamp; NaN when required inputs are missing.
+  const lniV = predictLniVNext(S);
+  const lni = lniV.ok ? lniV.probability : NaN;
   const extensive = clamp(predictExtensiveEce(S), 0.1, 0.9);
 
   // vNext side EPE (shadow candidate 2026-09-30): global ECE logit + side
