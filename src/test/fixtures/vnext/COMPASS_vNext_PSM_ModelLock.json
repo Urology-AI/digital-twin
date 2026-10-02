@@ -1,0 +1,213 @@
+{
+  "model_name": "COMPASS vNext Side-Specific PSM Vulnerability",
+  "version": "vNext-psm-side-candidate-2026-09-26",
+  "status": "Frozen candidate for external/prospective validation; research use only",
+  "not_for_clinical_use": true,
+  "endpoint": "Side-specific positive surgical margin at radical prostatectomy",
+  "unit_of_prediction": "left or right prostate side",
+  "architecture": "L2-regularized logistic regression, C=1.0",
+  "feature_order": [
+    "log_psad",
+    "pos_cores",
+    "pirads_index_side"
+  ],
+  "feature_definitions": {
+    "log_psad": "Natural logarithm of PSA density, where PSA density = PSA / prostate volume. No +0.01 offset.",
+    "pos_cores": "Number of positive biopsy cores using the reconciled preoperative biopsy source hierarchy.",
+    "pirads_index_side": "Side-localized index-lesion PI-RADS score. Use highest/index PI-RADS on the side of MRI lesion 1; use 0 for the contralateral side; bilateral or midline index lesion applies the score to both sides. If index-lesion side or PI-RADS cannot be determined, treat this predictor as missing."
+  },
+  "missing_data": {
+    "method": "training-cohort mean imputation",
+    "imputation_values": {
+      "log_psad": -1.7843017168203532,
+      "pos_cores": 5.946708463949843,
+      "pirads_index_side": 2.0291872474180512
+    },
+    "missingness_flags": false,
+    "note": "No outcome or postoperative information is used for imputation."
+  },
+  "standardization": {
+    "mean": {
+      "log_psad": -1.7843017168203532,
+      "pos_cores": 5.946708463949839,
+      "pirads_index_side": 2.0291872474180175
+    },
+    "scale": {
+      "log_psad": 0.7865778368193919,
+      "pos_cores": 3.64591566875227,
+      "pirads_index_side": 1.9264154359650032
+    }
+  },
+  "intercept": -2.7254046775739997,
+  "coefficients_standardized": {
+    "log_psad": 0.28707315882516415,
+    "pos_cores": 0.27403058576772316,
+    "pirads_index_side": 0.44639858983510483
+  },
+  "formula": "z_k=(x_k-mean_k)/scale_k; logit=intercept+sum(beta_k*z_k); p=sigmoid(logit)",
+  "risk_tiers": [
+    {
+      "label": "Very low",
+      "lower": 0.0,
+      "upper": 0.03
+    },
+    {
+      "label": "Low",
+      "lower": 0.03,
+      "upper": 0.08
+    },
+    {
+      "label": "Intermediate",
+      "lower": 0.08,
+      "upper": 0.15
+    },
+    {
+      "label": "High",
+      "lower": 0.15,
+      "upper": 1.0
+    }
+  ],
+  "development_target_laterality": {
+    "primary_rule": "Assign PSM to a side only when pathology margin text explicitly identifies left/right or an unambiguous sided abbreviation; explicit bilateral/both is assigned to both sides. Generic apical/base/posterior/bladder-neck/midline text without explicit side is ambiguous and excluded from the strict primary target.",
+    "transparent_reconstruction_cohort": {
+      "patients": 4203,
+      "side_observations": 8406,
+      "side_events": 616,
+      "event_rate": 0.07328098976921246,
+      "temporal_2024_2025_sides": 1918,
+      "temporal_2024_2025_events": 156
+    },
+    "historical_phase7_reference": {
+      "side_observations": 8400,
+      "side_events": 614,
+      "grouped_cv_auc": 0.6887,
+      "temporal_auc": 0.6731,
+      "note": "Prior Phase 7 result. Its exact parser/parameter object was not preserved, so the new transparent lock is separately versioned rather than forced to reproduce opaque parser choices."
+    }
+  },
+  "validation_summary": {
+    "analytic_cohort": {
+      "patients": 4203,
+      "side_observations": 8406,
+      "side_events": 616,
+      "event_rate": 0.07328098976921246,
+      "temporal_2024_2025_sides": 1918,
+      "temporal_2024_2025_events": 156
+    },
+    "primary_grouped_cv": {
+      "auc": 0.6934365778637281,
+      "brier": 0.06574695258701702,
+      "calibration_intercept": -0.0454,
+      "calibration_slope": 0.9809
+    },
+    "repeated_grouped_cv_5_repeats": {
+      "mean_auc": 0.6941928546421486,
+      "sd_auc": 0.0006318768643633291,
+      "mean_brier": 0.06572065064980934,
+      "mean_calibration_slope": 0.9865210568224695
+    },
+    "temporal_2024_2025": {
+      "auc": 0.6841202450595186,
+      "brier": 0.0724970325739173,
+      "calibration_intercept": -0.0694,
+      "calibration_slope": 0.9364,
+      "note": "Same-institution temporal check; not external validation."
+    },
+    "historical_phase7_reference": {
+      "side_observations": 8400,
+      "side_events": 614,
+      "grouped_cv_auc": 0.6887,
+      "temporal_auc": 0.6731,
+      "note": "Prior Phase 7 result. Its exact parser/parameter object was not preserved, so the new transparent lock is separately versioned rather than forced to reproduce opaque parser choices."
+    }
+  },
+  "tier_stability": {
+    "n_refits": 300,
+    "mean_same_tier_assignment": 0.9320885875168531,
+    "same_tier_95pct_range": [
+      0.86491792,
+      0.97484237
+    ],
+    "monotonic_tier_rate_fraction": 1.0,
+    "coefficient_bootstrap": {
+      "log_psad": {
+        "median": 0.2858372594846259,
+        "p2_5": 0.20158666,
+        "p97_5": 0.37515978,
+        "same_sign_fraction": 1.0
+      },
+      "pos_cores": {
+        "median": 0.27378582825879,
+        "p2_5": 0.18850505,
+        "p97_5": 0.35631367,
+        "same_sign_fraction": 1.0
+      },
+      "pirads_index_side": {
+        "median": 0.4416067714230496,
+        "p2_5": 0.36283104,
+        "p97_5": 0.53461101,
+        "same_sign_fraction": 1.0
+      }
+    }
+  },
+  "synthetic_regression_cases": [
+    {
+      "case_id": "low_contralateral",
+      "input": {
+        "log_psad": -2.5257286443082556,
+        "pos_cores": 2,
+        "pirads_index_side": 0
+      },
+      "expected_probability": 0.022690629796317318,
+      "expected_tier": "<3%"
+    },
+    {
+      "case_id": "lowmod_ipsi_pirads3",
+      "input": {
+        "log_psad": -1.8971199848858813,
+        "pos_cores": 4,
+        "pirads_index_side": 3
+      },
+      "expected_probability": 0.06368909053987712,
+      "expected_tier": "3–<8%"
+    },
+    {
+      "case_id": "intermediate_ipsi_pirads4",
+      "input": {
+        "log_psad": -1.3862943611198906,
+        "pos_cores": 7,
+        "pirads_index_side": 4
+      },
+      "expected_probability": 0.11463030756500332,
+      "expected_tier": "8–<15%"
+    },
+    {
+      "case_id": "high_ipsi_pirads5",
+      "input": {
+        "log_psad": -0.916290731874155,
+        "pos_cores": 10,
+        "pirads_index_side": 5
+      },
+      "expected_probability": 0.19536008910452843,
+      "expected_tier": "≥15%"
+    },
+    {
+      "case_id": "missing_optional_fields",
+      "input": {
+        "log_psad": -1.7147984280919266,
+        "pos_cores": null,
+        "pirads_index_side": null
+      },
+      "expected_probability": 0.0629710884661259,
+      "expected_tier": "3–<8%"
+    }
+  ],
+  "governance": {
+    "actual_nerve_sparing_grade_in_baseline_model": false,
+    "reason": "Historical nerve-sparing grade is treatment-selection-confounded and did not materially improve prediction.",
+    "external_validation_required": true,
+    "calibration_updates": "Any post-validation recalibration must be separately versioned.",
+    "retraining_rule": "Do not retune this candidate on the same external validation cohort used to report its performance."
+  },
+  "model_lock_sha256": "bdcfd1832c53799e9dc2eb908cc79cc653330c091edbbdc88825185ab9e84666"
+}

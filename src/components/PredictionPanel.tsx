@@ -31,6 +31,8 @@ import {
   NS_BASE_MODEL,
 } from "@/lib/compass/planningEvidence";
 import { cn } from "@/lib/utils";
+import { PSM_TIER_CUTOFFS, PSM_TIER_LABELS } from "@/lib/models/vnext/psmSide";
+import { assignTier } from "@/lib/models/vnext/common";
 
 function riskCls(v: number) {
   if (v < 0.15) return "text-emerald-500";
@@ -52,6 +54,24 @@ function computeCI(p: number): { lo: number; hi: number } {
   const hi = 1 / (1 + Math.exp(-(L + 0.951)));
   return { lo: Math.max(0.01, lo), hi: Math.min(0.99, hi) };
 }
+
+/** Side-specific PSM tiers: <3% very low, 3-<8% low, 8-<15% intermediate, >=15% high. */
+function psmTier(v: number) {
+  return Number.isFinite(v) ? assignTier(v, PSM_TIER_CUTOFFS, PSM_TIER_LABELS).label : "N/A";
+}
+function psmCls(v: number) {
+  if (!Number.isFinite(v)) return "text-muted-foreground/50";
+  if (v < 0.08) return "text-emerald-500";
+  if (v < 0.15) return "text-amber-500";
+  return "text-red-500";
+}
+function psmBarCls(v: number) {
+  if (!Number.isFinite(v)) return "bg-muted-foreground/30";
+  if (v < 0.08) return "bg-emerald-500";
+  if (v < 0.15) return "bg-amber-500";
+  return "bg-red-500";
+}
+const psmPct = (v: number) => (Number.isFinite(v) ? `${(v * 100).toFixed(1)}%` : "N/A");
 
 function bcrColor(pct: number) {
   if (pct === 0) return "text-emerald-500";
@@ -140,7 +160,7 @@ export function PredictionPanel() {
     { k: "ECE",     v: predictions.ece,     neutral: false },
     { k: "SVI",     v: predictions.svi,     neutral: sviNeutral },
     { k: "Upgrade", v: predictions.upgrade, neutral: !Number.isFinite(predictions.upgrade) },
-    { k: "PSM",     v: predictions.psm,     neutral: false },
+    { k: "PSM",     v: Math.max(predictions.psmL, predictions.psmR), neutral: false },
     { k: "BCR",     v: predictions.bcr,     neutral: false },
     { k: "LNI",     v: predictions.lni,     neutral: false },
   ] as const;
@@ -223,6 +243,48 @@ export function PredictionPanel() {
           <div className="mb-3 mt-2 grid grid-cols-3 gap-2 sm:mb-4 sm:mt-4 sm:gap-3">
             {preds.map((p) => {
               const ci = computeCI(p.v);
+              if (p.k === "PSM") {
+                const sides = [
+                  { s: "L", v: predictions.psmL },
+                  { s: "R", v: predictions.psmR },
+                ];
+                return (
+                  <Tooltip key={p.k}>
+                    <TooltipTrigger asChild>
+                      <div className="relative overflow-hidden rounded-xl border border-border/70 bg-card px-2 py-2 text-center shadow-sm transition-shadow hover:shadow-md cursor-default sm:px-3 sm:py-3">
+                        <div className="absolute inset-x-0 top-0 flex h-[3px]">
+                          {sides.map((x) => (
+                            <div key={x.s} className={cn("h-full w-1/2", psmBarCls(x.v))} />
+                          ))}
+                        </div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">PSM</div>
+                        <div className="grid grid-cols-2 gap-1">
+                          {sides.map((x) => (
+                            <div key={x.s}>
+                              <div className="text-[10px] font-semibold text-muted-foreground/70 sm:text-xs">{x.s === "L" ? "Left" : "Right"}</div>
+                              <div className={cn("text-base font-bold tabular-nums sm:text-xl lg:text-2xl", psmCls(x.v))}>{psmPct(x.v)}</div>
+                              <div className="text-[10px] leading-tight text-muted-foreground/60 sm:text-xs">{psmTier(x.v)}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-1.5 flex h-1 w-full gap-0.5 overflow-hidden rounded-full">
+                          {sides.map((x) => (
+                            <div key={x.s} className="h-full w-1/2 bg-muted/60">
+                              <div
+                                className={cn("h-full rounded-full transition-all", psmBarCls(x.v))}
+                                style={{ width: `${Number.isFinite(x.v) ? Math.min(100, Math.round(x.v * 100 * 5)) : 0}%` }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[220px]">
+                      {PREDICTION_EXPLANATIONS[p.k] ?? p.k}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
               return (
                 <Tooltip key={p.k}>
                   <TooltipTrigger asChild>
