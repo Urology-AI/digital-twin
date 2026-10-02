@@ -86,9 +86,9 @@ function OverviewTab() {
           <tbody className="text-muted-foreground">
             {[
               ["ECE (vNext)", "3,454", "882 (25.5%)", "0.7825", "—", "—", "—"],
-              ["SVI", "3,454", "301 (8.7%)", "0.842", "0.848", "0.839–0.884", "+23.5%"],
-              ["Grade Upgrade", "3,137", "422 (13.5%)", "0.807", "0.810", "0.802–0.853", "+27.2%"],
-              ["LNI (4-feature)", "663", "35 (5.3%)", "0.842", "0.836", "0.797–0.901", "+5.2%"],
+              ["SVI (vNext)", "3,454", "301 (8.7%)", "0.8322", "—", "—", "—"],
+              ["Grade Upgrade (vNext)", "3,137", "422 (13.5%)", "0.8121", "—", "—", "—"],
+              ["LNI (vNext)", "663", "35 (5.3%)", "0.8422", "—", "—", "—"],
               ["PSM (ceiling)", "3,454", "556 (16.1%)", "0.651", "0.651", "0.658–0.706", "+5.3%"],
               ["BCR", "2,399", "297 (12.4%)", "0.743", "—", "0.738–0.800", "+12.8%"],
             ].map(([ep, n, ev, cv, bc, ci, bss]) => (
@@ -104,12 +104,12 @@ function OverviewTab() {
             ))}
           </tbody>
         </Tbl>
-        <Note>BC AUC = Bootstrap-corrected AUC (Harrell optimism, 500 iterations). BSS = Brier Skill Score vs null model. All models independently verified from raw data 2026-05-03. ECE row is the vNext model: repeated 10×5-fold CV AUC; bootstrap-corrected AUC, CI and BSS were not recomputed for vNext.</Note>
+        <Note>BC AUC = Bootstrap-corrected AUC (Harrell optimism, 500 iterations). BSS = Brier Skill Score vs null model. All models independently verified from raw data 2026-05-03. ECE, SVI, Grade Upgrade and LNI rows are vNext models: repeated cross-validated AUC; bootstrap-corrected AUC, CI and BSS were not recomputed for vNext.</Note>
       </section>
 
       <section>
         <H2>Common 22-Feature Input Set</H2>
-        <p className="text-muted-foreground text-[11px] mb-2">SVI, Upgrade, PSM, and BCR use this identical set. ECE now uses its own 9-predictor vNext set (see ECE tab). Sparse-coverage features are mean-imputed; Decipher also has an availability flag.</p>
+        <p className="text-muted-foreground text-[11px] mb-2">PSM and BCR use this identical set. ECE, SVI, Upgrade and LNI now use their own smaller vNext sets (see each tab). Sparse-coverage features are mean-imputed; Decipher also has an availability flag.</p>
         <Tbl>
           <thead>
             <tr className="border-b border-border"><Th>#</Th><Th>Feature</Th><Th>Source</Th><Th>Coverage</Th></tr>
@@ -148,21 +148,20 @@ function OverviewTab() {
             ))}
           </tbody>
         </Tbl>
-        <Note>LNI uses a parsimonious 4-feature subset (see LNI tab). Decipher Available flag β=+0.42 in ECE (third largest predictor).</Note>
+        <Note>LNI uses a 3-feature vNext set (see LNI tab). Decipher Available flag β=+0.42 in ECE (third largest predictor).</Note>
       </section>
 
       <section>
-        <H2>LNI Parsimonious 4-Feature Set</H2>
+        <H2>LNI 3-Feature Set (vNext)</H2>
         <Tbl>
           <thead>
             <tr className="border-b border-border"><Th>Feature</Th><Th>Definition</Th><Th>Encoding</Th></tr>
           </thead>
           <tbody className="text-muted-foreground">
             {[
-              ["log(PSA Density)", "log(PSA / Prostate Volume cc)", "Continuous"],
-              ["GG High (gg_high)", "Biopsy Grade Group 4 or 5", "Binary"],
-              ["Positive Cores", "Number of positive biopsy cores", "Continuous"],
-              ["PSMA LN Positive", "PSMA PET-positive pelvic lymph nodes (any)", "Binary"],
+              ["log(PSA Density)", "ln(PSA / Prostate Volume cc), no offset", "Continuous"],
+              ["GG High (gg4_5)", "Biopsy Grade Group 4 or 5", "Binary"],
+              ["PSMA LN Positive", "PSMA PET-positive pelvic lymph nodes (any). Not performed is neutral, not negative", "Binary"],
             ].map(([feat, def, enc]) => (
               <tr key={feat} className="border-b border-border/40">
                 <Td className="font-medium text-foreground">{feat}</Td><Td>{def}</Td><Td>{enc}</Td>
@@ -170,7 +169,7 @@ function OverviewTab() {
             ))}
           </tbody>
         </Tbl>
-        <Note>4-feature model outperforms 17-feature expansion in the PLND cohort (N=663). Verified independently.</Note>
+        <Note>Three-feature vNext model. Positive biopsy cores are not an input.</Note>
       </section>
 
       <section>
@@ -365,7 +364,7 @@ function OverviewTab() {
           <li>BCR: median follow-up ~14 months (immature); negative imaging coefficients reflect salvage-therapy informative censoring, not biology.</li>
           <li>Zone-level cohort N=299 with MUS zone data — larger validation needed.</li>
           <li>Decipher coverage 37%; mean imputation + availability flag documented and calibrated.</li>
-          <li>Side-specific ECE is a shadow research model on a smaller cohort (606 patients, 1,212 sides); side-specific SVI uses a lateralized cohort of N=227 lobes.</li>
+          <li>Side-specific ECE is a shadow research model on a smaller cohort (606 patients, 1,212 sides); side-specific SVI uses 664 patients / 1,328 sides (92 events).</li>
           <li>Predictions are decision support, not substitutes for clinical judgment.</li>
         </ul>
         <Note>COMPASS v22 · 6 prediction models · Lateralized ECE + SVI · PLND Decision Module · Trimodal + Decipher · Verified 2026-05-03 · Mount Sinai Health System</Note>
@@ -615,18 +614,18 @@ function SviTab() {
   return (
     <>
       <section>
-        <H2>SVI Patient-Level Model</H2>
+        <H2>SVI Patient-Level Model (vNext)</H2>
+        <p className="text-muted-foreground text-[11px] mb-2">Probability of seminal vesicle invasion at surgery. Standardized L2-regularized logistic regression (same core lock as ECE and Upgrade). Research use only.</p>
         <Tbl>
           <thead><tr className="border-b border-border"><Th>Metric</Th><Th>Value</Th></tr></thead>
           <tbody className="text-muted-foreground">
             {[
+              ["Model version", "vNext-core-candidate-2026-09-24"],
               ["N (analytic cohort)", "3,454"],
               ["SVI events", "301 (8.7%)"],
-              ["Cross-validation AUC", "0.842 (SD 0.020)"],
-              ["Apparent AUC", "0.857"],
-              ["Bootstrap-corrected AUC", "0.848"],
-              ["95% CI", "0.839–0.884"],
-              ["Brier Skill Score", "+23.5%"],
+              ["Repeated 10×5-fold CV AUC", "0.8322"],
+              ["2024–2025 temporal AUC (same institution)", "0.8107"],
+              ["Output", "Raw logistic probability, no clamp"],
             ].map(([k, v]) => (
               <tr key={k} className="border-b border-border/40">
                 <Td className="font-medium text-foreground">{k}</Td><Td className="tabular-nums">{v}</Td>
@@ -634,51 +633,29 @@ function SviTab() {
             ))}
           </tbody>
         </Tbl>
-      </section>
-
-      <section>
-        <H2>SVI — Locked Coefficients (22 Features)</H2>
+        <div className="mt-3 mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Inputs (7 predictors)</div>
         <Tbl>
-          <thead>
-            <tr className="border-b border-border"><Th>Feature</Th><Th>β (standardized)</Th><Th>Magnitude</Th></tr>
-          </thead>
+          <thead><tr className="border-b border-border"><Th>Input</Th><Th>How it is used</Th></tr></thead>
           <tbody className="text-muted-foreground">
             {[
-              ["Grade Group 4–5", "+0.9954", "Strong"],
-              ["Grade Group 2", "+0.7981", "Strong"],
-              ["Grade Group 3", "+0.7700", "Strong"],
-              ["MRI SVI", "+0.4573", "Strong"],
-              ["Max Core %", "+0.3156", "Strong"],
-              ["log(PSA Density)", "+0.3139", "Strong"],
-              ["Decipher Available (flag)", "+0.3033", "Strong"],
-              ["PI-RADS", "+0.2892", "Moderate"],
-              ["Decipher Score (imputed)", "+0.2707", "Moderate"],
-              ["Bilateral Cores", "+0.1443", "Small"],
-              ["Bx IDC", "−0.1211", "Small"],
-              ["PRI-MUS Score", "−0.1044", "Small"],
-              ["MUS ECE", "+0.0924", "Small"],
-              ["Lesion Size (mm)", "+0.0685", "Small"],
-              ["MRI EPE", "+0.0614", "Small"],
-              ["PSMA SUVmax", "−0.0546", "Small"],
-              ["ADC Mean", "+0.0498", "Small"],
-              ["PSMA EPE", "+0.0492", "Small"],
-              ["Bx PNI", "+0.0476", "Small"],
-              ["Bx Cribriform", "+0.0458", "Small"],
-              ["Capsular Abutment", "+0.0337", "Small"],
-              ["Positive Cores", "+0.0324", "Small"],
-            ].map(([f, b, mag]) => (
+              ["Biopsy Grade Group", "Required. Entered as GG2, GG3, GG4–5 versus GG1"],
+              ["PSA and prostate volume", "Required. Combined as log PSA density"],
+              ["PI-RADS", "Optional"],
+              ["MRI SVI", "Optional"],
+              ["Max core %", "Optional"],
+            ].map(([f, d]) => (
               <tr key={f} className="border-b border-border/40">
-                <Td className="text-foreground">{f}</Td>
-                <Td className="tabular-nums font-mono">{b}</Td>
-                <Td className="text-muted-foreground">{mag}</Td>
+                <Td className="text-foreground">{f}</Td><Td>{d}</Td>
               </tr>
             ))}
           </tbody>
         </Tbl>
+        <Note>Missing optional inputs take the frozen training mean, never a negative value. If PSA, volume or grade group is missing, no prediction is made. Matches the pinned vNext regression cases in src/test/vnextSvi.test.ts.</Note>
       </section>
 
+
       <section>
-        <H2>SVI — Head-to-Head vs Comparators</H2>
+        <H2>SVI — Head-to-Head vs Comparators (v22 model, not recomputed for vNext)</H2>
         <Tbl>
           <thead>
             <tr className="border-b border-border"><Th>Model</Th><Th>AUC (95% CI)</Th><Th>ΔAUC vs COMPASS</Th><Th>p-value</Th></tr>
@@ -702,46 +679,26 @@ function SviTab() {
       </section>
 
       <section>
-        <H2>SVI Side-Specific — Why No New Model</H2>
+        <H2>SVI Left / Right Localization (vNext)</H2>
+        <p className="text-muted-foreground text-[11px] mb-2">Splits the patient-level SVI risk into left and right. It is a localization aid built on the patient-level SVI model, not a separate outcome. Research use only.</p>
         <Tbl>
-          <thead>
-            <tr className="border-b border-border"><Th>Issue</Th><Th>Detail</Th></tr>
-          </thead>
+          <thead><tr className="border-b border-border"><Th>Metric</Th><Th>Value</Th></tr></thead>
           <tbody className="text-muted-foreground">
             {[
-              ["Cohort", "158 patients / 227 lobes / 24 SVI+ events"],
-              ["Event prevalence", "10.6% lobe-level"],
-              ["EPV requirement", "≥10 events per variable"],
-              ["Max features supportable", "2–3 features (24 ÷ 10 ≈ 2.4)"],
-              ["Decision", "Apply patient-level model to lobes; no new side-specific model fitted"],
+              ["Model version", "vNext-svi-side-shadow-candidate-2026-10-01"],
+              ["Cohort", "664 patients / 1,328 sides"],
+              ["Side SVI events", "92"],
+              ["10×5 patient-grouped CV AUC", "0.8415"],
+              ["Patient-level SVI logit alone (AUC)", "0.8350"],
+              ["Inputs", "Patient-level SVI risk and biopsy Grade Group on that side"],
             ].map(([k, v]) => (
               <tr key={k} className="border-b border-border/40">
-                <Td className="font-medium text-foreground">{k}</Td><Td>{v}</Td>
+                <Td className="font-medium text-foreground">{k}</Td><Td className="tabular-nums">{v}</Td>
               </tr>
             ))}
           </tbody>
         </Tbl>
-        <div className="mt-3 mb-1 text-[10px] font-semibold text-muted-foreground">Head-to-Head AUC — Patient-Level Model Applied to Lobes</div>
-        <Tbl>
-          <thead>
-            <tr className="border-b border-border"><Th>Model</Th><Th>AUC (95% CI)</Th><Th>ΔAUC</Th><Th>p-value</Th></tr>
-          </thead>
-          <tbody className="text-muted-foreground">
-            {[
-              ["COMPASS patient-level (applied to lobes)", "0.853 (0.766–0.929)", "—", "—", "text-foreground font-semibold"],
-              ["Koh 2003 (exact)", "0.756 (0.652–0.846)", "−0.097", "0.004", ""],
-              ["MSKCC SVI (exact, hybrid DRE)", "0.714 (0.618–0.799)", "−0.139", "0.001", ""],
-              ["Parsimonious refit (log_PSAD + GG4-5)", "0.685 (0.550–0.794)", "−0.168", "0.001", ""],
-              ["MRI SVI alone", "0.641 (0.553–0.738)", "−0.212", "<0.001", ""],
-            ].map(([m, auc, d, p, cls]) => (
-              <tr key={m} className={`border-b border-border/40 ${cls}`}>
-                <Td>{m}</Td><Td className="tabular-nums">{auc}</Td>
-                <Td className="tabular-nums">{d}</Td><Td className="tabular-nums">{p}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </Tbl>
-        <Note>When SVI is suspected, surgical strategy (non-NS, wide resection) is typically applied bilaterally regardless of laterality — limiting clinical impact of side-specific SVI prediction.</Note>
+        <Note>Side grade group helps only modestly (ΔAUC +0.0065) and calibration is weaker than the patient-level model, so the side value is a ranking aid and not a calibrated probability. A side with no documented cancer counts as GG 0; an unknown side is treated as missing, not as zero.</Note>
       </section>
     </>
   );
@@ -752,17 +709,19 @@ function LniTab() {
   return (
     <>
       <section>
-        <H2>LNI Parsimonious 4-Feature Model</H2>
+        <H2>LNI Model (vNext)</H2>
+        <p className="text-muted-foreground text-[11px] mb-2">Probability of lymph node invasion at surgery. Standardized L2-regularized logistic regression with three inputs. Research use only.</p>
         <Tbl>
           <thead><tr className="border-b border-border"><Th>Metric</Th><Th>Value</Th></tr></thead>
           <tbody className="text-muted-foreground">
             {[
+              ["Model version", "vNext-lni-3feature-candidate-2026-10-02"],
               ["N (PLND cohort)", "663"],
               ["LN+ events", "35 (5.3%)"],
-              ["5-fold CV AUC", "0.842"],
-              ["Bootstrap-corrected AUC", "0.836"],
-              ["95% CI", "0.797–0.901"],
-              ["Brier Skill Score", "+5.2%"],
+              ["Repeated out-of-fold CV AUC", "0.8422"],
+              ["Brier score", "0.0491"],
+              ["Calibration slope / intercept", "0.91 / −0.236"],
+              ["Output", "Raw logistic probability, no clamp"],
             ].map(([k, v]) => (
               <tr key={k} className="border-b border-border/40">
                 <Td className="font-medium text-foreground">{k}</Td><Td className="tabular-nums">{v}</Td>
@@ -770,34 +729,42 @@ function LniTab() {
             ))}
           </tbody>
         </Tbl>
-      </section>
-
-      <section>
-        <H2>LNI — Locked Coefficients</H2>
+        <div className="mt-3 mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Inputs (3 predictors)</div>
         <Tbl>
-          <thead>
-            <tr className="border-b border-border"><Th>Feature</Th><Th>Definition</Th><Th>β (standardized)</Th></tr>
-          </thead>
+          <thead><tr className="border-b border-border"><Th>Input</Th><Th>How it is used</Th></tr></thead>
           <tbody className="text-muted-foreground">
             {[
-              ["log(PSA Density)", "log(PSA / Prostate Volume)", "+0.5623"],
-              ["PSMA LN Positive", "Any pelvic PSMA PET-positive LN (binary)", "+0.5437"],
-              ["Grade Group High", "Biopsy GG 4 or 5 (binary)", "+0.4162"],
-              ["Positive Cores", "Number of positive biopsy cores", "+0.1260"],
-            ].map(([f, def, b]) => (
+              ["PSA and prostate volume", "Required. Combined as log PSA density"],
+              ["Biopsy Grade Group", "Required. Grade Group 4–5 versus 1–3"],
+              ["PSMA PET pelvic lymph nodes", "Optional. Positive or negative. Not performed is NOT treated as negative"],
+            ].map(([f, d]) => (
               <tr key={f} className="border-b border-border/40">
-                <Td className="font-medium text-foreground">{f}</Td>
-                <Td>{def}</Td>
-                <Td className="tabular-nums font-mono">{b}</Td>
+                <Td className="text-foreground">{f}</Td><Td>{d}</Td>
               </tr>
             ))}
           </tbody>
         </Tbl>
-        <Note>4-feature model verified to outperform 17-feature expansion (0.842 vs 0.769). PSMA LN positive and log PSAD are the two dominant predictors.</Note>
+        <div className="mt-3 mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Risk tiers</div>
+        <Tbl>
+          <thead><tr className="border-b border-border"><Th>Tier</Th><Th>Predicted risk (observed in development)</Th></tr></thead>
+          <tbody className="text-muted-foreground">
+            {[
+              ["Low", "Below 2% (0 of 206 had LN+ in development)"],
+              ["Intermediate", "2% to below 5% (2.2% observed)"],
+              ["High", "5% or above (16.2% observed)"],
+            ].map(([f, d]) => (
+              <tr key={f} className="border-b border-border/40">
+                <Td className="text-foreground">{f}</Td><Td>{d}</Td>
+              </tr>
+            ))}
+          </tbody>
+        </Tbl>
+        <Note>Only 35 events, so the tiers rest on few cases and need external validation. There is no side-specific or regional LNI and no automatic PLND recommendation. Positive biopsy cores are no longer an input.</Note>
       </section>
 
+
       <section>
-        <H2>LNI — Head-to-Head vs Comparators</H2>
+        <H2>LNI — Head-to-Head vs Comparators (v22 model, not recomputed for vNext)</H2>
         <Tbl>
           <thead>
             <tr className="border-b border-border"><Th>Model</Th><Th>AUC (95% CI)</Th><Th>ΔAUC</Th><Th>p-value</Th></tr>
@@ -824,7 +791,7 @@ function LniTab() {
       </section>
 
       <section>
-        <H2>LNI — Confusion Matrices at Clinical Thresholds</H2>
+        <H2>LNI — Confusion Matrices at Clinical Thresholds (v22 model, not recomputed for vNext)</H2>
         <Tbl>
           <thead>
             <tr className="border-b border-border"><Th>Threshold</Th><Th>Sensitivity</Th><Th>Specificity</Th><Th>PPV</Th><Th>NPV</Th></tr>
@@ -911,18 +878,18 @@ function UpgradeTab() {
   return (
     <>
       <section>
-        <H2>Grade Upgrade Model — Option A (Primary)</H2>
-        <p className="text-muted-foreground text-[11px] mb-2">Endpoint: any pathologic grade group higher than biopsy grade group. Full GG1–GG4 cohort.</p>
+        <H2>Grade Upgrade Model (vNext)</H2>
+        <p className="text-muted-foreground text-[11px] mb-2">Probability that final pathology has a higher Grade Group than the biopsy. Applies to biopsy Grade Group 1–4 only. For GG5 there is no higher grade, so the result is Not applicable. Standardized L2-regularized logistic regression (same core lock as ECE and SVI). Research use only.</p>
         <Tbl>
           <thead><tr className="border-b border-border"><Th>Metric</Th><Th>Value</Th></tr></thead>
           <tbody className="text-muted-foreground">
             {[
-              ["N", "3,137"],
+              ["Model version", "vNext-core-candidate-2026-09-24"],
+              ["N (analytic cohort)", "3,137"],
               ["Upgrade events", "422 (13.5%)"],
-              ["Cross-validation AUC", "0.807 (SD 0.022)"],
-              ["Bootstrap-corrected AUC", "0.810"],
-              ["95% CI", "0.802–0.853"],
-              ["Brier Skill Score", "+27.2%"],
+              ["Repeated 10×5-fold CV AUC", "0.8121"],
+              ["2024–2025 temporal AUC (same institution)", "0.8226"],
+              ["Output", "Raw logistic probability, no clamp"],
             ].map(([k, v]) => (
               <tr key={k} className="border-b border-border/40">
                 <Td className="font-medium text-foreground">{k}</Td><Td className="tabular-nums">{v}</Td>
@@ -930,54 +897,45 @@ function UpgradeTab() {
             ))}
           </tbody>
         </Tbl>
-      </section>
-
-      <section>
-        <H2>Upgrade — Locked Coefficients (22 Features)</H2>
-        <p className="text-muted-foreground text-[11px] mb-2">
-          <strong className="text-amber-400">Critical observation:</strong> Biopsy Grade Group has STRONG NEGATIVE coefficients — patients with biopsy GG1 have the most "upgrade headroom" while GG3–4 patients have less. This is the source of the "NCCN inversion" for upgrade prediction.
-        </p>
+        <div className="mt-3 mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Inputs (6 clinical inputs)</div>
         <Tbl>
-          <thead>
-            <tr className="border-b border-border"><Th>Feature</Th><Th>β (standardized)</Th><Th>Magnitude</Th></tr>
-          </thead>
+          <thead><tr className="border-b border-border"><Th>Input</Th><Th>How it is used</Th></tr></thead>
           <tbody className="text-muted-foreground">
             {[
-              ["Grade Group 3", "−1.6370", "Strong (negative)"],
-              ["Grade Group 2", "−1.4920", "Strong (negative)"],
-              ["Grade Group 4–5", "−1.1417", "Strong (negative)"],
-              ["PI-RADS", "+0.2587", "Moderate"],
-              ["Decipher Score (imputed)", "+0.2554", "Moderate"],
-              ["MUS ECE", "−0.2267", "Moderate"],
-              ["Decipher Available (flag)", "+0.2133", "Moderate"],
-              ["log(PSA Density)", "+0.1976", "Moderate"],
-              ["MRI SVI", "+0.1484", "Small"],
-              ["ADC Mean", "−0.1386", "Small"],
-              ["Positive Cores", "−0.1070", "Small"],
-              ["Bx PNI", "−0.0814", "Small"],
-              ["PRI-MUS Score", "+0.0544", "Small"],
-              ["PSMA EPE", "+0.0504", "Small"],
-              ["Bx Cribriform", "+0.0418", "Small"],
-              ["Bx IDC", "−0.0324", "Small"],
-              ["PSMA SUVmax", "+0.0272", "Small"],
-              ["Bilateral Cores", "+0.0223", "Small"],
-              ["Lesion Size (mm)", "+0.0151", "Small"],
-              ["Capsular Abutment", "+0.0082", "Small"],
-              ["MRI EPE", "−0.0064", "Small"],
-              ["Max Core %", "−0.0032", "Small"],
-            ].map(([f, b, mag]) => (
+              ["Biopsy Grade Group", "Required. GG1 to GG4"],
+              ["PSA and prostate volume", "Required. Combined as log PSA density"],
+              ["PI-RADS", "Optional"],
+              ["MRI SVI", "Optional"],
+              ["Positive biopsy cores", "Optional"],
+              ["ADC mean", "Optional"],
+            ].map(([f, d]) => (
               <tr key={f} className="border-b border-border/40">
-                <Td className="text-foreground">{f}</Td>
-                <Td className={`tabular-nums font-mono ${b?.startsWith("−") ? "text-amber-400" : ""}`}>{b}</Td>
-                <Td className="text-muted-foreground">{mag}</Td>
+                <Td className="text-foreground">{f}</Td><Td>{d}</Td>
               </tr>
             ))}
           </tbody>
         </Tbl>
+        <div className="mt-3 mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Risk tiers</div>
+        <Tbl>
+          <thead><tr className="border-b border-border"><Th>Tier</Th><Th>Predicted risk (observed in development)</Th></tr></thead>
+          <tbody className="text-muted-foreground">
+            {[
+              ["Low", "Below 5% (about 3.7–3.8% observed)"],
+              ["Intermediate", "5% to below 20% (about 8.2–8.3% observed)"],
+              ["High", "20% or above (about 51–52% observed)"],
+            ].map(([f, d]) => (
+              <tr key={f} className="border-b border-border/40">
+                <Td className="text-foreground">{f}</Td><Td>{d}</Td>
+              </tr>
+            ))}
+          </tbody>
+        </Tbl>
+        <Note>Missing optional inputs take the frozen training mean, never a negative value. Patient-level only: there is no left/right or regional Upgrade. Matches the pinned vNext regression cases in src/test/vnextUpgrade.test.ts. Provisionally frozen pending external validation.</Note>
       </section>
 
+
       <section>
-        <H2>Upgrade — Option B (Sensitivity Analysis)</H2>
+        <H2>Upgrade — Option B (Sensitivity Analysis, v22 model, not recomputed for vNext)</H2>
         <Tbl>
           <thead><tr className="border-b border-border"><Th>Item</Th><Th>Value</Th></tr></thead>
           <tbody className="text-muted-foreground">
@@ -1221,10 +1179,10 @@ function ScoreTab() {
           <tbody className="text-muted-foreground">
             {[
               ["P(ECE)", "22-feature L2 logistic", "3,454 / 25.5%", "0.797"],
-              ["P(SVI)", "22-feature L2 logistic", "3,454 / 8.7%", "0.842"],
-              ["P(Upgrade)", "22-feature L2 logistic (GG1–4)", "3,137 / 13.5%", "0.807"],
+              ["P(SVI)", "7-feature vNext L2 logistic", "3,454 / 8.7%", "0.8322"],
+              ["P(Upgrade)", "8-feature vNext L2 logistic (GG1–4)", "3,137 / 13.5%", "0.8121"],
               ["P(PSM)", "22-feature L2 logistic", "3,454 / 16.1%", "0.651 (ceiling)"],
-              ["P(LNI)", "4-feature parsimonious with PSMA", "663 / 5.3%", "0.842"],
+              ["P(LNI)", "3-feature vNext L2 logistic with PSMA", "663 / 5.3%", "0.8422"],
             ].map(([ep, model, n, auc]) => (
               <tr key={ep} className="border-b border-border/40">
                 <Td className="font-medium text-foreground">{ep}</Td>
