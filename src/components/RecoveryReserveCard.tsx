@@ -88,8 +88,10 @@ export function RecoveryReserveCard({ reserve }: { reserve: RecoveryReserve }) {
           </div>
         )}
         <p className="text-[11px] leading-snug text-muted-foreground">
-          Best-case values from the functional-outcome nomogram (selected single-surgeon cohort). PDE5 response,
-          erection hardness, testosterone, neuropathy and penile Doppler are not inputs.
+          Best-case values from the functional-outcome nomogram (selected single-surgeon cohort). Unlike the
+          recovery scenarios above, this leaves out the patient's PDE5, exercise and pelvic-floor settings, so
+          it can read lower than the 12-month figures there. PDE5 response, erection hardness, testosterone,
+          neuropathy and penile Doppler are not inputs.
         </p>
       </CardContent>
     </Card>
