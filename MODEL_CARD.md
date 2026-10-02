@@ -310,12 +310,6 @@ cohort); it modifies counseling and rehabilitation, never the plane. Code:
 *Effect of the re-weighting on the bundled demo cases:* across the 16 demo cases the
 whole-patient and per-side scores change in 3 cases (by 2 to 5 percentage points, all
 remaining in the `low` tier); no tier, nerve-sparing grade or decision code changes.
-The cohort-derived demo cases carry no surgical history (the working-cohort rows do not
-include it), so none was assigned to them. Four labelled "planning scenarios" were added
-(`plan-prior-radiation`, `plan-prior-turp`, `plan-biopsy-hemorrhage`, `plan-prior-hifu-left`);
-each takes an existing demo case unchanged and layers one exposure with a published effect
-at prostatectomy (cited in `src/data/demoCases.ts`). They are teaching scenarios, not
-cohort data, and use no expert-prior flag.
 
 ### 9.7 Where to find everything
 
