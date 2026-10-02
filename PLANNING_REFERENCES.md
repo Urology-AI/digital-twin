@@ -43,7 +43,7 @@ Bibliography for the effect sizes and decision rules in
 | freedland2005 | Freedland SJ, Humphreys EB, Mangold LA, et al. Risk of prostate cancer-specific mortality following biochemical recurrence after radical prostatectomy. *JAMA.* 2005;294(4):433-9. | BCR event-timing fractions |
 | cao2011 | Cao Y, Ma J. Body mass index, prostate cancer-specific mortality, and biochemical recurrence: a systematic review and meta-analysis. *Cancer Prev Res.* 2011;4(4):486-501. | Obesity → BCR risk |
 | hofman2020 | Hofman MS, Lawrentschuk N, Francis RJ, et al. PSMA PET-CT in high-risk prostate cancer before curative-intent surgery or radiotherapy (proPSMA)… *Lancet.* 2020;395(10231):1208-1216. | PSMA-at-base ECE rate |
-| preisser2019 | Preisser F, et al. Positive surgical margin length / grade and biochemical recurrence after radical prostatectomy. 2019 *(verify)*. | Per-zone thresholds; dissection alerts |
+| preisser2019 | Preisser F, et al. Impact of positive surgical margin length and Gleason grade at the margin on biochemical recurrence in patients with organ-confined prostate cancer. *Prostate.* 2019;79(16):1832-1836. | Per-zone thresholds; dissection alerts |
 | mandel2016 | Mandel P, Steuber T, Ahyai S, et al. Salvage radical prostatectomy for recurrent prostate cancer: verification of EAU guideline criteria. *BJU Int.* 2016;117(1):55-61. | Inflammation-risk weights (prior pelvic radiation) |
 | furman2019sci | Furman D, Campisi J, Verdin E, et al. Chronic inflammation in the etiology of disease across the life span. *Nat Med.* 2019;25(12):1822-1832. | Inflammation-risk weights (systemic CRP/NLR, BMI framing) |
 | sotak2025obesity | Soták M, Clark M, Suur BE, Börgeson E. Inflammation and resolution in obesity. *Nat Rev Endocrinol.* 2025;21(1):45-61. | Inflammation-risk weights (BMI framing) |
@@ -59,7 +59,7 @@ Bibliography for the effect sizes and decision rules in
 | yao2026pelvis | Yao JM, Yuan YY, Yang JQ, et al. Correlation between male pelvic and soft tissue parameters based on three-dimensional reconstruction and the difficulty of robot-assisted radical prostatectomy. World J Urol. 2026;44(1):324. doi:10.1007/s00345-026-06401-5. | Periprostatic-inflammation risk weights |
 | alkhanaty2026route | Al-Khanaty A, Sandhu K, Wettstein MS, et al. Positive margin location and prostate biopsy route: a consecutive cohort comparison of transperineal and transrectal techniques. Cancers. 2026;18(5):849. doi:10.3390/cancers18050849. | Periprostatic-inflammation risk weights |
 | catanzaro2025ibd | Catanzaro C, Penaranda NR, Marmiroli A, et al. Inflammatory bowel disease vs. adverse in-hospital outcomes after radical prostatectomy. Urol Oncol. 2025. doi:10.1016/j.urolonc.2025.07.032. | Periprostatic-inflammation risk weights |
-| ball2015 | Ball MW, et al. Extent of extraprostatic extension and biochemical recurrence after radical prostatectomy. *Urology* 2015 *(verify)*. | Zonal ECE distribution |
+| ball2015 | Ball MW, et al. Extent of extraprostatic extension independently influences biochemical recurrence-free survival: evidence for further pT3 subclassification. *Urology.* 2015;85(1):161-164. | Zonal ECE distribution |
 | ficarra2012 | Ficarra V, Novara G, Ahlering TE, et al. Systematic review and meta-analysis of studies reporting potency rates after robot-assisted radical prostatectomy. *Eur Urol.* 2012;62(3):418-30. | Functional-outcome nomogram (recovery trajectory) |
 
 ## Modifiable-factor grounding
