@@ -25,7 +25,7 @@ export function RecoveryReserveCard({ reserve }: { reserve: RecoveryReserve }) {
         </div>
         <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
           How much erectile function this patient could recover if both bundles are preserved. It shapes
-          counseling and rehabilitation, never the plane. Research use only.
+          counseling and rehabilitation, never the plane.
         </p>
 
         {!reserve.available || !tier || reserve.probability === null ? (
@@ -88,9 +88,8 @@ export function RecoveryReserveCard({ reserve }: { reserve: RecoveryReserve }) {
           </div>
         )}
         <p className="text-[11px] leading-snug text-muted-foreground">
-          Computed from the functional-outcome nomogram, built on a selected single-surgeon cohort, so values
-          are best-case. PDE5 response, erection hardness, testosterone, neuropathy and penile Doppler are not
-          inputs.
+          Best-case values from the functional-outcome nomogram (selected single-surgeon cohort). PDE5 response,
+          erection hardness, testosterone, neuropathy and penile Doppler are not inputs.
         </p>
       </CardContent>
     </Card>
