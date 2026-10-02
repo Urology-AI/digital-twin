@@ -131,6 +131,13 @@ export function PlanningInputsPanel() {
     </details>
   );
 
+  // Count only factors that actually move the score; context-only toggles
+  // (zero weight) are recorded but must not inflate the headline number.
+  const scoredToggle = (k: BoolKey) => {
+    const wk = TOGGLE_WEIGHT[k];
+    return wk === undefined || INFLAMMATION_WEIGHTS.value[wk] !== 0;
+  };
+  const pvfMeasured = S.pelvic_visceral_fat_cm3 !== null;
   const activeCount =
     (
       [
@@ -143,16 +150,14 @@ export function PlanningInputsPanel() {
         "mri_post_biopsy_hemorrhage", "radiation_brachytherapy", "bph_procedure_complicated",
         "five_ari_long_term", "neoadjuvant_adt",
       ] as BoolKey[]
-    ).filter((k) => S[k]).length +
+    ).filter((k) => S[k] && scoredToggle(k)).length +
     (S.mri_periprostatic_inflammation !== "none" ? 1 : 0) +
-    (S.biopsy_sessions >= 2 ? 1 : 0) +
-    (S.age > 70 ? 1 : 0) +
     (S.vol > 80 ? 1 : 0) +
-    (S.bmi > 30 ? 1 : 0) +
-    (S.ipss > 19 ? 1 : 0) +
-    (S.prior_pelvic_surgery !== "none" ? 1 : 0) +
+    (S.bmi > 30 && !pvfMeasured ? 1 : 0) +
+    (pvfMeasured && (S.pelvic_visceral_fat_cm3 ?? 0) >= 1400 ? 1 : 0) +
+    (S.prior_pelvic_surgery === "rectal_denonvilliers" ? 1 : 0) +
     (S.penile_prosthesis_reservoir !== "none" ? 1 : 0) +
-    ((S.crp !== null && S.crp > 3) || (S.nlr !== null && S.nlr > 3) ? 1 : 0);
+    (S.mri_denonvilliers > 0 ? 1 : 0);
 
   const bmiCat =
     S.bmi >= 30 ? "Obese" : S.bmi >= 25 ? "Overweight" : S.bmi > 0 ? "Normal" : null;
@@ -167,13 +172,16 @@ export function PlanningInputsPanel() {
   return (
     <Card className="border-border/70">
       <CardHeader className="border-b border-border/50 bg-gradient-to-br from-muted/40 to-transparent px-4 py-3 dark:from-muted/25">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <CardTitle className="text-base font-semibold text-foreground">
             Surgical history &amp; anatomy
           </CardTitle>
           {activeCount > 0 && (
-            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-              {activeCount} risk factor{activeCount === 1 ? "" : "s"}
+            <span
+              className="whitespace-nowrap rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400"
+              title="Factors that change the score. Context-only items are recorded but not counted."
+            >
+              {activeCount} scored factor{activeCount === 1 ? "" : "s"}
             </span>
           )}
         </div>
@@ -187,8 +195,24 @@ export function PlanningInputsPanel() {
           <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
             {NUM.map(([k, lbl, unit, min, max]) => (
               <div key={k} className="space-y-1">
-                <label className="text-xs font-semibold text-foreground">
-                  {lbl} <span className="font-normal text-muted-foreground">({unit})</span>
+                <label className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-semibold text-foreground">
+                  <span>
+                    {lbl} <span className="font-normal text-muted-foreground">({unit})</span>
+                  </span>
+                  {k === "bmi" && bmiCat && (
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-px text-[10px] font-semibold",
+                        S.bmi >= 30
+                          ? "bg-red-500/10 text-red-500"
+                          : S.bmi >= 25
+                            ? "bg-amber-500/10 text-amber-500"
+                            : "bg-emerald-500/10 text-emerald-500",
+                      )}
+                    >
+                      {bmiCat}
+                    </span>
+                  )}
                 </label>
                 <div className="flex items-center gap-2">
                   <Input
@@ -203,20 +227,6 @@ export function PlanningInputsPanel() {
                     }}
                     className="h-8 w-20 text-sm"
                   />
-                  {k === "bmi" && bmiCat && (
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                        S.bmi >= 30
-                          ? "bg-red-500/10 text-red-500"
-                          : S.bmi >= 25
-                            ? "bg-amber-500/10 text-amber-500"
-                            : "bg-emerald-500/10 text-emerald-500",
-                      )}
-                    >
-                      {bmiCat}
-                    </span>
-                  )}
                 </div>
               </div>
             ))}

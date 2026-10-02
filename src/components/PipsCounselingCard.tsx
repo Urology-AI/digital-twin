@@ -78,23 +78,27 @@ function SideColumn({ c }: { c: SideCounseling }) {
       ) : (
         <div className="space-y-1.5">
           {c.contributors.map((x, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs">
-              <span className="min-w-0 flex-1 truncate text-muted-foreground" title={x.label}>
-                {x.label}
-              </span>
-              <span
-                className={cn(
-                  "w-20 shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-semibold uppercase tracking-wide",
-                  EVIDENCE_TONE[x.evidence].cls,
-                )}
-                title={EVIDENCE_TONE[x.evidence].hint}
-              >
-                {EVIDENCE_TONE[x.evidence].label}
-              </span>
-              <span className="w-10 shrink-0 text-right tabular-nums text-muted-foreground">
-                {x.points === 0 ? "context" : `+${x.points.toFixed(2)}`}
-              </span>
-              <span className="sr-only">{Math.round((x.points / maxPts) * 100)}% of the largest contributor</span>
+            <div key={i} className="space-y-1">
+              <div className="flex items-start gap-2 text-xs">
+                <span className="min-w-0 flex-1 break-words leading-snug text-muted-foreground">{x.label}</span>
+                <span
+                  className={cn(
+                    "w-[5.25rem] shrink-0 rounded px-1 py-0.5 text-center text-[10px] font-semibold uppercase tracking-wide",
+                    EVIDENCE_TONE[x.evidence].cls,
+                  )}
+                  title={EVIDENCE_TONE[x.evidence].hint}
+                >
+                  {EVIDENCE_TONE[x.evidence].label}
+                </span>
+                <span className="w-12 shrink-0 text-right tabular-nums text-muted-foreground">
+                  {x.points === 0 ? "context" : `+${x.points.toFixed(2)}`}
+                </span>
+              </div>
+              {x.points > 0 && (
+                <div className="h-1 overflow-hidden rounded-full bg-muted">
+                  <div className={cn("h-full rounded-full", tone.bar)} style={{ width: `${(x.points / maxPts) * 100}%` }} />
+                </div>
+              )}
             </div>
           ))}
         </div>
