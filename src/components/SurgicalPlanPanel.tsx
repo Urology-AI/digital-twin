@@ -541,6 +541,15 @@ export function SurgicalPlanPanel() {
   }
 
   const { plan, inflammation } = predictions;
+  // The MRI-review prompt is for cases with no plane read yet; once any side-specific
+  // MRI plane grade is recorded it would only repeat what the clinician entered.
+  const planeGradesRecorded = (
+    [
+      "mri_capsule_interface", "mri_nvb_plane", "mri_post_treatment_distortion",
+      "mri_nonmass_inflammatory_signal", "mri_fat_stranding",
+    ] as const
+  ).some((k) => S[`${k}_l`] > 0 || S[`${k}_r`] > 0);
+  const showMriReview = inflammation.reviewMri && !planeGradesRecorded;
   const { baseline, withPlan, bcr, counseling, reserve } = computed;
 
   const tierTone =
@@ -628,9 +637,9 @@ export function SurgicalPlanPanel() {
             </div>
           }
           alerts={
-            inflammation.reviewMri || inflammation.intraopObserved ? (
+            showMriReview || inflammation.intraopObserved ? (
               <div className="space-y-2 text-xs">
-                {inflammation.reviewMri && (
+                {showMriReview && (
                   <div className="flex gap-2 rounded-lg bg-amber-500/10 p-2.5 text-amber-700 dark:text-amber-300">
                     <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                     Review the MRI for tell-tale signs of periprostatic inflammation or fatty change
