@@ -1,15 +1,36 @@
 import { useMemo } from "react";
-import { Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { usePatientStore } from "@/store/patientStore";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import type { ClinicalState } from "@/types/patient";
 import { cn } from "@/lib/utils";
+import { INFLAMMATION_WEIGHTS } from "@/lib/compass/planningEvidence";
 
 type BoolKey = {
   [K in keyof ClinicalState]: ClinicalState[K] extends boolean ? K : never;
 }[keyof ClinicalState];
+
+/**
+ * Which score weight each boolean toggle feeds. A toggle whose weight is 0 is
+ * recorded but not scored (no radical-prostatectomy plane evidence, or a
+ * validated null), and is badged "context" so the clinician is not misled
+ * into thinking it moves the plan.
+ */
+const TOGGLE_WEIGHT: Partial<Record<BoolKey, keyof typeof INFLAMMATION_WEIGHTS.value>> = {
+  prior_urolift: "prior_urolift",
+  prior_rezum: "prior_rezum",
+  urinary_retention: "urinary_retention",
+  recurrent_uti: "recurrent_uti",
+  treated_prostatitis: "treated_prostatitis",
+  biopsy_shows_inflammation: "biopsy_inflammation",
+  diverticulitis: "diverticulitis",
+  pelvic_abscess: "pelvic_abscess",
+  catheter_prolonged_or_traumatic: "catheter_prolonged",
+  biopsy_recent_or_complicated: "biopsy_recent_or_complicated",
+  five_ari_long_term: "five_ari_long_term",
+};
 
 /** Segmented picker — matches the Modifiable Factors panel style. */
 function Seg<T extends string | number>({
@@ -29,7 +50,7 @@ function Seg<T extends string | number>({
           type="button"
           onClick={() => onChange(o.value)}
           className={cn(
-            "flex-1 px-2 py-2 text-xs font-semibold transition-colors",
+            "min-w-0 flex-1 px-2 py-2 text-xs font-semibold leading-tight transition-colors",
             value === o.value
               ? "bg-primary text-primary-foreground"
               : "bg-card text-muted-foreground hover:bg-muted/60",
@@ -57,14 +78,18 @@ export function PlanningInputsPanel() {
   if (!entry || !S) return null;
 
   /** Big toggle button for a boolean risk factor. */
-  const Toggle = ({ k, label }: { k: BoolKey; label: string }) => {
+  const Toggle = ({ k, label, hint, wide }: { k: BoolKey; label: string; hint?: string; wide?: boolean }) => {
     const on = S[k];
+    const weightKey = TOGGLE_WEIGHT[k];
+    const contextOnly = weightKey !== undefined && INFLAMMATION_WEIGHTS.value[weightKey] === 0;
     return (
       <button
         type="button"
+        aria-pressed={on}
         onClick={() => updateClinicalForm({ [k]: !on } as Partial<ClinicalState>)}
         className={cn(
-          "flex items-center gap-2 rounded-md border px-2.5 py-2 text-left text-xs font-semibold transition-all",
+          "flex items-start gap-2 rounded-md border px-2.5 py-2 text-left text-xs font-semibold transition-all",
+          wide && "col-span-2",
           on
             ? "border-primary bg-primary/10 text-primary"
             : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:bg-muted/60",
@@ -72,26 +97,47 @@ export function PlanningInputsPanel() {
       >
         <span
           className={cn(
-            "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
+            "mt-px flex h-4 w-4 shrink-0 items-center justify-center rounded border",
             on ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40",
           )}
         >
           {on && <Check className="h-3 w-3" strokeWidth={3} />}
         </span>
-        {label}
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-1.5">
+            {label}
+            {contextOnly && (
+              <span
+                className="rounded bg-muted px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-muted-foreground"
+                title="Recorded for the case, but not scored: no radical-prostatectomy plane evidence, or a validated null"
+              >
+                context
+              </span>
+            )}
+          </span>
+          {hint && <span className="mt-0.5 block text-[10px] font-normal leading-snug text-muted-foreground">{hint}</span>}
+        </span>
       </button>
     );
   };
 
   const Group = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="space-y-2 border-t border-border/60 pt-3.5 first:border-t-0 first:pt-0">
-      <h3 className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </h3>
-      {children}
-    </div>
+    <details open className="group space-y-2 border-t border-border/60 pt-3.5 first:border-t-0 first:pt-0">
+      <summary className="flex cursor-pointer list-none items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground [&::-webkit-details-marker]:hidden">
+        <h3>{title}</h3>
+        <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" aria-hidden />
+      </summary>
+      <div className="space-y-2 pt-2">{children}</div>
+    </details>
   );
 
+  // Count only factors that actually move the score; context-only toggles
+  // (zero weight) are recorded but must not inflate the headline number.
+  const scoredToggle = (k: BoolKey) => {
+    const wk = TOGGLE_WEIGHT[k];
+    return wk === undefined || INFLAMMATION_WEIGHTS.value[wk] !== 0;
+  };
+  const pvfMeasured = S.pelvic_visceral_fat_cm3 !== null;
   const activeCount =
     (
       [
@@ -101,17 +147,17 @@ export function PlanningInputsPanel() {
         "diverticulitis", "pelvic_abscess", "hernia_mesh", "rectal_fistula",
         "mri_periprostatic_fat_stranding", "catheter_prolonged_or_traumatic",
         "biopsy_recent_or_complicated",
+        "mri_post_biopsy_hemorrhage", "radiation_brachytherapy", "bph_procedure_complicated",
+        "five_ari_long_term", "neoadjuvant_adt",
       ] as BoolKey[]
-    ).filter((k) => S[k]).length +
+    ).filter((k) => S[k] && scoredToggle(k)).length +
     (S.mri_periprostatic_inflammation !== "none" ? 1 : 0) +
-    (S.biopsy_sessions >= 2 ? 1 : 0) +
-    (S.age > 70 ? 1 : 0) +
     (S.vol > 80 ? 1 : 0) +
-    (S.bmi > 30 ? 1 : 0) +
-    (S.ipss > 19 ? 1 : 0) +
-    (S.prior_pelvic_surgery !== "none" ? 1 : 0) +
+    (S.bmi > 30 && !pvfMeasured ? 1 : 0) +
+    (pvfMeasured && (S.pelvic_visceral_fat_cm3 ?? 0) >= 1400 ? 1 : 0) +
+    (S.prior_pelvic_surgery === "rectal_denonvilliers" ? 1 : 0) +
     (S.penile_prosthesis_reservoir !== "none" ? 1 : 0) +
-    ((S.crp !== null && S.crp > 3) || (S.nlr !== null && S.nlr > 3) ? 1 : 0);
+    (S.mri_denonvilliers > 0 ? 1 : 0);
 
   const bmiCat =
     S.bmi >= 30 ? "Obese" : S.bmi >= 25 ? "Overweight" : S.bmi > 0 ? "Normal" : null;
@@ -125,14 +171,17 @@ export function PlanningInputsPanel() {
 
   return (
     <Card className="border-border/70">
-      <CardHeader className="border-b border-border/50 bg-gradient-to-br from-muted/40 to-transparent px-4 py-3 dark:from-muted/25">
-        <div className="flex items-center justify-between">
+      <CardHeader className="sticky -top-5 z-10 rounded-t-xl border-b border-border/50 bg-card/95 px-4 pb-3 pt-8 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <CardTitle className="text-base font-semibold text-foreground">
             Surgical history &amp; anatomy
           </CardTitle>
           {activeCount > 0 && (
-            <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400">
-              {activeCount} risk factor{activeCount === 1 ? "" : "s"}
+            <span
+              className="whitespace-nowrap rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400"
+              title="Factors that change the score. Context-only items are recorded but not counted."
+            >
+              {activeCount} scored factor{activeCount === 1 ? "" : "s"}
             </span>
           )}
         </div>
@@ -146,8 +195,24 @@ export function PlanningInputsPanel() {
           <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
             {NUM.map(([k, lbl, unit, min, max]) => (
               <div key={k} className="space-y-1">
-                <label className="text-xs font-semibold text-foreground">
-                  {lbl} <span className="font-normal text-muted-foreground">({unit})</span>
+                <label className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs font-semibold text-foreground">
+                  <span>
+                    {lbl} <span className="font-normal text-muted-foreground">({unit})</span>
+                  </span>
+                  {k === "bmi" && bmiCat && (
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-px text-[10px] font-semibold",
+                        S.bmi >= 30
+                          ? "bg-red-500/10 text-red-500"
+                          : S.bmi >= 25
+                            ? "bg-amber-500/10 text-amber-500"
+                            : "bg-emerald-500/10 text-emerald-500",
+                      )}
+                    >
+                      {bmiCat}
+                    </span>
+                  )}
                 </label>
                 <div className="flex items-center gap-2">
                   <Input
@@ -162,20 +227,6 @@ export function PlanningInputsPanel() {
                     }}
                     className="h-8 w-20 text-sm"
                   />
-                  {k === "bmi" && bmiCat && (
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                        S.bmi >= 30
-                          ? "bg-red-500/10 text-red-500"
-                          : S.bmi >= 25
-                            ? "bg-amber-500/10 text-amber-500"
-                            : "bg-emerald-500/10 text-emerald-500",
-                      )}
-                    >
-                      {bmiCat}
-                    </span>
-                  )}
                 </div>
               </div>
             ))}
@@ -202,6 +253,9 @@ export function PlanningInputsPanel() {
             <Toggle k="prior_greenlight" label="GreenLight" />
             <Toggle k="prior_holep" label="HoLEP" />
             <Toggle k="prior_rezum" label="Rezūm" />
+            <Toggle k="five_ari_long_term" label="5-ARI ≥ 12 months" hint="Effect on the plane is uncertain in direction" wide />
+            <Toggle k="neoadjuvant_adt" label="Neoadjuvant ADT" hint="Weak evidence; not added on top of prior radiation" wide />
+            <Toggle k="bph_procedure_complicated" label="Complicated TURP / HoLEP / laser" hint="Capsular perforation, extravasation, infection or reoperation" wide />
           </div>
         </Group>
 
@@ -226,13 +280,14 @@ export function PlanningInputsPanel() {
             />
           </div>
           <div className="grid grid-cols-2 gap-2 pt-1">
-            <Toggle k="biopsy_recent_or_complicated" label="Transrectal complication, or <6 wk before surgery" />
+            <Toggle k="biopsy_recent_or_complicated" label="Recent or complicated biopsy" hint="Transrectal complication, or less than 6 weeks before surgery" wide />
           </div>
         </Group>
 
         <Group title="Pelvic conditions">
           <div className="grid grid-cols-2 gap-2">
             <Toggle k="prior_pelvic_radiation" label="Pelvic radiation" />
+            <Toggle k="radiation_brachytherapy" label="Brachytherapy / combined" hint="Radiation modality (expert prior)" />
             <Toggle k="radiation_proctitis" label="Radiation proctitis" />
             <Toggle k="crohns" label="Crohn's" />
             <Toggle k="ulcerative_colitis" label="Ulcerative colitis" />
@@ -240,7 +295,7 @@ export function PlanningInputsPanel() {
             <Toggle k="pelvic_abscess" label="Pelvic abscess" />
             <Toggle k="hernia_mesh" label="Hernia mesh" />
             <Toggle k="rectal_fistula" label="Rectal fistula" />
-            <Toggle k="catheter_prolonged_or_traumatic" label="Prolonged/traumatic catheter" />
+            <Toggle k="catheter_prolonged_or_traumatic" label="Prolonged or traumatic catheter" />
           </div>
           <div className="space-y-1 pt-1">
             <span className="text-xs font-semibold text-foreground">Prior pelvic surgery</span>
@@ -249,7 +304,7 @@ export function PlanningInputsPanel() {
               onChange={(v) => updateClinicalForm({ prior_pelvic_surgery: v })}
               options={[
                 { label: "None", value: "none" },
-                { label: "Bladder/fracture/urethroplasty", value: "bladder_fracture_urethroplasty" },
+                { label: "Bladder, fracture, urethroplasty", value: "bladder_fracture_urethroplasty" },
                 { label: "Rectal @ Denonvilliers", value: "rectal_denonvilliers" },
               ]}
             />
@@ -264,6 +319,26 @@ export function PlanningInputsPanel() {
                 { label: "Present", value: "present" },
                 { label: "Prior infection/revision", value: "prior_infection_or_revision" },
               ]}
+            />
+          </div>
+        </Group>
+
+        <Group title="Pelvic fat (imaging)">
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-foreground">
+              Pelvic visceral fat <span className="font-normal text-muted-foreground">(cm³; ≥ 1400 prolongs surgery, replaces BMI term)</span>
+            </label>
+            <Input
+              type="number"
+              min={0}
+              max={5000}
+              step={10}
+              value={S.pelvic_visceral_fat_cm3 ?? ""}
+              onChange={(e) => {
+                const n = parseFloat(e.target.value);
+                updateClinicalForm({ pelvic_visceral_fat_cm3: isNaN(n) ? null : n });
+              }}
+              className="h-8 w-24 text-sm"
             />
           </div>
         </Group>
@@ -326,6 +401,19 @@ export function PlanningInputsPanel() {
           />
           <div className="grid grid-cols-2 gap-2">
             <Toggle k="mri_periprostatic_fat_stranding" label="Fat stranding" />
+            <Toggle k="mri_post_biopsy_hemorrhage" label="Post-biopsy hemorrhage" hint="T1 MRI" />
+          </div>
+          <div className="space-y-1 pt-1">
+            <span className="text-xs font-semibold text-foreground">Denonvilliers fascia / rectoprostatic angle</span>
+            <Seg<number>
+              value={S.mri_denonvilliers}
+              onChange={(v) => updateClinicalForm({ mri_denonvilliers: v })}
+              options={[
+                { label: "Normal", value: 0 },
+                { label: "Thickened", value: 1 },
+                { label: "Obliterated", value: 2 },
+              ]}
+            />
           </div>
         </Group>
 

@@ -22,6 +22,11 @@ import {
 import { bcrByPlan } from "@/lib/compass/bcrByPlan";
 import { useUiStore } from "@/store/uiStore";
 import { MODIFIABLE_BCR } from "@/lib/compass/planningEvidence";
+import { PeriprostaticRiskBySide } from "@/components/PipsCounselingCard";
+import { buildPipsCounseling } from "@/lib/compass/pipsCounseling";
+import { RecoveryReserveCard } from "@/components/RecoveryReserveCard";
+import { computeRecoveryReserve } from "@/lib/compass/recoveryReserve";
+import { PDI_ITEMS, PDI_MAX, pdiTotal } from "@/lib/compass/planeDifficultyIndex";
 import type { ClinicalState } from "@/types/patient";
 import type { SidePlan } from "@/types/prediction";
 import { cn } from "@/lib/utils";
@@ -280,58 +285,6 @@ function Segmented<T extends string>({
 /* side card                                                          */
 /* ------------------------------------------------------------------ */
 
-function PipsStat({
-  label,
-  sublabel,
-  pct: value,
-  meta,
-}: {
-  label: string;
-  sublabel: string;
-  pct: number;
-  meta: { label: string; tone: "emerald" | "amber" | "red" };
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border p-2",
-        meta.tone === "emerald" && "border-emerald-500/25 bg-emerald-500/[0.05]",
-        meta.tone === "amber" && "border-amber-500/25 bg-amber-500/[0.05]",
-        meta.tone === "red" && "border-red-500/25 bg-red-500/[0.05]",
-      )}
-    >
-      <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-0.5 flex items-baseline gap-1.5">
-        <span
-          className={cn(
-            "text-lg font-bold",
-            meta.tone === "emerald" && "text-emerald-600 dark:text-emerald-400",
-            meta.tone === "amber" && "text-amber-600 dark:text-amber-400",
-            meta.tone === "red" && "text-red-600 dark:text-red-400",
-          )}
-        >
-          {pct(value)}
-        </span>
-        <span className="text-[11px] font-medium text-muted-foreground">{meta.label}</span>
-      </div>
-      <div className="mt-0.5 text-[10.5px] leading-tight text-muted-foreground">{sublabel}</div>
-    </div>
-  );
-}
-
-const HOSTILITY_META: Record<SidePlan["hostilityTier"], { label: string; tone: "emerald" | "amber" | "red" }> = {
-  low: { label: "Low", tone: "emerald" },
-  intermediate: { label: "Intermediate", tone: "amber" },
-  high: { label: "High", tone: "red" },
-  "very-high": { label: "Very high", tone: "red" },
-};
-
-const EPE_TIER_META: Record<SidePlan["epeTier"], { label: string; tone: "emerald" | "amber" | "red" }> = {
-  low: { label: "Low", tone: "emerald" },
-  intermediate: { label: "Intermediate", tone: "amber" },
-  high: { label: "High", tone: "red" },
-};
-
 function SideCard({
   plan,
   sideEce,
@@ -427,36 +380,14 @@ function SideCard({
           <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{plan.gradeRationale}</p>
         </div>
 
-        <div>
-          <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-xs font-semibold text-foreground">PIPS — oncologic risk vs. plane hostility</span>
+        {plan.hostileProtocol && (
+          <div className="flex items-start gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-2 text-[11px] leading-snug text-amber-700 dark:text-amber-300/90">
+            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            Hostile-plane protocol: early exposure, athermal low-traction dissection, alternate direction,
+            hydrodissection, and consent for an intraoperative plane change — fibrosis alone does not justify a
+            wider excision here.
           </div>
-          <p className="mb-1.5 text-[11px] leading-snug text-muted-foreground">
-            Two independent questions, combined only in the recommendation above — never blended into one number.
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <PipsStat
-              label="PIPS-EPE"
-              sublabel="can this be preserved oncologically?"
-              pct={sideEce}
-              meta={EPE_TIER_META[plan.epeTier]}
-            />
-            <PipsStat
-              label="PIPS-H"
-              sublabel="how hostile is the plane?"
-              pct={plan.hostilityScore}
-              meta={HOSTILITY_META[plan.hostilityTier]}
-            />
-          </div>
-          {plan.hostileProtocol && (
-            <div className="mt-2 flex items-start gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-2 text-[11px] leading-snug text-amber-700 dark:text-amber-300/90">
-              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Hostile-plane protocol: early exposure, athermal low-traction dissection, alternate direction,
-              hydrodissection, and consent for an intraoperative plane change — fibrosis alone does not justify a
-              wider excision here.
-            </div>
-          )}
-        </div>
+        )}
 
         <div>
           <div className="mb-1.5 text-xs font-semibold text-foreground">Zone grade</div>
@@ -592,7 +523,11 @@ export function SurgicalPlanPanel() {
       },
     );
 
-    return { baseline, withPlan, bcr };
+    const counseling = buildPipsCounseling(S, plan, predictions.eceL, predictions.eceR, base);
+
+    const reserve = computeRecoveryReserve(S, base);
+
+    return { baseline, withPlan, bcr, counseling, reserve };
   }, [predictions, S]);
 
   if (!predictions || !entry || !S || !computed) {
@@ -606,7 +541,16 @@ export function SurgicalPlanPanel() {
   }
 
   const { plan, inflammation } = predictions;
-  const { baseline, withPlan, bcr } = computed;
+  // The MRI-review prompt is for cases with no plane read yet; once any side-specific
+  // MRI plane grade is recorded it would only repeat what the clinician entered.
+  const planeGradesRecorded = (
+    [
+      "mri_capsule_interface", "mri_nvb_plane", "mri_post_treatment_distortion",
+      "mri_nonmass_inflammatory_signal", "mri_fat_stranding",
+    ] as const
+  ).some((k) => S[`${k}_l`] > 0 || S[`${k}_r`] > 0);
+  const showMriReview = inflammation.reviewMri && !planeGradesRecorded;
+  const { baseline, withPlan, bcr, counseling, reserve } = computed;
 
   const tierTone =
     inflammation.tier === "high"
@@ -615,14 +559,22 @@ export function SurgicalPlanPanel() {
         ? { text: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", bar: "bg-amber-500" }
         : { text: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", bar: "bg-emerald-500" };
 
-  const maxPts = Math.max(1, ...inflammation.contributors.map((c) => c.points));
-
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 pb-12">
-      <div>
-        <h2 className="text-lg font-semibold">Operative plan</h2>
-        <p className="text-xs text-muted-foreground">Advisory · research use only.</p>
-      </div>
+      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-border pb-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Operative plan</h2>
+          <p className="text-xs text-muted-foreground">
+            Side-specific nerve-sparing plan, plane risk and recovery outlook for this case.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase tracking-wide">
+          <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">Research use only</span>
+          <span className="rounded-full bg-amber-500/10 px-2 py-1 text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-400">
+            Provisional weights
+          </span>
+        </div>
+      </header>
 
       {plan.gates.activeInfection && (
         <div className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
@@ -673,6 +625,39 @@ export function SurgicalPlanPanel() {
         </div>
       )}
 
+      {!plan.gates.activeInfection && (
+        <PeriprostaticRiskBySide
+          counseling={counseling}
+          title={
+            <div className="flex items-center gap-1.5">
+              <SectionTitle icon={<TriangleAlert className="h-4 w-4" />}>
+                Periprostatic inflammation &amp; plane risk, by side
+              </SectionTitle>
+              <EvidenceInfo title="Periprostatic inflammation risk" tags={INFLAMMATION_SOURCES} />
+            </div>
+          }
+          alerts={
+            showMriReview || inflammation.intraopObserved ? (
+              <div className="space-y-2 text-xs">
+                {showMriReview && (
+                  <div className="flex gap-2 rounded-lg bg-amber-500/10 p-2.5 text-amber-700 dark:text-amber-300">
+                    <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    Review the MRI for tell-tale signs of periprostatic inflammation or fatty change
+                    (reticular fat stranding, effaced fat planes, dilated venous plexus) before finalising
+                    the plan.
+                  </div>
+                )}
+                {inflammation.intraopObserved && (
+                  <p className="text-muted-foreground">Estimate driven by the recorded intra-operative inflammation grade.</p>
+                )}
+              </div>
+            ) : null
+          }
+        />
+      )}
+
+      {!plan.gates.activeInfection && <RecoveryReserveCard reserve={reserve} />}
+
       {/* ── Impact ─────────────────────────────────────────────── */}
       <Card>
         <CardContent className="space-y-4 p-4">
@@ -684,6 +669,13 @@ export function SurgicalPlanPanel() {
               <EvidenceInfo title="Impact vs. nerve-sparing grade alone" tags={IMPACT_SOURCES} />
             </div>
           </div>
+          <p className="-mt-2 text-[11px] text-muted-foreground">
+            Outcomes are adjusted for the whole-patient inflammation tier:{" "}
+            <span className={cn("font-semibold uppercase", tierTone.text)}>
+              {inflammation.tier} · {pct(inflammation.score)}
+            </span>
+            .
+          </p>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <ImpactTile
@@ -782,75 +774,10 @@ export function SurgicalPlanPanel() {
         />
       </div>
 
-      {/* ── Inflammation risk ──────────────────────────────────── */}
+      {/* ── Intra-operative record ─────────────────────────────── */}
       <Card>
         <CardContent className="space-y-3 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <SectionTitle icon={<TriangleAlert className="h-4 w-4" />}>
-                Periprostatic inflammation risk
-              </SectionTitle>
-              <EvidenceInfo title="Periprostatic inflammation risk" tags={INFLAMMATION_SOURCES} />
-            </div>
-            <span className={cn("rounded-full px-2.5 py-1 text-xs font-bold uppercase", tierTone.bg, tierTone.text)}>
-              {inflammation.tier} · {pct(inflammation.score)}
-            </span>
-          </div>
-
-          <div className="h-2 overflow-hidden rounded-full bg-muted">
-            <div className={cn("h-full rounded-full", tierTone.bar)} style={{ width: `${inflammation.score * 100}%` }} />
-          </div>
-
-          {inflammation.tier === "high" && (
-            <p className={cn("text-xs font-medium", tierTone.text)}>
-              Planes likely obliterated — NS grade raised one step.
-            </p>
-          )}
-          {inflammation.tier === "moderate" && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              Flagged — a wider plane may be safer; grade left to surgeon judgement.
-            </p>
-          )}
-
-          {inflammation.reviewMri && (
-            <div className="flex gap-2 rounded-lg bg-amber-500/10 p-2.5 text-xs text-amber-700 dark:text-amber-300">
-              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Review the MRI for tell-tale signs of periprostatic inflammation or fatty change
-              (reticular fat stranding, effaced fat planes, dilated venous plexus) before finalising
-              the plan.
-            </div>
-          )}
-          {inflammation.intraopObserved && (
-            <p className="text-xs text-muted-foreground">
-              Estimate driven by the recorded intra-operative inflammation grade.
-            </p>
-          )}
-
-
-          {inflammation.contributors.length === 0 ? (
-            <p className="text-xs text-muted-foreground">No risk factors recorded.</p>
-          ) : (
-            <div className="space-y-1.5">
-              {inflammation.contributors.map((c, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs">
-                  <span className="w-52 shrink-0 truncate text-muted-foreground" title={c.label}>
-                    {c.label}
-                  </span>
-                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                    <span
-                      className={cn("block h-full rounded-full", tierTone.bar)}
-                      style={{ width: `${(c.points / maxPts) * 100}%` }}
-                    />
-                  </span>
-                  <span className="w-10 shrink-0 text-right tabular-nums text-muted-foreground">
-                    +{c.points.toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-2 border-t border-border pt-3">
+          <div className="space-y-2">
             <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Intra-op inflammation grade (overrides the estimate)
             </div>
@@ -888,6 +815,27 @@ export function SurgicalPlanPanel() {
               );
             })}
           </div>
+
+          <details className="space-y-2 border-t border-border pt-3">
+            <summary className="cursor-pointer text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Plane Difficulty Index (reference standard — recorded, not scored)
+            </summary>
+            <p className="pt-2 text-[11px] leading-snug text-muted-foreground">
+              Score each item 0 (none) to 3 (severe) per side after dissection. No model reads these;
+              they are collected so PIPS-H weights can later be fitted against a structured outcome.
+            </p>
+            <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1 text-xs">
+              <span />
+              <span className="text-center font-semibold text-muted-foreground">L</span>
+              <span className="text-center font-semibold text-muted-foreground">R</span>
+              {PDI_ITEMS.map((item, i) => (
+                <PdiRow key={item} index={i} label={item} S={S} onChange={updateClinicalForm} />
+              ))}
+              <span className="font-semibold text-foreground">Total (of {PDI_MAX})</span>
+              <span className="text-center font-semibold tabular-nums">{pdiTotal(S.plane_difficulty_l)}</span>
+              <span className="text-center font-semibold tabular-nums">{pdiTotal(S.plane_difficulty_r)}</span>
+            </div>
+          </details>
         </CardContent>
       </Card>
 
@@ -909,5 +857,45 @@ export function SurgicalPlanPanel() {
         Evidence &amp; sources →
       </button>
     </div>
+  );
+}
+
+/** One Plane Difficulty Index item: a 0–3 score for each side. */
+function PdiRow({
+  index,
+  label,
+  S,
+  onChange,
+}: {
+  index: number;
+  label: string;
+  S: ClinicalState;
+  onChange: (patch: Partial<ClinicalState>) => void;
+}) {
+  const set = (side: "l" | "r", n: number) => {
+    const key = side === "l" ? "plane_difficulty_l" : "plane_difficulty_r";
+    const next = [...S[key]];
+    next[index] = n;
+    onChange({ [key]: next } as Partial<ClinicalState>);
+  };
+  return (
+    <>
+      <span className="text-muted-foreground">{label}</span>
+      {(["l", "r"] as const).map((side) => (
+        <select
+          key={side}
+          aria-label={`${label} (${side === "l" ? "left" : "right"})`}
+          value={(side === "l" ? S.plane_difficulty_l : S.plane_difficulty_r)[index]}
+          onChange={(e) => set(side, Number(e.target.value))}
+          className="h-7 rounded-md border border-border bg-card px-1 text-xs"
+        >
+          {[0, 1, 2, 3].map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+      ))}
+    </>
   );
 }

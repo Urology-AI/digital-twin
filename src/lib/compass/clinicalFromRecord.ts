@@ -1,3 +1,4 @@
+import { normalizePdi } from "@/lib/compass/planeDifficultyIndex";
 import { resolveImagingAvailability } from "@/lib/compass/imagingAvailability";
 import {
   defaultClinicalState,
@@ -300,6 +301,16 @@ export function clinicalStateFromRecord(
     if (h.penile_prosthesis_reservoir) S.penile_prosthesis_reservoir = h.penile_prosthesis_reservoir;
     S.catheter_prolonged_or_traumatic = !!h.catheter_prolonged_or_traumatic;
     S.biopsy_recent_or_complicated = !!h.biopsy_recent_or_complicated;
+    S.mri_post_biopsy_hemorrhage = !!h.mri_post_biopsy_hemorrhage;
+    S.radiation_brachytherapy = !!h.radiation_brachytherapy;
+    S.bph_procedure_complicated = !!h.bph_procedure_complicated;
+    S.five_ari_long_term = !!h.five_ari_long_term;
+    S.mri_denonvilliers = num(h.mri_denonvilliers, S.mri_denonvilliers);
+    S.plane_difficulty_l = normalizePdi(h.plane_difficulty_l);
+    S.plane_difficulty_r = normalizePdi(h.plane_difficulty_r);
+    if (h.pelvic_visceral_fat_cm3 !== null && h.pelvic_visceral_fat_cm3 !== undefined)
+      S.pelvic_visceral_fat_cm3 = h.pelvic_visceral_fat_cm3;
+    S.neoadjuvant_adt = !!h.neoadjuvant_adt;
     if (h.crp !== null && h.crp !== undefined) S.crp = h.crp;
     if (h.nlr !== null && h.nlr !== undefined) S.nlr = h.nlr;
     S.flag_active_infection = !!h.flag_active_infection;

@@ -1,3 +1,5 @@
+import { PDI_ITEM_COUNT } from "@/lib/compass/planeDifficultyIndex";
+
 export type CompassZoneKey =
   | "1a"
   | "2a"
@@ -135,6 +137,27 @@ export interface Prostate3DInputV1 {
     catheter_prolonged_or_traumatic?: boolean;
     /** transrectal biopsy with complication, or biopsy <6 weeks before surgery */
     biopsy_recent_or_complicated?: boolean;
+    /** post-biopsy hemorrhage on T1 MRI (independent predictor of operative time and blood loss) */
+    mri_post_biopsy_hemorrhage?: boolean;
+    /** prior radiation was brachytherapy or combined EBRT + brachytherapy (vs EBRT alone) */
+    radiation_brachytherapy?: boolean;
+    /** prior TURP/HoLEP/laser complicated by capsular perforation, extravasation, infection, or reoperation */
+    bph_procedure_complicated?: boolean;
+    /** 5-alpha-reductase inhibitor use >= 12 months (recorded as context; effect on the plane is uncertain in direction) */
+    five_ari_long_term?: boolean;
+    /** Denonvilliers fascia / rectoprostatic angle on MRI — 0 normal, 1 thickened, 2 obliterated (midline, both sides) */
+    mri_denonvilliers?: number | null;
+    /**
+     * Intra-operative Plane Difficulty Index, one 0–3 score per PDI item (see
+     * planeDifficultyIndex.ts) for each side. Recorded as the reference
+     * standard for fitting PIPS-H; never read by a model.
+     */
+    plane_difficulty_l?: number[] | null;
+    plane_difficulty_r?: number[] | null;
+    /** pelvic visceral fat volume on pre-op imaging, cm3 (>= 1400 independently prolongs operative time; supersedes BMI) */
+    pelvic_visceral_fat_cm3?: number | null;
+    /** neoadjuvant androgen deprivation before surgery (desmoplasia; weak, descriptive evidence) */
+    neoadjuvant_adt?: boolean;
     /** hs-CRP, mg/L */
     crp?: number | null;
     /** neutrophil-to-lymphocyte ratio */
@@ -377,6 +400,16 @@ export interface ClinicalState {
   penile_prosthesis_reservoir: "none" | "present" | "prior_infection_or_revision";
   catheter_prolonged_or_traumatic: boolean;
   biopsy_recent_or_complicated: boolean;
+  mri_post_biopsy_hemorrhage: boolean;
+  radiation_brachytherapy: boolean;
+  bph_procedure_complicated: boolean;
+  five_ari_long_term: boolean;
+  mri_denonvilliers: number;
+  /** length PDI_ITEMS.length, each 0–3 */
+  plane_difficulty_l: number[];
+  plane_difficulty_r: number[];
+  pelvic_visceral_fat_cm3: number | null;
+  neoadjuvant_adt: boolean;
   crp: number | null;
   nlr: number | null;
   flag_active_infection: boolean;
@@ -503,6 +536,15 @@ export function defaultClinicalState(): ClinicalState {
     penile_prosthesis_reservoir: "none",
     catheter_prolonged_or_traumatic: false,
     biopsy_recent_or_complicated: false,
+    mri_post_biopsy_hemorrhage: false,
+    radiation_brachytherapy: false,
+    bph_procedure_complicated: false,
+    five_ari_long_term: false,
+    mri_denonvilliers: 0,
+    plane_difficulty_l: Array(PDI_ITEM_COUNT).fill(0),
+    plane_difficulty_r: Array(PDI_ITEM_COUNT).fill(0),
+    pelvic_visceral_fat_cm3: null,
+    neoadjuvant_adt: false,
     crp: null,
     nlr: null,
     flag_active_infection: false,

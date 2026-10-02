@@ -271,6 +271,52 @@ COMPASS predictions.
 | Healer tiers + plan deltas | `src/lib/compass/functionalOutcomes.ts` |
 | Tests | `src/test/surgicalPlanning.test.ts` |
 
+**Evidence tiers and zero-weight context (planning tab).** Every contributor to the
+periprostatic-inflammation / plane-hostility (PIPS-H) score carries an evidence tier:
+`direct` (plane or fibrosis measured, or an independent radical-prostatectomy difficulty
+predictor), `surrogate` (evidence only for nerve-sparing rate, operative time, rectal
+injury or margins), `unvalidated` (scored research input or expert prior, validated for
+something else such as extracapsular extension), `null` (studied, no effect on the plane;
+zero weight) and `no RP data` (never studied in radical prostatectomy; zero weight,
+shown as context). Terms with no radical-prostatectomy plane evidence do not move the
+score: age, hs-CRP/NLR, repeat or recent biopsy, general prior abdominal surgery,
+retention, IPSS, catheter duration, diverticulitis, bladder surgery/pelvic fracture/
+urethroplasty, prostatitis, biopsy inflammation, UroLift, Rezum, recurrent UTI, pelvic
+abscess, 5-ARI use and contralateral ablation. Hernia mesh, BMI and HoLEP are down-weighted;
+measured pelvic visceral fat (>= 1400 cm3) supersedes the BMI term; neoadjuvant ADT is a
+weak modifier that is not additive with prior radiation. The side-specific MRI plane grades
+remain scored but are tagged `unvalidated`: they are validated against extracapsular
+extension, not against intra-operative plane difficulty or whole-mount fibrosis. The
+intercept and tier cutpoints are expert-set and not fitted. The per-side counseling output
+(preservable oncologically, plane risk, qualitative likelihood of intra-operative change,
+conditional recovery scenarios, confidence) reuses existing model outputs; the likelihood
+that intended nerve sparing is reduced intra-operatively is deliberately qualitative
+because no validated model exists. A 12-item intra-operative Plane Difficulty Index is
+recorded per side as the future reference standard; no model reads it.
+
+**PIPS-R recovery reserve.** A separate, patient-level output (never combined with PIPS-H
+or PIPS-EPE): expected unassisted erectile function at 18 months if both bundles are
+preserved. It reuses the functional-outcome nomogram evaluated for bilateral intrafascial
+preservation, with PDE5 use, pelvic-floor training and the other lifestyle levers held
+neutral, so no new coefficients are introduced; only the tier cutpoints (good >= 60%,
+reduced 35-60%, poor < 35%) are PIPS-specific and provisional. Drivers are counterfactual
+costs (age vs 55, baseline SHIM vs 25, diabetes, hypertension, coronary disease, smoking,
+BMI vs 22). Prior pelvic radiation, ADT exposure and pelvic fracture/urethral injury are
+shown as "present but not modelled" flags rather than given invented penalties. Not
+estimated when baseline SHIM < 12. Absolute values are best-case (selected single-surgeon
+cohort); it modifies counseling and rehabilitation, never the plane. Code:
+`src/lib/compass/recoveryReserve.ts`; tests: `src/test/recoveryReserve.test.ts`.
+
+*Effect of the re-weighting on the bundled demo cases:* across the 16 demo cases the
+whole-patient and per-side scores change in 3 cases (by 2 to 5 percentage points, all
+remaining in the `low` tier); no tier, nerve-sparing grade or decision code changes.
+The cohort-derived demo cases carry no surgical history (the working-cohort rows do not
+include it), so none was assigned to them. Four labelled "planning scenarios" were added
+(`plan-prior-radiation`, `plan-prior-turp`, `plan-biopsy-hemorrhage`, `plan-prior-hifu-left`);
+each takes an existing demo case unchanged and layers one exposure with a published effect
+at prostatectomy (cited in `src/data/demoCases.ts`). They are teaching scenarios, not
+cohort data, and use no expert-prior flag.
+
 ### 9.7 Where to find everything
 
 | Artefact | Location |

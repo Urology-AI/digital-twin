@@ -5,6 +5,7 @@ import { createDefaultZones, createBaseThreeZones } from "@/lib/compass/constant
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { mapLesionsToZones } from "@/lib/compass/lesionZones";
 import { runCompassModels } from "@/lib/compass/runCompass";
+import { normalizePdi, pdiTotal } from "@/lib/compass/planeDifficultyIndex";
 import { buildProstateRecord } from "@/lib/compass/recordFactory";
 import {
   deriveClinicalFromLesions,
@@ -438,6 +439,7 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
         "prior_abdominal_surgery", "anticoagulant", "osa",
         "mri_periprostatic_fat_stranding",
         "catheter_prolonged_or_traumatic", "biopsy_recent_or_complicated",
+        "mri_post_biopsy_hemorrhage", "radiation_brachytherapy", "bph_procedure_complicated", "five_ari_long_term", "neoadjuvant_adt",
         "flag_active_infection", "flag_imaging_discordant", "flag_mri_artifact",
         "flag_key_data_missing",
       ];
@@ -451,6 +453,7 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
         H.mri_periprostatic_inflammation = patch.mri_periprostatic_inflammation;
       if (patch.prior_pelvic_surgery !== undefined) H.prior_pelvic_surgery = patch.prior_pelvic_surgery;
       if (patch.penile_prosthesis_reservoir !== undefined) H.penile_prosthesis_reservoir = patch.penile_prosthesis_reservoir;
+      if (patch.pelvic_visceral_fat_cm3 !== undefined) H.pelvic_visceral_fat_cm3 = patch.pelvic_visceral_fat_cm3;
       if (patch.crp !== undefined) H.crp = patch.crp;
       if (patch.nlr !== undefined) H.nlr = patch.nlr;
       if (patch.intraop_inflammation_l !== undefined)
@@ -463,11 +466,18 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
         "mri_post_treatment_distortion_l", "mri_post_treatment_distortion_r",
         "mri_nonmass_inflammatory_signal_l", "mri_nonmass_inflammatory_signal_r",
         "mri_fat_stranding_l", "mri_fat_stranding_r",
-        "prior_focal_ablation_l", "prior_focal_ablation_r",
+        "prior_focal_ablation_l", "prior_focal_ablation_r", "mri_denonvilliers",
       ];
       for (const k of hNumSet) {
         const v = (patch as Record<string, number | undefined>)[k];
         if (v !== undefined) (H as Record<string, unknown>)[k] = v || null;
+      }
+      for (const k of ["plane_difficulty_l", "plane_difficulty_r"] as const) {
+        const v = patch[k];
+        if (v !== undefined) {
+          const scores = normalizePdi(v);
+          H[k] = pdiTotal(scores) > 0 ? scores : null;
+        }
       }
       // ── Surgeon's operative plan ─────────────────────────────────────────
       const PL = (record.plan ??= {});

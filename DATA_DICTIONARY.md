@@ -142,4 +142,21 @@ The web tool accepts patient records as JSON conforming to schema `prostate-3d-i
 
 ---
 
+## 10. Planning-tab research inputs (optional; not used by the six core models)
+
+Stored under `history` in the `prostate-3d-input-v1` record. All optional; absent means "not known / not present". They feed only the Planning tab's plane-hostility and counseling output.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `mri_post_biopsy_hemorrhage` | boolean | Post-biopsy hemorrhage on T1 MRI |
+| `radiation_brachytherapy` | boolean | Prior radiation was brachytherapy or combined (vs EBRT alone) |
+| `bph_procedure_complicated` | boolean | Prior TURP/HoLEP/laser complicated by perforation, extravasation, infection or reoperation |
+| `mri_denonvilliers` | 0-2 | Denonvilliers fascia / rectoprostatic angle: normal, thickened, obliterated |
+| `pelvic_visceral_fat_cm3` | number (cm3) | Pelvic visceral fat volume; >= 1400 supersedes the BMI term |
+| `neoadjuvant_adt` | boolean | Neoadjuvant androgen deprivation (not additive with prior radiation) |
+| `five_ari_long_term` | boolean | 5-alpha-reductase inhibitor use >= 12 months (context only, zero weight) |
+| `plane_difficulty_l`, `plane_difficulty_r` | 12 x 0-3 | Intra-operative Plane Difficulty Index per side (recorded, never scored) |
+
+---
+
 *Last updated: May 2026. Variable list reflects COMPASS Model build v22, verified 2026-05-03, production deployment v2.5.1.*

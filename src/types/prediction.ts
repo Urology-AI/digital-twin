@@ -40,7 +40,7 @@ export type InflammationTier = "low" | "moderate" | "high";
 export interface InflammationRisk {
   score: number;
   tier: InflammationTier;
-  contributors: { label: string; points: number }[];
+  contributors: { label: string; points: number; evidence: "direct" | "surrogate" | "unvalidated" | "null" | "none" }[];
   reviewMri: boolean;
   intraopObserved: boolean;
   intraopDriven: boolean;
