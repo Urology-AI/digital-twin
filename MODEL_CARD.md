@@ -271,6 +271,33 @@ COMPASS predictions.
 | Healer tiers + plan deltas | `src/lib/compass/functionalOutcomes.ts` |
 | Tests | `src/test/surgicalPlanning.test.ts` |
 
+**Evidence tiers and zero-weight context (planning tab).** Every contributor to the
+periprostatic-inflammation / plane-hostility (PIPS-H) score carries an evidence tier:
+`direct` (plane or fibrosis measured, or an independent radical-prostatectomy difficulty
+predictor), `surrogate` (evidence only for nerve-sparing rate, operative time, rectal
+injury or margins), `unvalidated` (scored research input or expert prior, validated for
+something else such as extracapsular extension), `null` (studied, no effect on the plane;
+zero weight) and `no RP data` (never studied in radical prostatectomy; zero weight,
+shown as context). Terms with no radical-prostatectomy plane evidence do not move the
+score: age, hs-CRP/NLR, repeat or recent biopsy, general prior abdominal surgery,
+retention, IPSS, catheter duration, diverticulitis, bladder surgery/pelvic fracture/
+urethroplasty, prostatitis, biopsy inflammation, UroLift, Rezum, recurrent UTI, pelvic
+abscess, 5-ARI use and contralateral ablation. Hernia mesh, BMI and HoLEP are down-weighted;
+measured pelvic visceral fat (>= 1400 cm3) supersedes the BMI term; neoadjuvant ADT is a
+weak modifier that is not additive with prior radiation. The side-specific MRI plane grades
+remain scored but are tagged `unvalidated`: they are validated against extracapsular
+extension, not against intra-operative plane difficulty or whole-mount fibrosis. The
+intercept and tier cutpoints are expert-set and not fitted. The per-side counseling output
+(preservable oncologically, plane risk, qualitative likelihood of intra-operative change,
+conditional recovery scenarios, confidence) reuses existing model outputs; the likelihood
+that intended nerve sparing is reduced intra-operatively is deliberately qualitative
+because no validated model exists. A 12-item intra-operative Plane Difficulty Index is
+recorded per side as the future reference standard; no model reads it.
+
+*Effect of the re-weighting on the bundled demo cases:* across the 16 demo cases the
+whole-patient and per-side scores change in 3 cases (by 2 to 5 percentage points, all
+remaining in the `low` tier); no tier, nerve-sparing grade or decision code changes.
+
 ### 9.7 Where to find everything
 
 | Artefact | Location |

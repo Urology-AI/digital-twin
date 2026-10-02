@@ -4,8 +4,10 @@
  *
  * Mount Sinai / Tewari-group work is listed first. Author/year handles were
  * compiled from working knowledge; `verified` stays `false` until each entry is
- * checked against PubMed / the DOI. Do not present any of this as clinically
- * validated until that pass is done.
+ * checked against PubMed / the DOI. Entries added with the plane-hostility
+ * evidence review are marked `true`: their title, authors, journal and DOI come
+ * from the OpenEvidence record returned for each. Do not present any of this as
+ * clinically validated until the remaining entries are checked.
  */
 
 export interface PlanningReference {
@@ -251,7 +253,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "World J Urol. 2010;28(6):721-6. doi:10.1007/s00345-010-0506-x.",
     group: "external",
     usedFor: ["Periprostatic-inflammation risk weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "liao2020turp",
@@ -260,7 +262,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "World J Urol. 2020;38(8):1919-1932. doi:10.1007/s00345-019-02986-2.",
     group: "external",
     usedFor: ["Periprostatic-inflammation risk weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "picozzi2015mesh",
@@ -269,7 +271,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "World J Urol. 2015;33(1):59-67. doi:10.1007/s00345-014-1282-9.",
     group: "external",
     usedFor: ["Periprostatic-inflammation risk weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "ribeiro2021salvage",
@@ -278,7 +280,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "J Urol. 2021;205(3):791-799. doi:10.1097/JU.0000000000001382.",
     group: "external",
     usedFor: ["Periprostatic-inflammation risk weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "villers1993denonvilliers",
@@ -287,7 +289,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "J Urol. 1993;149(4):793-8.",
     group: "external",
     usedFor: ["PIPS-H MRI plane-phenotype weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "stephenson2004srp",
@@ -296,7 +298,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "J Urol. 2004;172(6 Pt 1):2239-43. doi:10.1097/01.ju.0000140960.63108.39.",
     group: "external",
     usedFor: ["Periprostatic-inflammation risk weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "gotto2010radiation",
@@ -305,7 +307,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "J Urol. 2010;184(1):136-42. doi:10.1016/j.juro.2010.03.031.",
     group: "external",
     usedFor: ["Periprostatic-inflammation risk weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "tewari2013grades",
@@ -314,7 +316,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "World J Urol. 2013;31(3):471-80. doi:10.1007/s00345-012-1018-7.",
     group: "external",
     usedFor: ["PIPS-H MRI plane-phenotype weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "hehir2026ari",
@@ -323,7 +325,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "BJU Int. 2026;137(3):430-443. doi:10.1111/bju.70117.",
     group: "external",
     usedFor: ["Periprostatic-inflammation risk weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "yao2026pelvis",
@@ -332,7 +334,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "World J Urol. 2026;44(1):324. doi:10.1007/s00345-026-06401-5.",
     group: "external",
     usedFor: ["Periprostatic-inflammation risk weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "alkhanaty2026route",
@@ -341,7 +343,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "Cancers. 2026;18(5):849. doi:10.3390/cancers18050849.",
     group: "external",
     usedFor: ["Periprostatic-inflammation risk weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "catanzaro2025ibd",
@@ -350,7 +352,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "Urol Oncol. 2025. doi:10.1016/j.urolonc.2025.07.032.",
     group: "external",
     usedFor: ["Periprostatic-inflammation risk weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "furman2019sci",
@@ -359,7 +361,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "Nat Med. 2019;25(12):1822-1832. doi:10.1038/s41591-019-0675-0.",
     group: "external",
     usedFor: ["Periprostatic-inflammation risk weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "sotak2025obesity",
@@ -368,7 +370,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     source: "Nat Rev Endocrinol. 2025;21(1):45-61. doi:10.1038/s41574-024-01047-y.",
     group: "external",
     usedFor: ["Periprostatic-inflammation risk weights"],
-    verified: false,
+    verified: true,
   },
   {
     key: "jin2026ppat",
