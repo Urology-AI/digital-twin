@@ -655,30 +655,6 @@ function SviTab() {
 
 
       <section>
-        <H2>SVI — Head-to-Head vs Comparators (v22 model, not recomputed for vNext)</H2>
-        <Tbl>
-          <thead>
-            <tr className="border-b border-border"><Th>Model</Th><Th>AUC (95% CI)</Th><Th>ΔAUC vs COMPASS</Th><Th>p-value</Th></tr>
-          </thead>
-          <tbody className="text-muted-foreground">
-            {[
-              ["COMPASS SVI (22 features)", "0.842 (0.839–0.884)", "—", "—", "text-foreground font-semibold"],
-              ["Gandaglia-style refit", "0.797 (0.772–0.821)", "−0.045", "0.001", ""],
-              ["Briganti-style refit", "0.776 (0.751–0.802)", "−0.066", "<0.001", ""],
-              ["Koh 2003 (exact published OR)", "0.756 (0.730–0.781)", "−0.086", "<0.001", ""],
-              ["MSKCC SVI (exact, hybrid DRE)", "0.745 (0.715–0.773)", "−0.101 (9.7 pts)", "<0.001", ""],
-            ].map(([m, auc, d, p, cls]) => (
-              <tr key={m} className={`border-b border-border/40 ${cls}`}>
-                <Td>{m}</Td><Td className="tabular-nums">{auc}</Td>
-                <Td className="tabular-nums">{d}</Td><Td className="tabular-nums">{p}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </Tbl>
-        <Note>9.7-AUC point advantage over MSKCC driven by MRI SVI (β=+0.46), MUS features, max core %, and Decipher integration.</Note>
-      </section>
-
-      <section>
         <H2>SVI Left / Right Localization (vNext)</H2>
         <p className="text-muted-foreground text-[11px] mb-2">Splits the patient-level SVI risk into left and right. It is a localization aid built on the patient-level SVI model, not a separate outcome. Research use only.</p>
         <Tbl>
@@ -762,55 +738,6 @@ function LniTab() {
         <Note>Only 35 events, so the tiers rest on few cases and need external validation. There is no side-specific or regional LNI and no automatic PLND recommendation. Positive biopsy cores are no longer an input.</Note>
       </section>
 
-
-      <section>
-        <H2>LNI — Head-to-Head vs Comparators (v22 model, not recomputed for vNext)</H2>
-        <Tbl>
-          <thead>
-            <tr className="border-b border-border"><Th>Model</Th><Th>AUC (95% CI)</Th><Th>ΔAUC</Th><Th>p-value</Th></tr>
-          </thead>
-          <tbody className="text-muted-foreground">
-            {[
-              ["COMPASS LNI (4 features)", "0.842 (0.797–0.901)", "—", "—", "text-foreground font-semibold"],
-              ["MSKCC LNI (exact, hybrid DRE)", "0.794 (0.715–0.864)", "−0.048", "0.133 (NS)", ""],
-              ["Memorial-style refit", "0.789 (0.718–0.851)", "−0.053", "0.047", ""],
-              ["Gandaglia 2019 (exact, hybrid DRE)", "0.766 (0.684–0.838)", "−0.076", "0.023", ""],
-              ["NCCN binary (high vs not)", "0.722 (0.654–0.783)", "−0.120", "0.001", ""],
-              ["Briganti 2012 (exact, hybrid DRE)", "0.718 (0.633–0.796)", "−0.124", "<0.001", ""],
-              ["PSMA LN+ alone", "0.657 (0.577–0.743)", "−0.185", "<0.001", ""],
-              ["PI-RADS alone", "0.586 (0.492–0.675)", "−0.256", "<0.001", ""],
-            ].map(([m, auc, d, p, cls]) => (
-              <tr key={m} className={`border-b border-border/40 ${cls}`}>
-                <Td>{m}</Td><Td className="tabular-nums">{auc}</Td>
-                <Td className="tabular-nums">{d}</Td><Td className="tabular-nums">{p}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </Tbl>
-        <Note>COMPASS vs MSKCC p=0.133 (NS) — likely reflects power limitation (35 events) rather than equivalent performance. COMPASS still numerically superior by 4.8 AUC points.</Note>
-      </section>
-
-      <section>
-        <H2>LNI — Confusion Matrices at Clinical Thresholds (v22 model, not recomputed for vNext)</H2>
-        <Tbl>
-          <thead>
-            <tr className="border-b border-border"><Th>Threshold</Th><Th>Sensitivity</Th><Th>Specificity</Th><Th>PPV</Th><Th>NPV</Th></tr>
-          </thead>
-          <tbody className="text-muted-foreground">
-            {[
-              ["0.05 (NCCN-style)", "77.1%", "75.6%", "15.0%", "98.3%"],
-              ["0.07", "54.3%", "83.4%", "15.4%", "97.0%"],
-              ["0.10 (EAU-style)", "48.6%", "89.6%", "20.7%", "96.9%"],
-            ].map(([t, sens, spec, ppv, npv]) => (
-              <tr key={t} className="border-b border-border/40">
-                <Td className="tabular-nums text-foreground font-medium">{t}</Td>
-                <Td className="tabular-nums">{sens}</Td><Td className="tabular-nums">{spec}</Td>
-                <Td className="tabular-nums">{ppv}</Td><Td className="tabular-nums">{npv}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </Tbl>
-      </section>
 
       <section>
         <H2>PLND Decision Module</H2>
@@ -934,26 +861,6 @@ function UpgradeTab() {
       </section>
 
 
-      <section>
-        <H2>Upgrade — Option B (Sensitivity Analysis, v22 model, not recomputed for vNext)</H2>
-        <Tbl>
-          <thead><tr className="border-b border-border"><Th>Item</Th><Th>Value</Th></tr></thead>
-          <tbody className="text-muted-foreground">
-            {[
-              ["Cohort", "N ≈ 1,885 (AS-eligible: biopsy GG1 or GG2)"],
-              ["Endpoint", "Pathologic GG ≥ 3 vs biopsy GG1–2"],
-              ["Upgrade events", "341"],
-              ["CV AUC", "0.812"],
-              ["Use case", "Active surveillance candidacy screening"],
-            ].map(([k, v]) => (
-              <tr key={k} className="border-b border-border/40">
-                <Td className="font-medium text-foreground">{k}</Td><Td>{v}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </Tbl>
-        <Note>Option B is a sensitivity analysis. Option A (GG1–4 full cohort) is the primary locked model.</Note>
-      </section>
     </>
   );
 }
@@ -1178,7 +1085,7 @@ function ScoreTab() {
           </thead>
           <tbody className="text-muted-foreground">
             {[
-              ["P(ECE)", "22-feature L2 logistic", "3,454 / 25.5%", "0.797"],
+              ["P(ECE)", "9-feature vNext L2 logistic", "3,454 / 25.5%", "0.7825"],
               ["P(SVI)", "7-feature vNext L2 logistic", "3,454 / 8.7%", "0.8322"],
               ["P(Upgrade)", "8-feature vNext L2 logistic (GG1–4)", "3,137 / 13.5%", "0.8121"],
               ["P(PSM)", "22-feature L2 logistic", "3,454 / 16.1%", "0.651 (ceiling)"],
