@@ -375,6 +375,24 @@ export const PIPS_EPE_CUTS = ev(
     "Eur Urol Open Sci 2023; Fasulo V et al., World J Urol 2022).",
 );
 
+/**
+ * PIPS-R recovery-reserve tiers: expected unassisted erectile function with
+ * both bundles preserved. The reserve itself comes from the existing
+ * functional-outcome nomogram (no new coefficients); only the tier cutpoints
+ * are PIPS-specific.
+ */
+export const PIPS_R_CUTS = ev(
+  { good: 0.6, reduced: 0.35 },
+  "provisional",
+  "PIPS-R recovery-reserve tier cutpoints",
+  "Good >= 60%, reduced 35-60%, poor < 35% expected unassisted erectile " +
+    "function with bilateral preservation (PIPS development framework and " +
+    "calculator, v0.1). Expert-set pending a prospective cohort; the reserve " +
+    "value is computed from the functional-outcome nomogram (Briganti 2010; " +
+    "Ficarra 2012; Tewari 2013), a selected single-surgeon cohort, so absolute " +
+    "values are best-case.",
+);
+
 export const PIPS_DECISION_MATRIX = ev(
   {
     // code: recommended plane action; escalates only when EPE itself is high.

@@ -294,6 +294,19 @@ that intended nerve sparing is reduced intra-operatively is deliberately qualita
 because no validated model exists. A 12-item intra-operative Plane Difficulty Index is
 recorded per side as the future reference standard; no model reads it.
 
+**PIPS-R recovery reserve.** A separate, patient-level output (never combined with PIPS-H
+or PIPS-EPE): expected unassisted erectile function at 18 months if both bundles are
+preserved. It reuses the functional-outcome nomogram evaluated for bilateral intrafascial
+preservation, with PDE5 use, pelvic-floor training and the other lifestyle levers held
+neutral, so no new coefficients are introduced; only the tier cutpoints (good >= 60%,
+reduced 35-60%, poor < 35%) are PIPS-specific and provisional. Drivers are counterfactual
+costs (age vs 55, baseline SHIM vs 25, diabetes, hypertension, coronary disease, smoking,
+BMI vs 22). Prior pelvic radiation, ADT exposure and pelvic fracture/urethral injury are
+shown as "present but not modelled" flags rather than given invented penalties. Not
+estimated when baseline SHIM < 12. Absolute values are best-case (selected single-surgeon
+cohort); it modifies counseling and rehabilitation, never the plane. Code:
+`src/lib/compass/recoveryReserve.ts`; tests: `src/test/recoveryReserve.test.ts`.
+
 *Effect of the re-weighting on the bundled demo cases:* across the 16 demo cases the
 whole-patient and per-side scores change in 3 cases (by 2 to 5 percentage points, all
 remaining in the `low` tier); no tier, nerve-sparing grade or decision code changes.

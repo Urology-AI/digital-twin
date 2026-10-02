@@ -24,6 +24,8 @@ import { useUiStore } from "@/store/uiStore";
 import { MODIFIABLE_BCR } from "@/lib/compass/planningEvidence";
 import { PeriprostaticRiskBySide } from "@/components/PipsCounselingCard";
 import { buildPipsCounseling } from "@/lib/compass/pipsCounseling";
+import { RecoveryReserveCard } from "@/components/RecoveryReserveCard";
+import { computeRecoveryReserve } from "@/lib/compass/recoveryReserve";
 import { PDI_ITEMS, PDI_MAX, pdiTotal } from "@/lib/compass/planeDifficultyIndex";
 import type { ClinicalState } from "@/types/patient";
 import type { SidePlan } from "@/types/prediction";
@@ -597,7 +599,9 @@ export function SurgicalPlanPanel() {
 
     const counseling = buildPipsCounseling(S, plan, predictions.eceL, predictions.eceR, base);
 
-    return { baseline, withPlan, bcr, counseling };
+    const reserve = computeRecoveryReserve(S, base);
+
+    return { baseline, withPlan, bcr, counseling, reserve };
   }, [predictions, S]);
 
   if (!predictions || !entry || !S || !computed) {
@@ -611,7 +615,7 @@ export function SurgicalPlanPanel() {
   }
 
   const { plan, inflammation } = predictions;
-  const { baseline, withPlan, bcr, counseling } = computed;
+  const { baseline, withPlan, bcr, counseling, reserve } = computed;
 
   const tierTone =
     inflammation.tier === "high"
@@ -708,6 +712,8 @@ export function SurgicalPlanPanel() {
           }
         />
       )}
+
+      {!plan.gates.activeInfection && <RecoveryReserveCard reserve={reserve} />}
 
       {/* ── Impact ─────────────────────────────────────────────── */}
       <Card>
