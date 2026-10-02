@@ -7,6 +7,7 @@ import { predictBcrPreop } from "@/lib/models/bcr";
 import { predictEceVNext } from "@/lib/models/vnext/ece";
 import { predictSviVNext } from "@/lib/models/vnext/svi";
 import { sviSideFromInputs } from "@/lib/models/vnext/sviSide";
+import { predictUpgradeVNext } from "@/lib/models/vnext/upgrade";
 import {
   exactvuOnSideFromRecord,
   sideBiopsyGgFromRecord,
@@ -15,9 +16,8 @@ import {
 import {
   predictExtensiveEce,
 } from "@/lib/models/ece";
-import { predictLni } from "@/lib/models/lni";
+import { predictLniVNext } from "@/lib/models/vnext/lni";
 import { predictPsm } from "@/lib/models/psm";
-import { predictUpgrade } from "@/lib/models/upgrade";
 import { clamp } from "@/lib/utils/math";
 import {
   lesionsFromRecordJson,
@@ -47,9 +47,13 @@ export function runCompassModels(
   // vNext SVI (same core lock). No clamp; NaN when required inputs are missing.
   const sviV = predictSviVNext(S);
   const svi = sviV.ok ? sviV.probability : NaN;
-  const upgrade =
-    S.gg >= 1 ? clamp(predictUpgrade(S), 0.05, 0.85) : 0.05;
-  const lni = clamp(predictLni(S), 0.005, 0.95);
+  // vNext Grade Upgrade (same core lock), GG1-4 only. NaN when required
+  // inputs are missing, and for GG5 where the endpoint is not applicable.
+  const upgradeV = predictUpgradeVNext(S);
+  const upgrade = upgradeV.ok && upgradeV.applicable ? upgradeV.probability : NaN;
+  // vNext LNI (lni lock 2026-10-02). No clamp; NaN when required inputs are missing.
+  const lniV = predictLniVNext(S);
+  const lni = lniV.ok ? lniV.probability : NaN;
   const extensive = clamp(predictExtensiveEce(S), 0.1, 0.9);
 
   // vNext side EPE (shadow candidate 2026-09-30): global ECE logit + side

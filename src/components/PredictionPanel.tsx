@@ -139,7 +139,7 @@ export function PredictionPanel() {
   const preds = [
     { k: "ECE",     v: predictions.ece,     neutral: false },
     { k: "SVI",     v: predictions.svi,     neutral: sviNeutral },
-    { k: "Upgrade", v: predictions.upgrade, neutral: false },
+    { k: "Upgrade", v: predictions.upgrade, neutral: !Number.isFinite(predictions.upgrade) },
     { k: "PSM",     v: predictions.psm,     neutral: false },
     { k: "BCR",     v: predictions.bcr,     neutral: false },
     { k: "LNI",     v: predictions.lni,     neutral: false },
@@ -235,16 +235,16 @@ export function PredictionPanel() {
                       />
                       <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">{p.k}</div>
                       <div className={cn("text-xl font-bold tabular-nums sm:text-2xl lg:text-3xl", p.neutral ? "text-muted-foreground/50" : riskCls(p.v))}>
-                        {Math.round(p.v * 100)}%
+                        {Number.isFinite(p.v) ? `${Math.round(p.v * 100)}%` : "N/A"}
                       </div>
                       {p.neutral
-                        ? <div className="text-[10px] leading-tight text-muted-foreground/40 sm:text-xs">low</div>
+                        ? <div className="text-[10px] leading-tight text-muted-foreground/40 sm:text-xs">{Number.isFinite(p.v) ? "low" : "not applicable"}</div>
                         : <div className="text-[10px] leading-tight text-muted-foreground/35 sm:text-xs">{Math.round(ci.lo * 100)}–{Math.round(ci.hi * 100)}%</div>
                       }
                       <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted/60">
                         <div
                           className={cn("h-full rounded-full transition-all", p.neutral ? "bg-muted-foreground/30" : riskBarCls(p.v))}
-                          style={{ width: `${Math.min(100, Math.round(p.v * 100))}%` }}
+                          style={{ width: `${Number.isFinite(p.v) ? Math.min(100, Math.round(p.v * 100)) : 0}%` }}
                         />
                       </div>
                     </div>

@@ -55,7 +55,7 @@ function Row({ label, value, tone, note }: {
 /** Risk tone thresholds match the prediction panel's colour bands. */
 const riskTone = (p: number): "good" | "warn" | "bad" =>
   p < 0.15 ? "good" : p < 0.3 ? "warn" : "bad";
-const pct = (p: number) => `${Math.round(p * 100)}%`;
+const pct = (p: number) => (Number.isFinite(p) ? `${Math.round(p * 100)}%` : "Not applicable");
 
 const toSmoking = (v: string): SmokingStatus =>
   (["never", "former", "current"] as string[]).includes(v) ? (v as SmokingStatus) : "never";

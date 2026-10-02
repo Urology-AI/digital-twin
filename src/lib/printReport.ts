@@ -13,7 +13,7 @@ const AB_LABELS: Record<string, string> = {
 };
 
 function pct(v: number) {
-  return `${Math.round(v * 100)}%`;
+  return Number.isFinite(v) ? `${Math.round(v * 100)}%` : "N/A";
 }
 
 function rk(v: number) {
