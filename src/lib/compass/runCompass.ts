@@ -5,6 +5,8 @@ import { getNsGradeZoneAware } from "@/lib/compass/nsGrade";
 import { buildSurgicalPlan } from "@/lib/compass/surgicalPlan";
 import { predictBcrPreop } from "@/lib/models/bcr";
 import { predictEceVNext } from "@/lib/models/vnext/ece";
+import { predictSviVNext } from "@/lib/models/vnext/svi";
+import { sviSideFromInputs } from "@/lib/models/vnext/sviSide";
 import {
   exactvuOnSideFromRecord,
   sideBiopsyGgFromRecord,
@@ -15,7 +17,6 @@ import {
 } from "@/lib/models/ece";
 import { predictLni } from "@/lib/models/lni";
 import { predictPsm } from "@/lib/models/psm";
-import { predictSviPatient, predictSviSide } from "@/lib/models/svi";
 import { predictUpgrade } from "@/lib/models/upgrade";
 import { clamp } from "@/lib/utils/math";
 import {
@@ -43,7 +44,9 @@ export function runCompassModels(
   // display of that "cannot compute" state is handled with the UI update.
   const eceV = predictEceVNext(S);
   const ece = eceV.ok ? eceV.probability : NaN;
-  const svi = clamp(predictSviPatient(S), 0.01, 0.9);
+  // vNext SVI (same core lock). No clamp; NaN when required inputs are missing.
+  const sviV = predictSviVNext(S);
+  const svi = sviV.ok ? sviV.probability : NaN;
   const upgrade =
     S.gg >= 1 ? clamp(predictUpgrade(S), 0.05, 0.85) : 0.05;
   const lni = clamp(predictLni(S), 0.005, 0.95);
@@ -68,16 +71,17 @@ export function runCompassModels(
   const eceL = sideEpe("left");
   const eceR = sideEpe("right");
 
-  const sviL = clamp(
-    predictSviSide(S, "left", uiLesions, recordLesions),
-    0.01,
-    0.85,
-  );
-  const sviR = clamp(
-    predictSviSide(S, "right", uiLesions, recordLesions),
-    0.01,
-    0.85,
-  );
+  // vNext side SVI (shadow candidate 2026-10-01): global SVI logit + side
+  // biopsy GG. Replaces the v22 side model and its clamps.
+  const sideSvi = (side: "left" | "right") =>
+    sviV.ok
+      ? sviSideFromInputs({
+          globalLogit: sviV.logit,
+          sideBiopsyGg: sideBiopsyGgFromRecord(P, side),
+        }).probability
+      : NaN;
+  const sviL = sideSvi("left");
+  const sviR = sideSvi("right");
 
   const predSlice = { eceL, eceR, sviL, sviR };
 
