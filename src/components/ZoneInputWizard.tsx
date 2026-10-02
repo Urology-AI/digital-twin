@@ -751,18 +751,40 @@ export function ZoneInputWizard() {
   /** Apply zone-derived aggregate flags to the clinical state, then save a checkpoint. */
   const applyZoneAggregates = () => {
     const zones = Object.values(zoneData);
+    // An aggregate flag is only a real negative if that modality was entered at
+    // all. With no MRI zone data, "no zone flagged EPE" means MRI not performed,
+    // which is null, not 0. Same for PSMA nodal status and max core involvement.
+    const anyMri = zones.some(
+      (d) =>
+        d.pirads !== undefined ||
+        d.mriSize !== undefined ||
+        d.mriAdc !== undefined ||
+        d.mriAbut !== undefined ||
+        d.mriEpe !== undefined ||
+        d.mriSvi !== undefined,
+    );
+    const anyPsma = zones.some(
+      (d) =>
+        d.suv !== undefined ||
+        d.psmaEpe !== undefined ||
+        d.psmaSvi !== undefined ||
+        d.psmaLn !== undefined,
+    );
+    const corePcts = zones
+      .map((d) => d.corePct)
+      .filter((v): v is number => v !== undefined);
     updateClinicalForm({
-      mri_epe: zones.some((d) => d.mriEpe) ? 1 : 0,
-      mri_svi: zones.some((d) => d.mriSvi) ? 1 : 0,
+      mri_epe: anyMri ? (zones.some((d) => d.mriEpe) ? 1 : 0) : null,
+      mri_svi: anyMri ? (zones.some((d) => d.mriSvi) ? 1 : 0) : null,
       mus_ece: zones.some((d) => d.musEce) ? 1 : 0,
       mus_svi: 0,
       psma_epe: zones.some((d) => d.psmaEpe) ? 1 : 0,
       psma_svi: zones.some((d) => d.psmaSvi) ? 1 : 0,
-      psma_ln: zones.some((d) => d.psmaLn) ? 1 : 0,
+      psma_ln: anyPsma ? (zones.some((d) => d.psmaLn) ? 1 : 0) : null,
       cribriform_bx: zones.some((d) => d.cribriform) ? 1 : 0,
       idc_bx: zones.some((d) => d.idc) ? 1 : 0,
       pni_bx: zones.some((d) => d.pni) ? 1 : 0,
-      maxcore: Math.max(0, ...zones.map((d) => d.corePct ?? 0)),
+      maxcore: corePcts.length > 0 ? Math.max(...corePcts) : null,
       linear_mm: Math.max(0, ...zones.map((d) => d.linearMm ?? 0)) || undefined,
     });
     pushHistory();

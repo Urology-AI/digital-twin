@@ -19,17 +19,53 @@ function optNum(min: number, max: number) {
   );
 }
 
+/**
+ * Optional tri-state boolean — blank stays `null` (not assessed) instead of
+ * defaulting to `false`, which the vNext models read as an observed negative.
+ * Stored as 0/1/null to match `OptionalPredictor`.
+ */
+function optFlag() {
+  return z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? null : v ? 1 : 0),
+    z.union([z.literal(0), z.literal(1), z.null()]),
+  );
+}
+
+/**
+ * Optional integer that keeps `null` rather than collapsing to `undefined` or 0.
+ *
+ * `.nullable()` rather than `z.union([z.coerce.number(), z.null()])`: a coercing
+ * branch turns `null` into 0, which is the exact collapse this contract exists
+ * to prevent. `.nullable()` short-circuits on null before coercion runs.
+ */
+function optIntNullable(min: number, max: number) {
+  return z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? null : v),
+    z.coerce.number().int().min(min).max(max).nullable(),
+  );
+}
+
+/** Optional float that keeps `null`. See `optIntNullable` on `.nullable()`. */
+function optNumNullable(min: number, max: number) {
+  return z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? null : v),
+    z.coerce.number().min(min).max(max).nullable(),
+  );
+}
+
 export const clinicalFormSchema = z.object({
   // ── Lab & anatomy ──────────────────────────────────────────────────────────
-  psa: z.coerce.number().nonnegative(),
+  // REQUIRED for vNext: ln(PSA / volume) needs both strictly > 0.
+  psa: z.coerce.number().positive(),
   vol: z.coerce.number().positive(),
   age: optInt(18, 120),
   bmi: optNum(10, 80),
 
   // ── Biopsy summary ─────────────────────────────────────────────────────────
-  gg: z.coerce.number().int().min(0).max(5),
-  cores: z.coerce.number().int().min(0),
-  maxcore: z.coerce.number().min(0).max(100),
+  // REQUIRED for vNext: grade group 1–5. 0 is not a grade group.
+  gg: z.coerce.number().int().min(1).max(5),
+  cores: optIntNullable(0, 100),
+  maxcore: optNumNullable(0, 100),
   linear_mm: optNum(0, 200),
   pct45: optNum(0, 100),
 
@@ -51,16 +87,13 @@ export const clinicalFormSchema = z.object({
   decipherStr: z.string().optional(),
 
   // ── MRI ───────────────────────────────────────────────────────────────────
-  pirads: optInt(1, 5),
-  mri_epe: z.coerce.boolean().default(false),
-  mri_svi: z.coerce.boolean().default(false),
+  pirads: optIntNullable(1, 5),
+  mri_epe: optFlag(),
+  mri_svi: optFlag(),
   mri_size: optNum(0, 20),
-  /** -1 = not assessed, 0–4 = capsular contact grade */
-  mri_abutment: z.preprocess(
-    (v) => (v === "" || v === null || v === undefined ? -1 : v),
-    z.coerce.number().int().min(-1).max(4),
-  ),
-  mri_adc: optNum(0, 5000),
+  /** null = not assessed, 0–4 = capsular contact grade (was the -1 sentinel) */
+  mri_abutment: optIntNullable(0, 4),
+  mri_adc: optNumNullable(0, 5000),
 
   // ── Micro-ultrasound / ExactVu ─────────────────────────────────────────────
   mus_ece: z.coerce.boolean().default(false),
@@ -73,7 +106,7 @@ export const clinicalFormSchema = z.object({
   // ── PSMA PET/CT ───────────────────────────────────────────────────────────
   psma_epe: z.coerce.boolean().default(false),
   psma_svi: z.coerce.boolean().default(false),
-  psma_ln: z.coerce.boolean().default(false),
+  psma_ln: optFlag(),
   suv: optNum(0, 200),
 
   // ── Quality of life ───────────────────────────────────────────────────────

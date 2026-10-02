@@ -1,3 +1,4 @@
+import { MissingInputsNotice } from "@/components/MissingInputsNotice";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -100,10 +101,15 @@ function NsGradeTag({ grade }: { grade: number }) {
 
 export function PredictionPanel() {
   const predictions = usePatientStore((s) => s.predictions);
+  const missingRequired = usePatientStore((s) => s.missingRequired);
   const patients = usePatientStore((s) => s.patients);
   const activeId = usePatientStore((s) => s.activeId);
   const entry = patients.find((p) => p.id === activeId);
   const setExplainKey = useUiStore((s) => s.setExplainKey);
+
+  if (!predictions && entry && missingRequired.length > 0) {
+    return <MissingInputsNotice />;
+  }
 
   if (!predictions || !entry) {
     return (

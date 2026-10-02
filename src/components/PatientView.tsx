@@ -1,3 +1,4 @@
+import { isObserved } from "@/lib/models/inputContract";
 import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { ArrowRight, ClipboardList, Languages, FileText, Maximize2, Loader2, RotateCcw, SlidersHorizontal, Sparkles, Stethoscope, TrendingUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -219,12 +220,16 @@ function Basics() {
         <BasicsField
           label="PSA" hint="(ng/mL)" locked={patientViewLocked} value={psa}
           type="number" step="0.1" inputMode="decimal" placeholder="6.5"
-          onChange={(v) => { setPsa(v); updateClinicalForm({ psa: parseFloat(v) || 0 }); }}
+          onChange={(v) => { setPsa(v); const n = parseFloat(v);
+            // Blank clears the record field to null, which makes
+            // required_present.psa false downstream. No silent 0.
+            updateClinicalForm({ psa: Number.isFinite(n) && n > 0 ? n : null }); }}
         />
         <BasicsField
           label="Prostate volume" hint="(cc)" locked={patientViewLocked} value={vol}
           type="number" step="0.1" inputMode="decimal" placeholder="45"
-          onChange={(v) => { setVol(v); updateClinicalForm({ vol: parseFloat(v) || 45 }); }}
+          onChange={(v) => { setVol(v); const n = parseFloat(v);
+            updateClinicalForm({ vol: Number.isFinite(n) && n > 0 ? n : null }); }}
         />
       </div>
     </div>
@@ -356,9 +361,9 @@ function DiagnosisSummary() {
   const side = t(S.laterality === "bilateral" ? "both sides" : S.laterality === "left" ? "the left side" : "the right side");
   const rows: [string, string][] = [
     ["Type of cancer", GG_WORDS[S.gg] ? t(GG_WORDS[S.gg]!) : none],
-    ["Biopsy", S.cores > 0 ? t(S.cores === 1 ? "1 biopsy sample showed cancer, on {side} of the prostate." : "{n} biopsy samples showed cancer, on {side} of the prostate.", { n: S.cores, side }) : none],
+    ["Biopsy", isObserved(S.cores) && S.cores > 0 ? t(S.cores === 1 ? "1 biopsy sample showed cancer, on {side} of the prostate." : "{n} biopsy samples showed cancer, on {side} of the prostate.", { n: S.cores, side }) : none],
     ["PSA", S.psa > 0 ? t("{n} ng/mL. PSA is a blood marker; after surgery the goal is for it to become undetectable.", { n: S.psa }) : none],
-    ["MRI", hasMri && S.pirads > 0
+    ["MRI", hasMri && isObserved(S.pirads) && S.pirads > 0
       ? [t("The most suspicious area scored PI-RADS {n} out of 5 ({meaning}).", { n: S.pirads, meaning: t(PIRADS_WORDS[S.pirads] ?? "") }),
          t(S.mri_epe ? "The MRI suggests the cancer may reach the edge of the prostate." : "The MRI does not show cancer outside the prostate."),
          ...(S.mri_svi ? [t("It may involve the seminal vesicles.")] : [])].join(" ")

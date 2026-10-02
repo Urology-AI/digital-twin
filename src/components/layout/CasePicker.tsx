@@ -120,7 +120,7 @@ export function CasePicker({ sampleOnly = false }: { sampleOnly?: boolean }) {
         )}
       >
         <span className="truncate">{active?.name ?? "No case"}</span>
-        {active && (
+        {active && predictions && (
           <span className={cn("hidden shrink-0 rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-wider sm:inline", chip.cls)}>
             {chip.label}
           </span>

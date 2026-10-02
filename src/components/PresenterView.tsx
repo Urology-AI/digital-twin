@@ -1,3 +1,4 @@
+import { MissingInputsNotice } from "@/components/MissingInputsNotice";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePatientStore } from "@/store/patientStore";
@@ -86,7 +87,9 @@ export function PresenterView() {
       </div>
 
       {!predictions || !entry || !S ? (
-        <div className="py-8 text-center text-sm text-muted-foreground">No patient data available.</div>
+        (entry && <MissingInputsNotice className="my-8" />) || (
+          <div className="py-8 text-center text-sm text-muted-foreground">No patient data available.</div>
+        )
       ) : (
         <>
           <section>

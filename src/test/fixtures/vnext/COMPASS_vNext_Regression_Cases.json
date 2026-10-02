@@ -1,0 +1,162 @@
+[
+  {
+    "caseId": "FAVORABLE_GG1",
+    "input": {
+      "psa": 4.5,
+      "prostateVolume": 50.0,
+      "biopsyGradeGroup": 1,
+      "pirads": 3,
+      "mriEpe": 0,
+      "mriSvi": 0,
+      "maxCorePct": 20.0,
+      "capsularAbutment": 0,
+      "positiveCores": 2,
+      "adcMean": 1000.0
+    },
+    "expected": {
+      "ECE": {
+        "probability": 0.013547502871051649,
+        "tierIndex": 1,
+        "tierLabel": "Tier 1"
+      },
+      "SVI": {
+        "probability": 0.0017008294623253144,
+        "tierIndex": 1,
+        "tierLabel": "Very low"
+      },
+      "Upgrade": {
+        "probability": 0.39364205332085817,
+        "tierIndex": 3,
+        "tierLabel": "High"
+      }
+    }
+  },
+  {
+    "caseId": "MODERATE_GG2",
+    "input": {
+      "psa": 8.0,
+      "prostateVolume": 40.0,
+      "biopsyGradeGroup": 2,
+      "pirads": 4,
+      "mriEpe": 0,
+      "mriSvi": 0,
+      "maxCorePct": 50.0,
+      "capsularAbutment": 2,
+      "positiveCores": 5,
+      "adcMean": 800.0
+    },
+    "expected": {
+      "ECE": {
+        "probability": 0.1424123433056428,
+        "tierIndex": 2,
+        "tierLabel": "Tier 2"
+      },
+      "SVI": {
+        "probability": 0.032064889047253985,
+        "tierIndex": 2,
+        "tierLabel": "Low"
+      },
+      "Upgrade": {
+        "probability": 0.07246661142883444,
+        "tierIndex": 2,
+        "tierLabel": "Intermediate"
+      }
+    }
+  },
+  {
+    "caseId": "ADVERSE_GG4",
+    "input": {
+      "psa": 20.0,
+      "prostateVolume": 30.0,
+      "biopsyGradeGroup": 4,
+      "pirads": 5,
+      "mriEpe": 1,
+      "mriSvi": 1,
+      "maxCorePct": 90.0,
+      "capsularAbutment": 4,
+      "positiveCores": 10,
+      "adcMean": 600.0
+    },
+    "expected": {
+      "ECE": {
+        "probability": 0.9370421355953156,
+        "tierIndex": 5,
+        "tierLabel": "Tier 5"
+      },
+      "SVI": {
+        "probability": 0.8329636354686046,
+        "tierIndex": 5,
+        "tierLabel": "Very high"
+      },
+      "Upgrade": {
+        "probability": 0.2938686961106417,
+        "tierIndex": 3,
+        "tierLabel": "High"
+      }
+    }
+  },
+  {
+    "caseId": "MISSING_OPTIONALS_GG3",
+    "input": {
+      "psa": 7.0,
+      "prostateVolume": 45.0,
+      "biopsyGradeGroup": 3,
+      "pirads": 4,
+      "mriEpe": null,
+      "mriSvi": null,
+      "maxCorePct": null,
+      "capsularAbutment": null,
+      "positiveCores": null,
+      "adcMean": null
+    },
+    "expected": {
+      "ECE": {
+        "probability": 0.2254681033074624,
+        "tierIndex": 3,
+        "tierLabel": "Tier 3"
+      },
+      "SVI": {
+        "probability": 0.05056691896126766,
+        "tierIndex": 3,
+        "tierLabel": "Intermediate"
+      },
+      "Upgrade": {
+        "probability": 0.037071280657272186,
+        "tierIndex": 1,
+        "tierLabel": "Low"
+      }
+    }
+  },
+  {
+    "caseId": "UPGRADE_PRONE_GG1",
+    "input": {
+      "psa": 12.0,
+      "prostateVolume": 35.0,
+      "biopsyGradeGroup": 1,
+      "pirads": 5,
+      "mriEpe": 0,
+      "mriSvi": 1,
+      "maxCorePct": 45.0,
+      "capsularAbutment": 1,
+      "positiveCores": 2,
+      "adcMean": 600.0
+    },
+    "expected": {
+      "ECE": {
+        "probability": 0.3308140771254167,
+        "tierIndex": 4,
+        "tierLabel": "Tier 4"
+      },
+      "SVI": {
+        "probability": 0.11113127911196385,
+        "tierIndex": 4,
+        "tierLabel": "High"
+      },
+      "Upgrade": {
+        "probability": 0.9173936760956031,
+        "tierIndex": 3,
+        "tierLabel": "High"
+      }
+    }
+  }
+]

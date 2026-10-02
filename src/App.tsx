@@ -59,12 +59,13 @@ function DimOverlay() {
     clinicalStateFromRecord(rec),
     lesionsFromRows(entry.lesionRows),
   );
-  const vol = entry.record.prostate.volume_cc ?? S.vol;
+  const vol = entry.record.prostate.volume_cc;
   const d = entry.record.prostate.dimensions_cm;
-  const psadValid = isFinite(S.psad) && S.psad > 0;
+  const psadValid =
+    S.required_present.psa && S.required_present.vol && isFinite(S.psad) && S.psad > 0;
   return (
     <div className="glass pointer-events-none absolute left-2 z-10 rounded-lg px-2.5 py-1.5 text-[10px] text-muted-foreground sm:px-3 sm:py-2 sm:text-[11px] max-lg:top-2 lg:bottom-3 lg:left-3">
-      <span className="font-semibold text-primary">{vol} cc</span>
+      <span className="font-semibold text-primary">{vol != null ? `${vol} cc` : "Volume not entered"}</span>
       {d && (
         <>
           {" "}
