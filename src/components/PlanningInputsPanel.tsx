@@ -171,7 +171,7 @@ export function PlanningInputsPanel() {
 
   return (
     <Card className="border-border/70">
-      <CardHeader className="border-b border-border/50 bg-gradient-to-br from-muted/40 to-transparent px-4 py-3 dark:from-muted/25">
+      <CardHeader className="sticky -top-5 z-10 rounded-t-xl border-b border-border/50 bg-card/95 px-4 pb-3 pt-8 backdrop-blur supports-[backdrop-filter]:bg-card/80">
         <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <CardTitle className="text-base font-semibold text-foreground">
             Surgical history &amp; anatomy
@@ -295,7 +295,7 @@ export function PlanningInputsPanel() {
             <Toggle k="pelvic_abscess" label="Pelvic abscess" />
             <Toggle k="hernia_mesh" label="Hernia mesh" />
             <Toggle k="rectal_fistula" label="Rectal fistula" />
-            <Toggle k="catheter_prolonged_or_traumatic" label="Prolonged/traumatic catheter" />
+            <Toggle k="catheter_prolonged_or_traumatic" label="Prolonged or traumatic catheter" />
           </div>
           <div className="space-y-1 pt-1">
             <span className="text-xs font-semibold text-foreground">Prior pelvic surgery</span>

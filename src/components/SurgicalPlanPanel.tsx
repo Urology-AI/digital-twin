@@ -622,10 +622,20 @@ export function SurgicalPlanPanel() {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-5 pb-12">
-      <div>
-        <h2 className="text-lg font-semibold">Operative plan</h2>
-        <p className="text-xs text-muted-foreground">Advisory · research use only.</p>
-      </div>
+      <header className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-border pb-3">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Operative plan</h2>
+          <p className="text-xs text-muted-foreground">
+            Side-specific nerve-sparing plan, plane risk and recovery outlook for this case.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase tracking-wide">
+          <span className="rounded-full bg-muted px-2 py-1 text-muted-foreground">Research use only</span>
+          <span className="rounded-full bg-amber-500/10 px-2 py-1 text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-400">
+            Provisional weights
+          </span>
+        </div>
+      </header>
 
       {plan.gates.activeInfection && (
         <div className="flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-300">
