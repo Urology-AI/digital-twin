@@ -184,11 +184,12 @@ function SideColumn({
 export function PeriprostaticRiskBySide({
   counseling,
   title,
-  wholePatient,
+  alerts,
 }: {
   counseling: PipsCounseling;
   title: ReactNode;
-  wholePatient: ReactNode;
+  /** optional alerts (MRI review, intra-op override) shown under the sides */
+  alerts?: ReactNode;
 }) {
   const rightKeys = new Set(counseling.right.contributors.map(rowKey));
   const shared = counseling.left.contributors.filter((x) => rightKeys.has(rowKey(x)));
@@ -209,8 +210,9 @@ export function PeriprostaticRiskBySide({
       <CardContent className="space-y-4 p-4">
         {title}
         <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
-          Plane risk is scored for each side separately (PIPS-H). A difficult plane is not poor surgical
-          performance, and a plan to preserve a bundle never overrides oncologic judgment. Research use only.
+          Each side is scored separately (PIPS-H). Points add up on a log-odds scale: a larger number means
+          that factor contributes more. A difficult plane is not poor surgical performance, and a plan to
+          preserve a bundle never overrides oncologic judgment.
         </p>
         {shared.length > 0 && (
           <section className="rounded-xl border border-border bg-card/60 px-4 py-3 shadow-sm">
@@ -252,7 +254,7 @@ export function PeriprostaticRiskBySide({
           </section>
         )}
 
-        {wholePatient}
+        {alerts}
 
         <div>
           <Eyebrow>Expected recovery at 12 months, by how much nerve sparing is achieved</Eyebrow>
@@ -278,23 +280,26 @@ export function PeriprostaticRiskBySide({
               </tbody>
             </table>
           </div>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            From the functional-outcome nomogram, built on a selected single-surgeon cohort, so treat the absolute
-            values as best-case; the differences between scenarios are the useful part.
+          <p className="mt-1 text-[11px] leading-snug text-muted-foreground">
+            "Wide" means extrafascial dissection. Complete bundle resection is not modelled and would be lower.
+            Values come from a selected single-surgeon cohort, so treat them as best-case; the differences
+            between scenarios are the useful part.
           </p>
         </div>
 
-        <div>
-          <div className="mb-1.5 flex items-center gap-1.5">
-            <TriangleAlert className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-            <Eyebrow>Key sources of uncertainty</Eyebrow>
+        {counseling.uncertainty.length > 0 && (
+          <div>
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <TriangleAlert className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+              <Eyebrow>Key sources of uncertainty</Eyebrow>
+            </div>
+            <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">
+              {counseling.uncertainty.map((u) => (
+                <li key={u}>{u}</li>
+              ))}
+            </ul>
           </div>
-          <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-muted-foreground">
-            {counseling.uncertainty.map((u) => (
-              <li key={u}>{u}</li>
-            ))}
-          </ul>
-        </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -614,7 +614,7 @@ describe("PIPS counseling output and per-side confidence", () => {
     expect(c.left.preservableOncologically).toBeCloseTo(0.9);
     expect(c.right.preservableOncologically).toBeCloseTo(0.6);
     expect(c.left.technicallyDifficult).toBe(plan.left.hostilityScore);
-    expect(c.recovery.map((r) => r.label)).toEqual(["Bilateral nerve sparing", "Left only", "Right only", "No nerve sparing"]);
+    expect(c.recovery.map((r) => r.label)).toEqual(["Nerve sparing both sides, as planned", "Left preserved, right wide", "Right preserved, left wide", "Wide (extrafascial) both sides"]);
     const [p0, p1, , p3] = c.recovery.map((r) => r.potency12 as number);
     expect(p0).toBeGreaterThanOrEqual(p1!);
     expect(p1).toBeGreaterThanOrEqual(p3!);
@@ -636,6 +636,7 @@ describe("PIPS counseling output and per-side confidence", () => {
     const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, 0.1, 0.1);
     const u = buildPipsCounseling(S, plan, 0.1, 0.1, fbase(S)).uncertainty.join(" ");
     expect(u).toMatch(/pelvic radiation/);
-    expect(u).toMatch(/provisional/);
+    // the standing "weights are provisional" caveat lives in the page header, not the uncertainty list
+    expect(u).not.toMatch(/provisional/);
   });
 });

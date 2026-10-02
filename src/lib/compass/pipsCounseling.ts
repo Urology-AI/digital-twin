@@ -135,7 +135,6 @@ function uncertaintySources(S: ClinicalState): string[] {
   if (S.prior_focal_ablation_l > 0 || S.prior_focal_ablation_r > 0) prior.push("focal ablation");
   if (S.prior_pelvic_surgery !== "none") prior.push("prior pelvic surgery");
   if (prior.length) out.push(`Prior treatment (${prior.join(", ")}) changes anatomy in ways imaging may not fully show`);
-  out.push("Plane-hostility weights are provisional expert priors, not yet fitted or validated");
   return out;
 }
 
@@ -166,10 +165,10 @@ export function buildPipsCounseling(
     return { label, potency12: r.potency12, continence12: r.continence12 };
   };
   const recovery = [
-    run(kept(plan.left), kept(plan.right), "Bilateral nerve sparing"),
-    run(kept(plan.left), 3, "Left only"),
-    run(3, kept(plan.right), "Right only"),
-    run(3, 3, "No nerve sparing"),
+    run(kept(plan.left), kept(plan.right), "Nerve sparing both sides, as planned"),
+    run(kept(plan.left), 3, "Left preserved, right wide"),
+    run(3, kept(plan.right), "Right preserved, left wide"),
+    run(3, 3, "Wide (extrafascial) both sides"),
   ];
 
   return { left: side(plan.left, eceL), right: side(plan.right, eceR), recovery, uncertainty: uncertaintySources(S) };

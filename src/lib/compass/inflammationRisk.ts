@@ -76,7 +76,7 @@ export function preopHistoryPoints(
 
   add(S.age > 70, "Age > 70", W.age_gt_70, "null");
   add(S.vol > 80, "Prostate volume > 80 cc", W.volume_gt_80, "surrogate");
-  add(S.vol > 100, "Prostate volume > 100 cc", W.volume_gt_100, "surrogate");
+  add(S.vol > 100, "Prostate volume > 100 cc (adds to > 80 cc)", W.volume_gt_100, "surrogate");
 
   // BPH / outlet procedures: scored individually by dissection burden, capped.
   let bph = 0;
