@@ -47,12 +47,12 @@ export function printReport(
     { l: "ECE", v: predictions.ece },
     { l: "SVI", v: predictions.svi },
     { l: "Upgrade", v: predictions.upgrade },
-    { l: "PSM", v: predictions.psm },
+    { l: "PSM (L / R)", v: Math.max(predictions.psmL, predictions.psmR), t: `${pct(predictions.psmL)} / ${pct(predictions.psmR)}` },
     { l: "BCR", v: predictions.bcr },
     { l: "LNI", v: predictions.lni },
   ];
   let predHtml = `<table><tr>${predFields.map((p) => `<th>${p.l}</th>`).join("")}</tr>`;
-  predHtml += `<tr>${predFields.map((p) => `<td style="color:${rk(p.v)};font-weight:700;font-size:14px">${pct(p.v)}</td>`).join("")}</tr></table>`;
+  predHtml += `<tr>${predFields.map((p) => `<td style="color:${rk(p.v)};font-weight:700;font-size:14px">${"t" in p && p.t ? p.t : pct(p.v)}</td>`).join("")}</tr></table>`;
 
   // NS 5-zone table
   const L = predictions.nsDetailL ?? { zones: {}, alerts: [], has_zone_data: false };

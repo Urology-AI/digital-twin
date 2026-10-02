@@ -19,7 +19,9 @@ export interface CompassPredictions {
   ece: number;
   svi: number;
   upgrade: number;
-  psm: number;
+  /** Side-specific positive surgical margin vulnerability. NaN when it cannot be computed. */
+  psmL: number;
+  psmR: number;
   bcr: number;
   lni: number;
   extensive: number;

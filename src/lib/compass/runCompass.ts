@@ -17,7 +17,7 @@ import {
   predictExtensiveEce,
 } from "@/lib/models/ece";
 import { predictLniVNext } from "@/lib/models/vnext/lni";
-import { predictPsm } from "@/lib/models/psm";
+import { predictPsmSideVNext, psmIndexPiradsBySide } from "@/lib/models/vnext/psmSide";
 import { clamp } from "@/lib/utils/math";
 import {
   lesionsFromRecordJson,
@@ -106,7 +106,14 @@ export function runCompassModels(
 
   const nsL = nsDetailL.nsGrade;
   const nsR = nsDetailR.nsGrade;
-  const psm = clamp(predictPsm(S), 0.05, 0.8);
+  // Side-specific PSM (psm side lock 2026-09-26): log PSAD, positive cores and
+  // the side-localized index-lesion PI-RADS. No clamp; NaN when required inputs
+  // are missing.
+  const psmPirads = psmIndexPiradsBySide(P, lesionRows);
+  const psmLv = predictPsmSideVNext(S, psmPirads.left);
+  const psmRv = predictPsmSideVNext(S, psmPirads.right);
+  const psmL = psmLv.ok ? psmLv.probability : NaN;
+  const psmR = psmRv.ok ? psmRv.probability : NaN;
 
   const bcr = clamp(predictBcrPreop(S), 0.03, 0.75);
 
@@ -125,7 +132,8 @@ export function runCompassModels(
     ece,
     svi,
     upgrade,
-    psm,
+    psmL,
+    psmR,
     bcr,
     lni,
     extensive,

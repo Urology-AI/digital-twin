@@ -329,19 +329,21 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
     { label: "ECE",     val: predictions.ece },
     { label: "SVI",     val: predictions.svi },
     { label: "Upgrade", val: predictions.upgrade },
-    { label: "PSM",     val: predictions.psm },
+    { label: "PSM (L / R)", val: Math.max(predictions.psmL, predictions.psmR), txt: `${pct(predictions.psmL)} / ${pct(predictions.psmR)}` },
     { label: "BCR",     val: predictions.bcr },
     { label: "LNI",     val: predictions.lni },
   ];
 
   const predCards = predFields
-    .map(({ label, val }) => {
+    .map((f) => {
+      const { label, val } = f;
+      const txt = "txt" in f && f.txt ? f.txt : pct(val);
       const color = riskColor(val);
       const bg = riskBgColor(val);
       const border = riskBorderColor(val);
       return `<div style="flex:1;text-align:center;padding:8px 6px;background:${bg};border:1.5px solid ${border};border-radius:6px">
         <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#555;margin-bottom:2px">${label}</div>
-        <div style="font-size:22px;font-weight:800;color:${color};line-height:1">${pct(val)}</div>
+        <div style="font-size:22px;font-weight:800;color:${color};line-height:1">${txt}</div>
       </div>`;
     })
     .join("");
