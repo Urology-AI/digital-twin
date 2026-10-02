@@ -103,7 +103,7 @@ export function runCompassModels(
   const bcr = clamp(predictBcrPreop(S), 0.03, 0.75);
 
   const inflammation = predictInflammationRisk(S);
-  const plan = buildSurgicalPlan(S, nsDetailL, nsDetailR, sviL, sviR, inflammation, eceL, eceR);
+  const plan = buildSurgicalPlan(S, nsDetailL, nsDetailR, sviL, sviR, eceL, eceR);
 
   // Per-zone recommended NS grade → drives the "plan" 3D overlay.
   for (const z of threeZones) {

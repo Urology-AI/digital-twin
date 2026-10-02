@@ -97,7 +97,6 @@ const IMPACT_SOURCES = [
   "Obesity → BCR risk",
 ];
 
-const ANTERIOR_SOURCES = ["Anterior hood candidacy", "Bladder-neck preservation candidacy"];
 
 const INFLAMMATION_SOURCES = [
   "Inflammation-risk framing",
@@ -551,8 +550,6 @@ export function SurgicalPlanPanel() {
     // SAME patient (inflammation tier carries into both arms so the delta is
     // purely the surgical choices).
     const baselineMods: PlanModifiers = {
-      hood: "none",
-      bnPreservation: false,
       svPreservationL: true,
       svPreservationR: true,
       hydrodissectionL: false,
@@ -567,8 +564,6 @@ export function SurgicalPlanPanel() {
     });
 
     const planMods: PlanModifiers = {
-      hood: plan.hood.value,
-      bnPreservation: plan.bladderNeckPreservation.value,
       svPreservationL: plan.left.svPreservation.value,
       svPreservationR: plan.right.svPreservation.value,
       hydrodissectionL: plan.left.hydrodissection.value,
@@ -787,40 +782,6 @@ export function SurgicalPlanPanel() {
         />
       </div>
 
-      {/* ── Anterior approach ──────────────────────────────────── */}
-      <Card>
-        <CardContent className="space-y-4 p-4">
-          <div className="flex items-center gap-1.5">
-            <SectionTitle icon={<ShieldCheck className="h-4 w-4" />}>Anterior approach</SectionTitle>
-            <EvidenceInfo title="Anterior approach" tags={ANTERIOR_SOURCES} />
-          </div>
-          <div>
-            <div className="mb-1.5 text-xs font-semibold text-foreground">
-              Retzius-sparing / anterior hood
-            </div>
-            <Segmented
-              value={S.plan_hood}
-              onChange={(v) => updateClinicalForm({ plan_hood: v })}
-              options={[
-                { value: "auto", label: "Auto" },
-                { value: "none", label: "None" },
-                { value: "unilateral", label: "Uni" },
-                { value: "bilateral", label: "Bilat" },
-              ]}
-            />
-            <p className="mt-1.5 text-xs leading-snug text-muted-foreground">{plan.hood.rationale}</p>
-          </div>
-          <TriToggle
-            icon={<ShieldCheck className="h-4 w-4" />}
-            title="Bladder-neck preservation"
-            detail={plan.bladderNeckPreservation.rationale}
-            resolved={plan.bladderNeckPreservation.value}
-            value={S.plan_bnp}
-            onChange={(v) => updateClinicalForm({ plan_bnp: v })}
-          />
-        </CardContent>
-      </Card>
-
       {/* ── Inflammation risk ──────────────────────────────────── */}
       <Card>
         <CardContent className="space-y-3 p-4">
@@ -842,7 +803,7 @@ export function SurgicalPlanPanel() {
 
           {inflammation.tier === "high" && (
             <p className={cn("text-xs font-medium", tierTone.text)}>
-              Planes likely obliterated — NS grade raised one step, hood not offered.
+              Planes likely obliterated — NS grade raised one step.
             </p>
           )}
           {inflammation.tier === "moderate" && (

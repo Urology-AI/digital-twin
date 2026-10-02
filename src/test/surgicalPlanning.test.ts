@@ -309,8 +309,7 @@ describe("PIPS gates", () => {
   it("active infection defers both sides regardless of EPE/hostility", () => {
     const S = defaultClinicalState();
     S.flag_active_infection = true;
-    const infl = predictInflammationRisk(S);
-    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl, 0.4, 0.4);
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, 0.4, 0.4);
     expect(plan.left.decisionCode).toBe("defer");
     expect(plan.right.decisionCode).toBe("defer");
     expect(plan.gates.activeInfection).toBe(true);
@@ -321,8 +320,7 @@ describe("PIPS gates", () => {
 
   it("without the active-infection flag, the plan is scored normally", () => {
     const S = defaultClinicalState();
-    const infl = predictInflammationRisk(S);
-    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl, 0.02, 0.02);
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, 0.02, 0.02);
     expect(plan.left.decisionCode).not.toBe("defer");
     expect(plan.gates.activeInfection).toBe(false);
   });
@@ -332,8 +330,7 @@ describe("PIPS gates", () => {
     S.flag_imaging_discordant = true;
     S.flag_mri_artifact = true;
     S.flag_key_data_missing = true;
-    const infl = predictInflammationRisk(S);
-    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl, 0.02, 0.02);
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, 0.02, 0.02);
     expect(plan.gates.imagingDiscordant).toBe(true);
     expect(plan.gates.mriArtifact).toBe(true);
     expect(plan.gates.keyDataMissing).toBe(true);
@@ -342,14 +339,6 @@ describe("PIPS gates", () => {
 });
 
 describe("buildSurgicalPlan", () => {
-  it("recommends a bilateral hood for low-risk bilateral disease", () => {
-    const S = defaultClinicalState();
-    const infl = predictInflammationRisk(S);
-    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl, 0.02, 0.02);
-    expect(plan.hood.value).toBe("bilateral");
-    expect(plan.bladderNeckPreservation.value).toBe(true);
-  });
-
   it("does NOT escalate a hostile-but-EPE-low side — uses the hostile-plane protocol instead", () => {
     // PIPS-style behaviour: a hostile plane on a side with low oncologic risk
     // gets a protocol note, not a wider excision (replaces the old
@@ -358,8 +347,7 @@ describe("buildSurgicalPlan", () => {
     S.mri_capsule_interface_l = 3;
     S.mri_nvb_plane_l = 2;
     S.mri_post_treatment_distortion_l = 2;
-    const infl = predictInflammationRisk(S);
-    const plan = buildSurgicalPlan(S, nsDetail(2), nsDetail(1), 0.02, 0.02, infl, 0.02, 0.02);
+    const plan = buildSurgicalPlan(S, nsDetail(2), nsDetail(1), 0.02, 0.02, 0.02, 0.02);
     expect(plan.left.hostilityTier).toMatch(/high|very-high/);
     expect(plan.left.epeTier).toBe("low");
     expect(plan.left.nsGrade).toBe(2); // unchanged — no escalation
@@ -369,8 +357,7 @@ describe("buildSurgicalPlan", () => {
 
   it("keeps the 5-zone model grade when EPE is high — the matrix is advisory only", () => {
     const S = defaultClinicalState();
-    const infl = predictInflammationRisk(S);
-    const plan = buildSurgicalPlan(S, nsDetail(2), nsDetail(1), 0.02, 0.02, infl, 0.4, 0.02);
+    const plan = buildSurgicalPlan(S, nsDetail(2), nsDetail(1), 0.02, 0.02, 0.4, 0.02);
     expect(plan.left.epeTier).toBe("high");
     expect(plan.left.nsGrade).toBe(2);
     expect(plan.left.pipsGrade).toBe(3);
@@ -379,34 +366,22 @@ describe("buildSurgicalPlan", () => {
 
   it("flags hydrodissection in the intermediate posterolateral-ECE band", () => {
     const S = defaultClinicalState();
-    const infl = predictInflammationRisk(S);
     const plan = buildSurgicalPlan(
       S,
       nsDetail(2, { posterolateral: 0.2 }),
       nsDetail(1),
       0.02,
       0.02,
-      infl,
       0.02,
       0.02,
     );
     expect(plan.left.hydrodissection.value).toBe(true);
   });
 
-  it("drops bladder-neck preservation with a large median lobe", () => {
-    const S = defaultClinicalState();
-    S.median_lobe_grade = 3;
-    const infl = predictInflammationRisk(S);
-    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl, 0.02, 0.02);
-    expect(plan.bladderNeckPreservation.value).toBe(false);
-    expect(plan.hood.value).toBe("none");
-  });
-
   it("honours a surgeon NS-grade override", () => {
     const S = defaultClinicalState();
     S.plan_ns_override_r = 3;
-    const infl = predictInflammationRisk(S);
-    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, infl, 0.02, 0.02);
+    const plan = buildSurgicalPlan(S, nsDetail(1), nsDetail(1), 0.02, 0.02, 0.02, 0.02);
     expect(plan.right.nsGrade).toBe(3);
     expect(plan.right.overridden).toBe(true);
   });
@@ -470,26 +445,6 @@ describe("computeFunctionalOutcomes — healer tiers + plan deltas", () => {
     expect(r.healerBands).toBeNull();
   });
 
-  it("a bilateral hood improves early continence", () => {
-    const noPlan = computeFunctionalOutcomes({ ...base, nsL: 2, nsR: 2 });
-    const withHood = computeFunctionalOutcomes({
-      ...base,
-      nsL: 2,
-      nsR: 2,
-      plan: {
-        hood: "bilateral",
-        bnPreservation: true,
-        svPreservationL: true,
-        svPreservationR: true,
-        hydrodissectionL: false,
-        hydrodissectionR: false,
-        inflammationTier: "low",
-      },
-    });
-    expect(withHood.continenceTimeline[0]).toBeGreaterThan(noPlan.continenceTimeline[0]!);
-    expect(withHood.planContinenceAdj).toBeGreaterThan(0);
-  });
-
   it("high inflammation drags potency down", () => {
     const clean = computeFunctionalOutcomes({ ...base, nsL: 2, nsR: 2 });
     const inflamed = computeFunctionalOutcomes({
@@ -497,8 +452,6 @@ describe("computeFunctionalOutcomes — healer tiers + plan deltas", () => {
       nsL: 2,
       nsR: 2,
       plan: {
-        hood: "none",
-        bnPreservation: false,
         svPreservationL: true,
         svPreservationR: true,
         hydrodissectionL: false,

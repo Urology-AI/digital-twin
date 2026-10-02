@@ -139,18 +139,6 @@
     "moderate": 0.3,
     "high": 0.55
   },
-  "hood_decision": {
-    "source": "literature",
-    "citation": "Rosenberg 2020 Cochrane; Menon 2018 RCT; Galfano 2013 Retzius-sparing technique",
-    "anterior_apex_ece_max": 0.15
-  },
-  "bnp_decision": {
-    "source": "literature",
-    "citation": "Ma 2016 meta-analysis; Nyarangi-Dix 2013 RCT",
-    "max_median_lobe_grade": 2,
-    "max_bladder_neck_ece": 0.1,
-    "max_volume_cc": 120
-  },
   "sv_preservation": {
     "source": "literature",
     "citation": "John & Hauri 2000; Gilbert 2017",
@@ -168,22 +156,7 @@
   },
   "plan_functional_deltas_pp": {
     "source": "literature",
-    "citation": "Rosenberg 2020; Menon 2018; Ma 2016; Patel 2012. Inflammation penalties are expert priors.",
-    "hood_bilateral": {
-      "contEarly": 12,
-      "cont": 4,
-      "pot": 2
-    },
-    "hood_unilateral": {
-      "contEarly": 6,
-      "cont": 2,
-      "pot": 1
-    },
-    "bladder_neck_preservation": {
-      "contEarly": 6,
-      "cont": 3,
-      "pot": 0
-    },
+    "citation": "Patel 2012. Inflammation penalties are expert priors.",
     "hydrodissection": {
       "pot": 4
     },

@@ -93,8 +93,6 @@ export interface PipsGates {
 export interface SurgicalPlan {
   left: SidePlan;
   right: SidePlan;
-  hood: PlanRec<"none" | "unilateral" | "bilateral">;
-  bladderNeckPreservation: PlanRec<boolean>;
   gates: PipsGates;
 }
 

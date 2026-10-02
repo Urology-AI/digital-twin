@@ -87,8 +87,6 @@ export function buildProstateRecord(
     plan: {
       ns_override_l: S.plan_ns_override_l,
       ns_override_r: S.plan_ns_override_r,
-      hood: S.plan_hood,
-      bladder_neck_preservation: S.plan_bnp,
       sv_preservation_l: S.plan_sv_preservation_l,
       sv_preservation_r: S.plan_sv_preservation_r,
       hydrodissection_l: S.plan_hydrodissection_l,

@@ -163,10 +163,7 @@ export interface Prostate3DInputV1 {
     ns_expected_r?: number | null;
     ns_override_l?: number | null;
     ns_override_r?: number | null;
-    /** "auto" = follow the model recommendation */
-    hood?: "auto" | "none" | "unilateral" | "bilateral";
     /** null = follow the model recommendation, true/false = surgeon decided */
-    bladder_neck_preservation?: boolean | null;
     sv_preservation_l?: boolean | null;
     sv_preservation_r?: boolean | null;
     hydrodissection_l?: boolean | null;
@@ -390,8 +387,6 @@ export interface ClinicalState {
   // ── Surgeon's editable operative plan (null / "auto" = follow the model) ──
   plan_ns_override_l: number | null;
   plan_ns_override_r: number | null;
-  plan_hood: "auto" | "none" | "unilateral" | "bilateral";
-  plan_bnp: boolean | null;
   plan_sv_preservation_l: boolean | null;
   plan_sv_preservation_r: boolean | null;
   plan_hydrodissection_l: boolean | null;
@@ -517,8 +512,6 @@ export function defaultClinicalState(): ClinicalState {
 
     plan_ns_override_l: null,
     plan_ns_override_r: null,
-    plan_hood: "auto",
-    plan_bnp: null,
     plan_sv_preservation_l: null,
     plan_sv_preservation_r: null,
     plan_hydrodissection_l: null,

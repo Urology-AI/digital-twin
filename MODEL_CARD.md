@@ -242,8 +242,7 @@ This matches the pinned regression test value of **38.006%** in `src/test/modelO
 ### 9.6 Surgical-plan, inflammation-risk and healer-tier modules
 
 These modules turn the model outputs into an advisory operative plan (nerve-sparing
-plane and per-zone grade, Retzius-sparing / anterior "hood", bladder-neck
-preservation, seminal-vesicle tip-sparing, hydrodissection candidacy), a
+plane and per-zone grade, seminal-vesicle tip-sparing, hydrodissection candidacy), a
 periprostatic-inflammation / "obliterated planes" risk tier, and an
 erectile-recovery phenotype ("super / healer / delayed healer", from the time the
 modeled potency probability first reaches 50%). They also project BCR to 1 year
@@ -256,7 +255,7 @@ and 2–3 years under the chosen plan.
 | tag | meaning |
 |---|---|
 | `institutional` | derived from the Mount Sinai RARP cohort / an existing fitted COMPASS model (side ECE/SVI models, the 5,003-side NS-grade→PSM→BCR database) |
-| `literature` | a published estimate, paper cited (NS-plane thresholds, hood/BNP/SV/hydrodissection rules, functional-choice deltas, BCR event-timing) |
+| `literature` | a published estimate, paper cited (NS-plane thresholds, SV/hydrodissection rules, functional-choice deltas, BCR event-timing) |
 | `provisional` | an expert-prior default not yet calibrated on COMPASS data — surfaced in the UI as "provisional" (inflammation-risk weights + cutpoints, GG→zone prior, healer threshold, PSM plan-modulation, the functional-outcome nomogram) |
 
 The app renders an **"Evidence & sources"** panel (Planning and Outcomes tabs)
