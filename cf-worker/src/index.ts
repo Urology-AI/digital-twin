@@ -116,6 +116,23 @@ const SHARE_PUT =
   "INSERT OR REPLACE INTO patient_shares (id, record, created_at) VALUES (?, ?, ?)";
 const SHARE_CREATE =
   "CREATE TABLE IF NOT EXISTS patient_shares ( id TEXT PRIMARY KEY, record TEXT NOT NULL, created_at TEXT NOT NULL )";
+
+// Patient links expire server-side: the lookup only matches rows newer than
+// the cutoff, and every share write purges expired rows. Re-copying a link
+// re-saves the row, which restarts the clock.
+// created_at is stored as "YYYY-MM" only, stamped by the Worker (never the
+// client), because the exact share day is usually the visit day. So a link
+// lives until the end of the month after SHARE_TTL_DAYS have passed: 30–61
+// days. "YYYY-MM" strings compare correctly as text.
+const SHARE_TTL_DAYS = 30;
+const SHARE_GET_UNEXPIRED = "SELECT record FROM patient_shares WHERE id = ? AND created_at >= ?";
+const SHARE_PURGE = "DELETE FROM patient_shares WHERE created_at < ?";
+function shareMonth(): string {
+  return new Date().toISOString().slice(0, 7);
+}
+function shareCutoff(): string {
+  return new Date(Date.now() - SHARE_TTL_DAYS * 86_400_000).toISOString().slice(0, 7);
+}
 // The single read pullCases() issues (src/lib/turso.ts) — case_log is the
 // de-identified research log, so a full-table read of it is by design.
 const CASE_LOG_SELECT = "SELECT * FROM case_log ORDER BY date DESC";
@@ -201,7 +218,9 @@ async function handleTursoExecute(request: Request, env: Env): Promise<Response>
   }
 
   try {
-    const result = await tursoClient(env).execute({ sql, args: args as Args });
+    const result = s === SHARE_GET
+      ? await tursoClient(env).execute({ sql: SHARE_GET_UNEXPIRED, args: [...(args as Args), shareCutoff()] })
+      : await tursoClient(env).execute({ sql, args: args as Args });
     // libsql's Row objects support both row[0] and row.columnName access but
     // are NOT plain arrays — JSON.stringify on them directly does not
     // reliably carry the actual values across. Force each row into a real
@@ -255,8 +274,18 @@ async function handleTursoBatch(request: Request, env: Env): Promise<Response> {
     if (!isAllowedSql(s.sql, s.args)) return jsonError("SQL statement not permitted", 403);
   }
 
+  let writesShare = false;
+  const stamped = (statements as BatchStatement[]).map((st) => {
+    if (normalizeSql(st.sql) !== SHARE_PUT) return st;
+    writesShare = true;
+    return { ...st, args: [st.args[0], st.args[1], shareMonth()] };
+  });
+  const toRun = writesShare
+    ? [...stamped, { sql: SHARE_PURGE, args: [shareCutoff()] }]
+    : stamped;
+
   try {
-    await tursoClient(env).batch(statements as BatchStatement[], "write");
+    await tursoClient(env).batch(toRun, "write");
     return new Response(JSON.stringify({ ok: true, count: statements.length }), {
       headers: { "Content-Type": "application/json" },
     });

@@ -3,6 +3,7 @@ import { defaultClinicalState } from "@/types/patient";
 import { buildProstateRecord } from "@/lib/compass/recordFactory";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import {
+  fmtReviewDate,
   PREOP_REFERENCES, counselingFlags, recoveryMilestones, recoveryStretch,
 } from "@/lib/compass/preopCounseling";
 
@@ -202,5 +203,14 @@ describe("Spanish coverage — rest of patient mode", () => {
     ].map((x) => x.replace(/\\"/g, '"'));
     const missing = [...new Set(strings)].filter((x) => !hasSpanish(x));
     expect(missing).toEqual([]);
+  });
+});
+
+describe("fmtReviewDate", () => {
+  it("shows month and year for a month-only sign-off date (no shifted day)", () => {
+    expect(fmtReviewDate("2026-09")).toBe("Sep 2026");
+  });
+  it("shows the year for a year-only date", () => {
+    expect(fmtReviewDate("2026")).toBe("2026");
   });
 });

@@ -969,14 +969,19 @@ export async function buildClinicalShareUrl(): Promise<string | null> {
  * keyed by the same share id, and the recipient's browser fetches it by id
  * instead of decoding a giant URL. Unauthenticated by design (Cloudflare
  * Access is configured to bypass this path) — patients don't have Sinai
- * logins.
+ * logins. Attached media is stripped (images may be photos of clinic notes
+ * or reports), the sign-off date is cut to the month, and the Worker expires
+ * the link after SHARE_TTL_DAYS.
  */
 export async function buildPatientShareUrl(): Promise<string | null> {
   const found = getOrCreateShareId();
   if (!found) return null;
   const { id: shareId, entry: p } = found;
-  const data = { ...p.record, _shareId: shareId, lesions: p.lesionRows };
-  const { saveShareCase } = await import("@/lib/turso");
+  const { media: _media, ...record } = p.record;
+  // Sign-off day is usually the visit day; the patient link keeps the month.
+  if (record.preop_review) record.preop_review = { ...record.preop_review, date: record.preop_review.date.slice(0, 7) };
+  const { saveShareCase, renumberLesions } = await import("@/lib/turso");
+  const data = { ...record, _shareId: shareId, lesions: renumberLesions(p.lesionRows) };
   await saveShareCase(shareId, data);
   return `${window.location.origin}/patient/${shareId}`;
 }
