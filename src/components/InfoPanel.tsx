@@ -85,7 +85,7 @@ function OverviewTab() {
           </thead>
           <tbody className="text-muted-foreground">
             {[
-              ["ECE", "3,454", "882 (25.5%)", "0.797", "0.795", "0.790–0.825", "+25.4%"],
+              ["ECE (vNext)", "3,454", "882 (25.5%)", "0.7825", "—", "—", "—"],
               ["SVI", "3,454", "301 (8.7%)", "0.842", "0.848", "0.839–0.884", "+23.5%"],
               ["Grade Upgrade", "3,137", "422 (13.5%)", "0.807", "0.810", "0.802–0.853", "+27.2%"],
               ["LNI (4-feature)", "663", "35 (5.3%)", "0.842", "0.836", "0.797–0.901", "+5.2%"],
@@ -104,12 +104,12 @@ function OverviewTab() {
             ))}
           </tbody>
         </Tbl>
-        <Note>BC AUC = Bootstrap-corrected AUC (Harrell optimism, 500 iterations). BSS = Brier Skill Score vs null model. All models independently verified from raw data 2026-05-03.</Note>
+        <Note>BC AUC = Bootstrap-corrected AUC (Harrell optimism, 500 iterations). BSS = Brier Skill Score vs null model. All models independently verified from raw data 2026-05-03. ECE row is the vNext model: repeated 10×5-fold CV AUC; bootstrap-corrected AUC, CI and BSS were not recomputed for vNext.</Note>
       </section>
 
       <section>
         <H2>Common 22-Feature Input Set</H2>
-        <p className="text-muted-foreground text-[11px] mb-2">ECE, SVI, Upgrade, PSM, and BCR use this identical set. Sparse-coverage features are mean-imputed; Decipher also has an availability flag.</p>
+        <p className="text-muted-foreground text-[11px] mb-2">SVI, Upgrade, PSM, and BCR use this identical set. ECE now uses its own 9-predictor vNext set (see ECE tab). Sparse-coverage features are mean-imputed; Decipher also has an availability flag.</p>
         <Tbl>
           <thead>
             <tr className="border-b border-border"><Th>#</Th><Th>Feature</Th><Th>Source</Th><Th>Coverage</Th></tr>
@@ -294,7 +294,7 @@ function OverviewTab() {
             {[
               ["1 — Z-score each input", "z = (value − mean) / scale", "mean and scale are from the training cohort (N=5,352). Never re-standardise on external data."],
               ["2 — Linear combination", "logit = intercept + Σ (coeff × z)", "Coefficients from L2 logistic regression. All weights are in src/lib/models/weights.ts."],
-              ["3 — Logistic function", "probability = 1 / (1 + e⁻ˡᵒᵍⁱᵗ)", "ECE is clamped to 2–92%. All other models use the raw sigmoid output."],
+              ["3 — Logistic function", "probability = 1 / (1 + e⁻ˡᵒᵍⁱᵗ)", "ECE uses the raw sigmoid output with no clamp. Other endpoints are unchanged."],
             ].map(([step, formula, note]) => (
               <tr key={step} className="border-b border-border/40">
                 <Td className="font-medium text-foreground whitespace-nowrap">{step}</Td>
@@ -328,22 +328,22 @@ function OverviewTab() {
           </tbody>
         </Tbl>
 
-        <div className="mt-3 mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Worked example — ECE patient (GG3, PSA 12, volume 30 cc, PI-RADS 4, MRI EPE+, no Decipher)</div>
+        <div className="mt-3 mb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Worked example — vNext ECE (GG3, PSA 12, volume 30 cc, PI-RADS 4, MRI EPE+; MRI SVI, max core % and capsular abutment not entered)</div>
         <Tbl>
           <thead>
             <tr className="border-b border-border"><Th>Feature</Th><Th>Value → z-score</Th><Th>× coeff</Th><Th>Contribution</Th></tr>
           </thead>
           <tbody className="text-muted-foreground">
             {[
-              ["log_psad",           "log(12/30+0.01)=−1.304 → +0.443", "× 0.3285", "+0.146"],
-              ["grade_group_2",      "0 → −0.812",                       "× 0.4091", "−0.332"],
-              ["grade_group_3",      "1 → +1.687",                       "× 0.4912", "+0.829"],
-              ["grade_group_4_5",    "0 → −0.561",                       "× 0.5948", "−0.334"],
-              ["max_core_pct",       "60 → +0.276",                      "× 0.2019", "+0.056"],
-              ["pirads",             "max(4,2)=4 → −0.097",              "× 0.3922", "−0.038"],
-              ["mri_epe",            "1 → +2.381",                       "× 0.1399", "+0.333"],
-              ["decipher_imputed",   "missing→0.521 → −1.059",           "× 0.2133", "−0.226"],
-              ["decipher_available", "0 (missing) → −0.558",             "× 0.4180", "−0.233"],
+              ["gg2",                "0 → −0.861",                       "× 0.3872", "−0.333"],
+              ["gg3",                "1 → +1.820",                       "× 0.5178", "+0.942"],
+              ["gg4_5",              "0 → −0.535",                       "× 0.6650", "−0.356"],
+              ["log_psad",           "log(12/30)=−0.916 → +1.096",       "× 0.3169", "+0.347"],
+              ["pirads",             "4 → −0.283",                       "× 0.4302", "−0.122"],
+              ["mri_epe",            "1 → +2.643",                       "× 0.1396", "+0.369"],
+              ["mri_svi_clean",      "missing → training mean → 0",      "× 0.2510", "0.000"],
+              ["max_core_pct",       "missing → training mean → 0",      "× 0.4629", "0.000"],
+              ["capsular_abutment",  "missing → training mean → 0",      "× 0.1257", "0.000"],
             ].map(([feat, val, coeff, contrib]) => (
               <tr key={feat} className="border-b border-border/40">
                 <Td className="font-mono text-[10px] text-foreground">{feat}</Td>
@@ -354,7 +354,7 @@ function OverviewTab() {
             ))}
           </tbody>
         </Tbl>
-        <Note>intercept −0.7423 + sum of contributions = logit −0.540 → probability 38.0%. Matches pinned regression test in src/test/modelOutputs.test.ts.</Note>
+        <Note>intercept −1.3398 + sum of contributions = logit −0.492 → probability 37.9%. Missing optional inputs take the frozen training mean (z = 0), never a negative value. Matches the pinned vNext regression cases in src/test/vnextEce.test.ts.</Note>
       </section>
 
       <section>
@@ -365,7 +365,7 @@ function OverviewTab() {
           <li>BCR: median follow-up ~14 months (immature); negative imaging coefficients reflect salvage-therapy informative censoring, not biology.</li>
           <li>Zone-level cohort N=299 with MUS zone data — larger validation needed.</li>
           <li>Decipher coverage 37%; mean imputation + availability flag documented and calibrated.</li>
-          <li>Side-specific ECE/SVI predictions use smaller lateralized cohorts (N=228 lobes for ECE, N=227 for SVI).</li>
+          <li>Side-specific ECE is a shadow research model on a smaller cohort (606 patients, 1,212 sides); side-specific SVI uses a lateralized cohort of N=227 lobes.</li>
           <li>Predictions are decision support, not substitutes for clinical judgment.</li>
         </ul>
         <Note>COMPASS v22 · 6 prediction models · Lateralized ECE + SVI · PLND Decision Module · Trimodal + Decipher · Verified 2026-05-03 · Mount Sinai Health System</Note>
@@ -379,18 +379,19 @@ function EceTab() {
   return (
     <>
       <section>
-        <H2>ECE Patient-Level Model</H2>
+        <H2>ECE Patient-Level Model (vNext)</H2>
         <Tbl>
           <thead><tr className="border-b border-border"><Th>Metric</Th><Th>Value</Th></tr></thead>
           <tbody className="text-muted-foreground">
             {[
+              ["Model version", "vNext-core-candidate-2026-09-24"],
               ["N (analytic cohort)", "3,454"],
               ["ECE events", "882 (25.5%)"],
-              ["Cross-validation AUC", "0.797 (SD 0.018)"],
-              ["Apparent AUC", "0.803"],
-              ["Bootstrap-corrected AUC", "0.795"],
-              ["95% CI (1,000 bootstrap)", "0.790–0.825"],
-              ["Brier Skill Score", "+25.4%"],
+              ["Repeated 10×5-fold CV AUC", "0.7825"],
+              ["2024–2025 temporal AUC (same institution)", "0.7415"],
+              ["Brier score (repeated CV)", "0.1494"],
+              ["Calibration slope / intercept (repeated CV)", "0.9815 / −0.0162"],
+              ["Output", "Raw logistic probability, no clamp"],
             ].map(([k, v]) => (
               <tr key={k} className="border-b border-border/40">
                 <Td className="font-medium text-foreground">{k}</Td><Td className="tabular-nums">{v}</Td>
@@ -401,35 +402,22 @@ function EceTab() {
       </section>
 
       <section>
-        <H2>ECE — Locked Coefficients (22 Features)</H2>
+        <H2>ECE — Locked Coefficients (9 Predictors)</H2>
         <Tbl>
           <thead>
             <tr className="border-b border-border"><Th>Feature</Th><Th>β (standardized)</Th><Th>Magnitude</Th></tr>
           </thead>
           <tbody className="text-muted-foreground">
             {[
-              ["Grade Group 4–5", "+0.5948", "Strong"],
-              ["Grade Group 3", "+0.4912", "Strong"],
-              ["Decipher Available (flag)", "+0.4180", "Strong"],
-              ["Grade Group 2", "+0.4091", "Strong"],
-              ["PI-RADS", "+0.3922", "Strong"],
-              ["log(PSA Density)", "+0.3285", "Strong"],
-              ["MRI SVI", "+0.2352", "Moderate"],
-              ["Decipher Score (imputed)", "+0.2133", "Moderate"],
-              ["Max Core %", "+0.2019", "Moderate"],
-              ["MRI EPE", "+0.1399", "Moderate"],
-              ["Capsular Abutment", "+0.1371", "Moderate"],
-              ["PRI-MUS Score", "+0.0898", "Small"],
-              ["Lesion Size (mm)", "+0.0817", "Small"],
-              ["Positive Cores", "+0.0642", "Small"],
-              ["ADC Mean", "−0.0635", "Small"],
-              ["MUS ECE", "+0.0435", "Small"],
-              ["Bx PNI", "+0.0383", "Small"],
-              ["Bilateral Cores", "+0.0374", "Small"],
-              ["PSMA SUVmax", "−0.0274", "Small"],
-              ["Bx IDC", "+0.0215", "Small"],
-              ["Bx Cribriform", "+0.0178", "Small"],
-              ["PSMA EPE", "+0.0062", "Small"],
+              ["Grade Group 4–5", "+0.6650", "Strong"],
+              ["Grade Group 3", "+0.5178", "Strong"],
+              ["Max Core %", "+0.4629", "Strong"],
+              ["PI-RADS", "+0.4302", "Strong"],
+              ["Grade Group 2", "+0.3872", "Strong"],
+              ["log(PSA Density)", "+0.3169", "Strong"],
+              ["MRI SVI", "+0.2510", "Moderate"],
+              ["MRI EPE", "+0.1396", "Moderate"],
+              ["Capsular Abutment", "+0.1257", "Moderate"],
             ].map(([f, b, mag]) => (
               <tr key={f} className="border-b border-border/40">
                 <Td className="text-foreground">{f}</Td>
@@ -442,7 +430,7 @@ function EceTab() {
       </section>
 
       <section>
-        <H2>ECE — Head-to-Head vs Comparator Nomograms</H2>
+        <H2>ECE — Head-to-Head vs Comparator Nomograms (v22 model, not recomputed for vNext)</H2>
         <p className="text-muted-foreground text-[11px] mb-2">MSKCC applied with exact published coefficients. Clinical T stage: 77% from DRE notes, 23% MRI-derived proxy. Stage distribution: T1c 51%, T2 45%, T3+ 4%. Mean predicted ECE 56.1% vs actual 25.5%.</p>
         <Tbl>
           <thead>
@@ -467,7 +455,7 @@ function EceTab() {
       </section>
 
       <section>
-        <H2>ECE — Confusion Matrices</H2>
+        <H2>ECE — Confusion Matrices (v22 model, not recomputed for vNext)</H2>
         <div className="mb-1 text-[10px] font-semibold text-muted-foreground">Threshold = 0.20</div>
         <Tbl>
           <thead>
@@ -512,38 +500,22 @@ function EceTab() {
       </section>
 
       <section>
-        <H2>ECE Side-Specific Model (Lateralized)</H2>
+        <H2>ECE Side-Specific Model (vNext Shadow Candidate)</H2>
         <Tbl>
           <thead><tr className="border-b border-border"><Th>Metric</Th><Th>Value</Th></tr></thead>
           <tbody className="text-muted-foreground">
             {[
-              ["Cohort", "159 patients / 228 lobes"],
-              ["ECE+ events (lobe-level)", "63 (27.6%)"],
-              ["Apparent AUC", "0.813"],
-              ["Bootstrap optimism-corrected AUC", "0.785"],
-              ["GroupKFold CV AUC (cluster-aware)", "0.765"],
-              ["95% CI (cluster bootstrap)", "0.692–0.838"],
+              ["Model version", "vNext-ece-side-shadow-candidate-2026-09-30"],
+              ["Cohort", "606 patients / 1,212 sides"],
+              ["Side EPE events", "241"],
+              ["10×5 patient-grouped CV AUC", "0.7362"],
+              ["Global ECE + side grade group only (AUC)", "0.7304"],
+              ["Brier score", "0.1378"],
+              ["Calibration slope / intercept", "0.8775 / −0.1533"],
+              ["2024–2025 temporal AUC", "0.6928"],
             ].map(([k, v]) => (
               <tr key={k} className="border-b border-border/40">
                 <Td className="font-medium text-foreground">{k}</Td><Td className="tabular-nums">{v}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </Tbl>
-        <div className="mt-3 mb-1 text-[10px] font-semibold text-muted-foreground">Side-Specific vs Comparators</div>
-        <Tbl>
-          <thead>
-            <tr className="border-b border-border"><Th>Model</Th><Th>AUC</Th><Th>ΔAUC</Th><Th>p-value</Th></tr>
-          </thead>
-          <tbody className="text-muted-foreground">
-            {[
-              ["COMPASS ECE Side-Specific", "0.813", "—", "—", "text-foreground font-semibold"],
-              ["Martini 2018 (lateralized)", "0.732", "−0.081", "0.001", ""],
-              ["Pedraza 2022 (lateralized)", "0.722", "−0.091", "<0.001", ""],
-            ].map(([m, auc, d, p, cls]) => (
-              <tr key={m} className={`border-b border-border/40 ${cls}`}>
-                <Td>{m}</Td><Td className="tabular-nums">{auc}</Td>
-                <Td className="tabular-nums">{d}</Td><Td className="tabular-nums">{p}</Td>
               </tr>
             ))}
           </tbody>
@@ -555,18 +527,9 @@ function EceTab() {
           </thead>
           <tbody className="text-muted-foreground">
             {[
-              ["Grade Group 4–5 (ipsilateral)", "+0.38"],
-              ["log(PSA Density)", "+0.38"],
-              ["Grade Group 3 (ipsilateral)", "+0.36"],
-              ["Grade Group 2 (ipsilateral)", "+0.26"],
-              ["MRI SVI", "+0.20"],
-              ["PI-RADS (ipsilateral)", "+0.19"],
-              ["Positive Cores (ipsilateral)", "+0.17"],
-              ["ECE Concordance (ipsilateral, 0–3)", "+0.15"],
-              ["Max Core % (ipsilateral)", "+0.14"],
-              ["MUS ECE (ipsilateral)", "+0.11"],
-              ["Imaging Ipsilateral (any)", "+0.10"],
-              ["PSMA EPE (ipsilateral)", "−0.02"],
+              ["Global vNext ECE logit", "+0.7386"],
+              ["Side biopsy Grade Group", "+0.3789"],
+              ["ExactVu lesion on that side", "+0.3151"],
             ].map(([f, b]) => (
               <tr key={f} className="border-b border-border/40">
                 <Td className="text-foreground">{f}</Td><Td className="tabular-nums font-mono">{b}</Td>
@@ -601,7 +564,7 @@ function EceTab() {
       </section>
 
       <section>
-        <H2>Imaging Detail Variables (MRI Adjustments)</H2>
+        <H2>Imaging Detail Variables (MRI Adjustments, v22)</H2>
         <p className="text-muted-foreground text-[11px] mb-2">Three MRI-derived variables that adjust ECE prediction when entered via the lesion table:</p>
         <Tbl>
           <thead>
@@ -623,7 +586,7 @@ function EceTab() {
       </section>
 
       <section>
-        <H2>ECE Risk vs Actual Pathology</H2>
+        <H2>ECE Risk vs Actual Pathology (v22 model, not recomputed for vNext)</H2>
         <Tbl>
           <thead>
             <tr className="border-b border-border"><Th>Predicted ECE Risk</Th><Th>Actual EPE Found</Th><Th>Suggested Action</Th></tr>
