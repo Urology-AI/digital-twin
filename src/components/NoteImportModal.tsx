@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { parseSafeSheet } from "@/lib/safeSheet";
+import { parseSafeSheet, sheetImportPatch, type SheetImportPatch } from "@/lib/safeSheet";
 import { isAiParsingEnabled, parseClinicalText } from "@/lib/api";
 import { emptyLesion, type LesionRow, type LesionSource } from "@/types/lesion";
 import { cn } from "@/lib/utils";
@@ -135,7 +135,7 @@ export interface NoteImportClinical {
 
 interface Props {
   onClose: () => void;
-  onApply: (rows: LesionRow[], clinical: NoteImportClinical) => void;
+  onApply: (rows: LesionRow[], clinical: NoteImportClinical, sheet: SheetImportPatch | null) => void;
 }
 
 type Step = "example" | "paste" | "check" | "fix" | "done";
@@ -156,6 +156,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
   const [warnings, setWarnings] = useState<string[]>([]);
   const [extracting, setExtracting] = useState(false);
   const [phi, setPhi] = useState<{ removed: string[]; count: number } | null>(null);
+  const [sheetPatch, setSheetPatch] = useState<SheetImportPatch | null>(null);
 
   async function handleExtract() {
     setParseError("");
@@ -186,21 +187,17 @@ export function NoteImportModal({ onClose, onApply }: Props) {
         noteWarnings.push("Parsed in your browser — the note text was not sent anywhere. Anything the offline parser could not find is left blank for you to fill in.");
       }
 
-      setEntries(collapseToReviewEntries(sheet.lesions));
+      // Per-side biopsy results (no location on the sheet) replace the note
+      // parser's invented Bx rows — see SheetImportPatch.dropBxRows.
+      const patch = sheetImportPatch(sheet);
+      setSheetPatch(patch);
+      setEntries(collapseToReviewEntries(patch.dropBxRows ? sheet.lesions.filter((l) => l.source !== "Bx") : sheet.lesions));
       // Row-scoped safe-sheet fields win over the free-text parser: the row
       // label disambiguates the value, where a whole-document regex cannot
       // (a bare "64" on the Patient row is an age; the same digits elsewhere
       // are an MRN fragment or a date).
       setClinical({
-        vol: sheet.fields.prostateVolumeCc ?? parsed.prostateVolumeCc,
-        gg: parsed.biopsyGG,
-        cores: sheet.fields.positiveCores ?? parsed.biopsyTotalCores,
-        maxcore: parsed.biopsyMaxCorePct,
-        age: sheet.fields.age,
-        psa: sheet.fields.psa ?? parsed.psa,
-        bmi: sheet.fields.bmi,
-        shim: sheet.fields.shim ?? parsed.shim,
-        ipss: sheet.fields.ipss,
+        ...patch.clinical,
         ...demographics,
       });
       setWarnings(noteWarnings);
@@ -225,7 +222,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
   }
 
   function handleApply() {
-    onApply(reviewEntriesToRows(entries), clinical);
+    onApply(reviewEntriesToRows(entries), clinical, sheetPatch);
     setStep("done");
   }
 
@@ -435,6 +432,33 @@ export function NoteImportModal({ onClose, onApply }: Props) {
                     {clinical.decipher !== undefined && <span className="text-muted-foreground">Decipher <span className="font-semibold text-foreground">{clinical.decipher}</span></span>}
                     {clinical.shim !== undefined && <span className="text-muted-foreground">SHIM <span className="font-semibold text-foreground">{clinical.shim}</span></span>}
                     {clinical.ipss !== undefined && <span className="text-muted-foreground">IPSS <span className="font-semibold text-foreground">{clinical.ipss}</span></span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Safe-sheet extras — everything beyond the zone grid */}
+              {sheetPatch && (sheetPatch.dropBxRows || Object.keys(sheetPatch.form).length > 0 || Object.keys(sheetPatch.notes).length > 0) && (
+                <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5" data-testid="sheet-extras">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Also captured from the sheet</p>
+                  <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+                    {sheetPatch.dropBxRows && (
+                      <span>Biopsy by side <span className="font-semibold text-foreground">
+                        {(["left", "right"] as const).filter((sd) => sheetPatch.form[sd === "left" ? "gg_left" : "gg_right"] !== undefined).map((sd) => {
+                          const k = sd === "left" ? "left" : "right";
+                          return `${sd === "left" ? "L" : "R"} GG${String(sheetPatch.form[`gg_${k}`])}/${String(sheetPatch.form[`cores_${k}`] ?? "?")} cores`;
+                        }).join(" · ")}
+                      </span></span>
+                    )}
+                    {sheetPatch.form.biopsy_sessions !== undefined && <span>Biopsy # <span className="font-semibold text-foreground">{String(sheetPatch.form.biopsy_sessions)}</span></span>}
+                    {sheetPatch.form.asa_class !== undefined && <span>ASA <span className="font-semibold text-foreground">{String(sheetPatch.form.asa_class)}</span></span>}
+                    {sheetPatch.form.psma_ln === true && <span>PSMA node <span className="font-semibold text-foreground">positive</span></span>}
+                    {(sheetPatch.nsExpectedL !== undefined || sheetPatch.nsExpectedR !== undefined) && (
+                      <span>Expected NS <span className="font-semibold text-foreground">L {sheetPatch.nsExpectedL ?? "—"} / R {sheetPatch.nsExpectedR ?? "—"}</span></span>
+                    )}
+                    {(["crohns", "ulcerative_colitis", "diverticulitis", "osa", "htn", "dm", "cad", "anticoagulant", "hernia_mesh", "prior_abdominal_surgery"] as const)
+                      .filter((k) => sheetPatch.form[k] === true)
+                      .map((k) => <span key={k} className="font-semibold text-foreground">{k.replace(/_/g, " ")}</span>)}
+                    {Object.keys(sheetPatch.notes).length > 0 && <span>{Object.keys(sheetPatch.notes).length} sheet rows saved as notes</span>}
                   </div>
                 </div>
               )}

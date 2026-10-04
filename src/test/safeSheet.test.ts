@@ -160,3 +160,70 @@ describe("parseSafeSheet", () => {
     expect(r.phi.count).toBeGreaterThan(0);
   });
 });
+
+
+describe("real-sheet shapes", () => {
+  const SHEET2 = [
+    "Patient A\tBMI 23.85\t59",
+    "Biopsy 7/8/26 1st Biopsy 8/14/25 Gleason 6\t3rd\tGleason 6 (3+3) 25% Right side, 5 cores Gleason 6 (3+3) 15% Left side, 4 cores",
+    "PSMA 8/7/26\tR apex PM PZ (SUV max 7.0) with extension. L apex PM and PL PZ  (SUV max 5.1).",
+    "MRI 9/11/26\t33.3 cc D 0.12 Diffuse symmetric T2 hypointensity. (PIRADS 2) favours chronic inflammation",
+    "LNs on PSMA\tLeft pelvic sidewall lymph node, 1.2 cm, SUV 3.0.",
+    "ASA\tASA 3, CLL on Ibrutinib, Crohns disease, OSAS, HTN",
+    "General Surgery\tYes - left inguinal hernia 18 years ago",
+    "DVT Risk\tHigh Risk",
+    "Dr. Gainsburg Comments",
+    "MUS 8/11/26\tPRIMUS 4, Right PL PZ Mid. DRE: T1 (Dr Pedraza)",
+  ].join("\n");
+  const r = parseSafeSheet(SHEET2);
+
+  it("reads per-side biopsy results and the session number", () => {
+    expect(r.extras.biopsy.right).toEqual({ gg: 1, maxPct: 25, cores: 5 });
+    expect(r.extras.biopsy.left).toEqual({ gg: 1, maxPct: 15, cores: 4 });
+    expect(r.extras.biopsySessions).toBe(3);
+  });
+
+  it("keeps comorbidity lists instead of removing them as names", () => {
+    expect(r.phi.text).toContain("Ibrutinib, Crohns");
+    expect(r.extras.asaClass).toBe(3);
+    expect(r.extras.history).toMatchObject({ crohns: true, osa: true, htn: true, prior_abdominal_surgery: true });
+  });
+
+  it("removes clinician names", () => {
+    expect(r.phi.text).not.toMatch(/Gainsburg|Pedraza/);
+    expect(r.phi.removed).toContain("clinician name");
+  });
+
+  it("reads every PSMA finding and a bare L/R side", () => {
+    const psma = r.lesions.filter((l) => l.source === "PSMA").map((l) => `${l.side}${l.score}`);
+    expect(psma.sort()).toEqual(["L5.1", "R7"]);
+  });
+
+  it("does not turn a diffuse whole-gland read into lesions", () => {
+    expect(r.lesions.filter((l) => l.source === "MRI")).toHaveLength(0);
+    // ...but the volume on the same cell must survive.
+    expect(r.fields.prostateVolumeCc ?? r.note.prostateVolumeCc).toBe(33.3);
+  });
+
+  it("flags a node on PSMA and keeps unmapped rows as notes", () => {
+    expect(r.extras.psmaNodePositive).toBe(true);
+    expect(r.extras.notes["DVT Risk"]).toBe("High Risk");
+    expect(r.extras.notes["MUS"]).toContain("DRE: T1");
+  });
+});
+
+
+describe("extension findings", () => {
+  const r = parseSafeSheet(
+    "PSMA\tR apex PM PZ (SUV max 7.0) with extension toward the right PL PZ/mid gland.",
+  );
+  const rows = r.lesions.filter((l) => l.source === "PSMA").map((l) => `${l.side}/${l.level}/${l.zone}/${l.score}`);
+
+  it("keeps the extension as its own finding on the right side", () => {
+    expect(rows).toContain("R/Mid/Posterolateral/7");
+    expect(rows.some((x) => x.startsWith("R/Apex/"))).toBe(true);
+  });
+  it("does not invent a left-sided finding", () => {
+    expect(rows.every((x) => x.startsWith("R/"))).toBe(true);
+  });
+});

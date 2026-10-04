@@ -40,6 +40,16 @@ export interface SheetPhiResult {
  * The patient name is the hard case — it carries no label of its own, so it is
  * matched as the ALL-CAPS "SURNAME, FIRST" form these sheets use.
  */
+/**
+ * "SMITH, JOHN" — the surname-comma-forename form, all caps or title case.
+ *
+ * Applied to the Patient row ONLY. Anywhere else the shape matches clinical
+ * lists — "Asthma, HTN", "Ibrutinib, Crohns disease" — and removing those
+ * deleted real comorbidities from the case. A name in free text elsewhere is
+ * left to the second-layer scan, which holds the sheet for review.
+ */
+const PATIENT_NAME_RE = /\b[A-Z][A-Za-z'’-]+,[ \t]*[A-Z][A-Za-z'’-]+(?:[ \t]+[A-Z])?\b/g;
+
 const SHEET_RULES: { label: string; re: RegExp; replace: string }[] = [
   { label: "MRN", re: /\bMRN\b[ \t]*[:#]?[ \t]*[\w-]+/gi, replace: "MRN [removed]" },
   { label: "date of birth", re: /\bDOB\b[ \t]*:?[ \t]*[\d/.-]+/gi, replace: "DOB [removed]" },
@@ -54,11 +64,14 @@ const SHEET_RULES: { label: string; re: RegExp; replace: string }[] = [
     replace: "Date of surgery [removed]",
   },
   { label: "accession", re: /\baccession\b[ \t]*[:#]?[ \t]*[\w-]+/gi, replace: "Accession [removed]" },
-  // "SMITH, JOHN" — the surname-comma-forename form, all caps or title case.
+  // Clinician names ("Dr Pedraza", "Dr. Gainsburg Comments"): not the patient,
+  // but nothing downstream needs them and a free-text name is exactly what a
+  // scrub can miss, so they go too. Surname only — a following capitalised word
+  // is usually a label, not part of the name.
   {
-    label: "name",
-    re: /\b[A-Z][A-Za-z'’-]+,[ \t]*[A-Z][A-Za-z'’-]+(?:[ \t]+[A-Z])?\b/g,
-    replace: "[name removed]",
+    label: "clinician name",
+    re: /\bDr\.?[ \t]+(?:[A-Z]\.[ \t]*)*[A-Z][A-Za-z'’-]+/g,
+    replace: "Dr [removed]",
   },
   { label: "phone", re: /\b(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b/g, replace: "[phone removed]" },
   { label: "email", re: /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g, replace: "[email removed]" },
@@ -87,6 +100,19 @@ export function stripSheetPhi(input: string): SheetPhiResult {
   const removed = new Set<string>();
   let count = 0;
   let text = input;
+
+  text = text
+    .split("\n")
+    .map((line) =>
+      /^\s*patient\b/i.test(line)
+        ? line.replace(PATIENT_NAME_RE, () => {
+            removed.add("name");
+            count += 1;
+            return "[name removed]";
+          })
+        : line,
+    )
+    .join("\n");
 
   for (const { label, re, replace } of SHEET_RULES) {
     text = text.replace(re, () => {
@@ -134,7 +160,7 @@ function sheetRows(text: string): { label: string; rest: string }[] {
   const out: { label: string; rest: string }[] = [];
   for (const line of text.split(/\r?\n/)) {
     if (!line.trim()) continue;
-    const m = /^([^\t]{1,40}?)(?:\t|\s{2,})(.*)$/.exec(line);
+    const m = /^([^\t]{1,80}?)(?:\t|\s{2,})(.*)$/.exec(line);
     if (!m?.[1] || m[2] === undefined) continue;
     out.push({ label: m[1].trim(), rest: m[2].replace(/\t/g, " ").trim() });
   }
@@ -258,6 +284,10 @@ function normalizeScoreWords(line: string): string {
       .replace(/\bpostero[- ]?lateral\b/gi, "PL")
       .replace(/\bantero[- ]?lateral\b/gi, "AL")
       .replace(/\bbilat(?:eral)?\b/gi, "bilateral")
+      // "L apex" / "R mid": a bare initial before a level is a side. The
+      // note parser reads "R" but not "L", and falls back to both sides.
+      .replace(/\bL(?=\s+(?:apex|mid|base)\b)/g, "Left")
+      .replace(/\bR(?=\s+(?:apex|mid|base)\b)/g, "Right")
   );
 }
 
@@ -282,9 +312,33 @@ export function sheetToNote(text: string): string {
     matched += 1;
     out.push(hit[1]);
     const cleaned = rest.replace(/\[[^\]]*\]/g, " ").trim();
-    for (const part of cleaned.split(/\s*;\s*|(?<=\.)\s+(?=(?:PIRADS|PI-RADS|PRIMUS|PRI-MUS|SUV|Gleason|GG)\b)/i)) {
-      const line = normalizeScoreWords(part.trim());
+    // PSMA reads list one finding per sentence ("… SUV 5.5. Anterior left … SUV
+    // max 14.4."), with no score word to split on, so split on the sentence.
+    const splitter = hit[1] === "PSMA"
+      ? /\s*;\s*|(?<=\.)\s+(?=[A-Z])/
+      : /\s*;\s*|(?<=\.)\s+(?=(?:PIRADS|PI-RADS|PRIMUS|PRI-MUS|SUV|Gleason|GG)\b)/i;
+    for (const part of cleaned.split(splitter)) {
+      // "Diffuse symmetric T2 hypointensity (PIRADS 2)" is a whole-gland read,
+      // not a lesion; with no side or level it would become six phantom ones.
+      // Keep what precedes it: the MRI cell leads with "33.3 cc D 0.12".
+      let kept = part;
+      if (/\bdiffuse\b/i.test(part) && hit[1] !== "Biopsy") kept = part.split(/\bdiffuse\b/i)[0] ?? "";
+      // "…(SUV max 7.0) with extension toward the right PL PZ/mid gland": the
+      // note parser reads one location per line, so the extension becomes its
+      // own line carrying the same score, and is cut from the original so its
+      // zone words don't leak into the first finding.
+      const ext = /\s*,?\s*(?:with\s+)?extension\s+(?:toward|towards|to|into)\s+(?:the\s+)?([^.;()]+)/i.exec(kept);
+      let extLine = "";
+      if (ext && (hit[1] === "PSMA" || hit[1] === "MRI")) {
+        const score = hit[1] === "PSMA"
+          ? /\bSUV\s*(?:max)?\s*[\d.]+/i.exec(kept)?.[0]
+          : /\bPI-?RADS\s*[\d]/i.exec(kept)?.[0];
+        if (score) extLine = normalizeScoreWords(`${ext[1]?.trim()} ${score}`);
+        kept = kept.replace(ext[0], "");
+      }
+      const line = normalizeScoreWords(kept.trim());
       if (line) out.push(line);
+      if (extLine) out.push(extLine);
     }
   }
   // No recognisable section rows: this is a free-text note, not a grid, so pass
@@ -292,11 +346,140 @@ export function sheetToNote(text: string): string {
   return matched ? out.join("\n") : text;
 }
 
+// ── Everything else on the sheet ─────────────────────────────────────────────
+
+export interface BiopsySide {
+  /** Grade group 1–5, from the (a+b) pattern. */
+  gg: number;
+  /** Percent of the core involved, as written. */
+  maxPct?: number;
+  /** Positive cores on this side. */
+  cores?: number;
+}
+
+export interface SheetExtras {
+  /** `3rd` in the biopsy row: this is the third biopsy, current one included. */
+  biopsySessions?: number;
+  biopsy: { left?: BiopsySide; right?: BiopsySide };
+  asaClass?: number;
+  /** History flags read from the ASA / surgery rows. Only ever set to true. */
+  history: Partial<
+    Record<
+      | "crohns"
+      | "ulcerative_colitis"
+      | "diverticulitis"
+      | "osa"
+      | "htn"
+      | "dm"
+      | "cad"
+      | "anticoagulant"
+      | "hernia_mesh"
+      | "prior_abdominal_surgery",
+      true
+    >
+  >;
+  /** `LNs on PSMA` names a node. Never set to false: "None" is just absence. */
+  psmaNodePositive?: boolean;
+  /**
+   * Every row's scrubbed text, keyed by label. Rows with no model input
+   * (DVT risk, type of surgery, comments, DRE…) land here so the case keeps
+   * them — recorded, never read by a model.
+   */
+  notes: Record<string, string>;
+}
+
+function gradeGroup(a: number, b: number): number {
+  const sum = a + b;
+  if (sum <= 6) return 1;
+  if (sum === 7) return a === 3 ? 2 : 3;
+  if (sum === 8) return 4;
+  return 5;
+}
+
+/** Term present and not negated just before it ("no OSA", "denies anticoagulants"). */
+function mentions(text: string, re: RegExp): boolean {
+  const m = re.exec(text);
+  if (!m) return false;
+  const before = text.slice(Math.max(0, m.index - 20), m.index);
+  return !/\b(?:no|denies|without|negative for|nil)\b[^.;]*$/i.test(before);
+}
+
+const EMPTY_CELL = /^\s*(?:-+|n\/?a|none|nil|no|wnl|nad|normal)\.?\s*$/i;
+
+const HISTORY_ROWS = /^(?:asa|trans[- ]?operative|abdominal wall|general surgery)\b/i;
+const HISTORY_TERMS: [keyof SheetExtras["history"], RegExp][] = [
+  ["crohns", /\bcrohn'?s?\b/i],
+  ["ulcerative_colitis", /\bulcerative colitis\b|\bUC\b/],
+  ["diverticulitis", /\bdiverticulitis\b/i],
+  ["osa", /\bOSAS?\b|\bsleep apn(?:o)?ea\b/i],
+  ["anticoagulant", /\banticoag\w*|\bwarfarin\b|\bcoumadin\b|\bapixaban\b|\beliquis\b|\brivaroxaban\b|\bxarelto\b|\bdabigatran\b/i],
+  ["hernia_mesh", /\bmesh\b/i],
+  ["htn", /\bHTN\b|\bhypertension\b/i],
+  ["dm", /\bDM2?\b|\bdiabet\w*/i],
+  ["cad", /\bCAD\b|\bcoronary artery disease\b/i],
+];
+const SURGERY_WORDS = /repair|surger|ectomy|laparoscop|laparotom|resection|obstruction|hernia|adhesion/i;
+
+/** Clean a row label for use as a notes key: drop scrubbed placeholders and dates. */
+function noteKey(label: string): string {
+  const k = label.replace(/\[[^\]]*\]/g, " ").replace(/\s+/g, " ").trim();
+  return /^dr\b.*comments?$/i.test(k) ? "Surgeon comments" : k;
+}
+
+export function parseSheetExtras(text: string): SheetExtras {
+  const out: SheetExtras = { biopsy: {}, history: {}, notes: {} };
+  const historyText: string[] = [];
+
+  for (const { label, rest } of sheetRows(text)) {
+    const key = noteKey(label);
+    if (/^patient/i.test(key)) continue;
+
+    // The label cell can hold a prior study and its finding ("Biopsy 1st
+    // Biopsy Gleason 6"); keep it with the row instead of dropping it.
+    const study = /^(biopsy|mri|mus|psma|ua\/ucx)\b(.*)$/i.exec(key);
+    const studyName = study?.[1]?.toLowerCase();
+    const noteName = studyName === "biopsy" ? "Biopsy" : studyName === "ua/ucx" ? "UA/UCx" : studyName ? studyName.toUpperCase() : key;
+    const noteText = study ? `${(study[2] ?? "").trim()} ${rest}`.trim() : rest;
+    if (noteName && noteText) {
+      out.notes[noteName] = out.notes[noteName] ? `${out.notes[noteName]} | ${noteText}` : noteText;
+    }
+
+    if (/^biopsy\b/i.test(key)) {
+      const ord = /\b(\d+)(?:st|nd|rd|th)\b/i.exec(rest);
+      if (ord?.[1]) out.biopsySessions = parseInt(ord[1], 10);
+      // "Gleason 7 (3+4) 60% Right side, 3 cores" — one result per side.
+      const re = /Gleason\s*(\d+)\s*\(\s*(\d)\s*\+\s*(\d)\s*\)\s*(?:(\d+)\s*%)?\s*(Right|Left|R|L)\b(?:\s*side)?[ ,]*(?:(\d+)\s*cores?)?/gi;
+      for (const m of rest.matchAll(re)) {
+        const side = m[5]?.[0]?.toUpperCase() === "R" ? "right" : "left";
+        const entry: BiopsySide = { gg: gradeGroup(parseInt(m[2] ?? "0", 10), parseInt(m[3] ?? "0", 10)) };
+        if (m[4]) entry.maxPct = parseInt(m[4], 10);
+        if (m[6]) entry.cores = parseInt(m[6], 10);
+        out.biopsy[side] = entry;
+      }
+    } else if (/^asa\b/i.test(key)) {
+      const m = /\bASA\s*(?:class\s*)?([1-5])\b/i.exec(rest);
+      if (m?.[1]) out.asaClass = parseInt(m[1], 10);
+    } else if (/^lns?\s+on\s+psma/i.test(key)) {
+      if (rest && !EMPTY_CELL.test(rest)) out.psmaNodePositive = true;
+    }
+
+    if (HISTORY_ROWS.test(key)) historyText.push(rest);
+    if (/^(?:abdominal wall|general surgery)/i.test(key) && !EMPTY_CELL.test(rest) && SURGERY_WORDS.test(rest)) {
+      out.history.prior_abdominal_surgery = true;
+    }
+  }
+
+  const blob = historyText.join(" ; ");
+  for (const [k, re] of HISTORY_TERMS) if (mentions(blob, re)) out.history[k] = true;
+  return out;
+}
+
 // ── Combined entry point ─────────────────────────────────────────────────────
 
 export interface SafeSheetResult {
   phi: SheetPhiResult;
   fields: SheetFields;
+  extras: SheetExtras;
   lesions: LesionRow[];
   note: ParsedNote;
   warnings: string[];
@@ -329,5 +512,72 @@ export function parseSafeSheet(input: string): SafeSheetResult {
   if (fields.prostateVolumeCc === undefined && note.prostateVolumeCc === undefined) {
     warnings.push("No prostate volume on the sheet — PSA density cannot be computed and COMPASS will use its default.");
   }
-  return { phi, fields, lesions: dedupeLesions(note.lesions), note, warnings };
+  return { phi, fields, extras: parseSheetExtras(phi.text), lesions: dedupeLesions(note.lesions), note, warnings };
+}
+
+// ── Sheet → case patch (shared by the Paste-note import and the batch tool) ──
+
+export interface SheetImportPatch {
+  /** Demographics and whole-gland biopsy fields — the NoteImportClinical shape. */
+  clinical: {
+    vol?: number; gg?: number; cores?: number; maxcore?: number;
+    age?: number; psa?: number; bmi?: number; shim?: number; ipss?: number;
+  };
+  /**
+   * Extra `updateClinicalForm` fields: per-side biopsy, laterality, history
+   * flags, ASA, biopsy session, PSMA node. Keys are ClinicalState names.
+   */
+  form: Record<string, unknown>;
+  /**
+   * The sheet gives biopsy results per side with no location. The note parser
+   * spreads them over invented levels, and the app derives cores/grade from
+   * any Bx rows it finds, overwriting the exact per-side values — so when the
+   * sheet has them, the Bx rows are dropped.
+   */
+  dropBxRows: boolean;
+  nsExpectedL?: number;
+  nsExpectedR?: number;
+  /** Scrubbed text of every row, for the case record. */
+  notes: Record<string, string>;
+}
+
+export function sheetImportPatch(sheet: SafeSheetResult): SheetImportPatch {
+  const { fields, note, extras } = sheet;
+  const clinical: SheetImportPatch["clinical"] = {
+    vol: fields.prostateVolumeCc ?? note.prostateVolumeCc,
+    gg: note.biopsyGG,
+    cores: fields.positiveCores ?? note.biopsyTotalCores,
+    maxcore: note.biopsyMaxCorePct,
+    age: fields.age,
+    psa: fields.psa ?? note.psa,
+    bmi: fields.bmi,
+    shim: fields.shim ?? note.shim,
+    ipss: fields.ipss,
+  };
+  const form: Record<string, unknown> = { ...extras.history };
+  const { left, right } = extras.biopsy;
+  const sides = [left, right].filter((x): x is BiopsySide => !!x);
+  if (sides.length) {
+    clinical.gg = Math.max(...sides.map((x) => x.gg));
+    const pcts = sides.map((x) => x.maxPct).filter((x): x is number => x !== undefined);
+    if (pcts.length) clinical.maxcore = Math.max(...pcts);
+    const cores = sides.map((x) => x.cores).filter((x): x is number => x !== undefined);
+    if (cores.length) clinical.cores = cores.reduce((a, b) => a + b, 0);
+    form.laterality = left && right ? "bilateral" : left ? "left" : "right";
+    if (left) Object.assign(form, { gg_left: left.gg, cores_left: left.cores ?? null, mc_left: left.maxPct ?? null });
+    if (right) Object.assign(form, { gg_right: right.gg, cores_right: right.cores ?? null, mc_right: right.maxPct ?? null });
+  }
+  if (extras.biopsySessions !== undefined) form.biopsy_sessions = extras.biopsySessions;
+  if (extras.asaClass !== undefined) form.asa_class = extras.asaClass;
+  if (extras.psmaNodePositive) form.psma_ln = true;
+
+  const out: SheetImportPatch = {
+    clinical: Object.fromEntries(Object.entries(clinical).filter(([, v]) => v !== undefined)),
+    form,
+    dropBxRows: sides.length > 0,
+    notes: extras.notes,
+  };
+  if (fields.nsExpectedL !== undefined) out.nsExpectedL = fields.nsExpectedL;
+  if (fields.nsExpectedR !== undefined) out.nsExpectedR = fields.nsExpectedR;
+  return out;
 }

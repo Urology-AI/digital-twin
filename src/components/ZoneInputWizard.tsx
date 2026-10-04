@@ -556,6 +556,7 @@ export function ZoneInputWizard() {
   const activeId           = usePatientStore((s) => s.activeId);
   const threeZones         = usePatientStore((s) => s.threeZones);
   const updateLesionRows   = usePatientStore((s) => s.updateLesionRows);
+  const applySheetCaseData = usePatientStore((s) => s.applySheetCaseData);
   const updateClinicalForm = usePatientStore((s) => s.updateClinicalForm);
   const pushHistory        = usePatientStore((s) => s.pushHistory);
   const setPatientName     = usePatientStore((s) => s.setPatientName);
@@ -799,7 +800,7 @@ export function ZoneInputWizard() {
   };
 
   const applyNoteImport = useCallback(
-    (rows: import("@/types/lesion").LesionRow[], clinical: NoteImportClinical) => {
+    (rows: import("@/types/lesion").LesionRow[], clinical: NoteImportClinical, sheet: import("@/lib/safeSheet").SheetImportPatch | null) => {
       const existingRows = zoneDataToRows(zoneData);
       const merged = rowsToZoneData([...existingRows, ...rows]);
       setZoneData(merged);
@@ -836,9 +837,14 @@ export function ZoneInputWizard() {
         setIpss(String(clinical.ipss));
         updateClinicalForm({ ipss: clinical.ipss });
       }
+      if (sheet) {
+        // Per-side biopsy, history flags, ASA, node: ClinicalState fields.
+        updateClinicalForm(sheet.form as never);
+        applySheetCaseData({ nsExpectedL: sheet.nsExpectedL, nsExpectedR: sheet.nsExpectedR, notes: sheet.notes });
+      }
       pushHistory();
     },
-    [zoneData, updateLesionRows, updateClinicalForm, pushHistory],
+    [zoneData, updateLesionRows, updateClinicalForm, applySheetCaseData, pushHistory],
   );
 
   if (!entry) return null;
