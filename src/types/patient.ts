@@ -242,6 +242,12 @@ export interface Prostate3DInputV1 {
   };
   zones: ZoneMap;
   lesions: import("./lesion").LesionRow[];
+  /**
+   * Scrubbed text of every safe-sheet row, keyed by row label — DVT risk, type
+   * of surgery, DRE, comments and the rest. Kept so batch-imported cases lose
+   * nothing; recorded for the clinician, never read by a model.
+   */
+  sheet_notes?: Record<string, string>;
   /** clinician sign-off on the patient pre-op counseling page */
   preop_review?: { reviewer: string; date: string; fingerprint: string } | null;
   media?: Record<

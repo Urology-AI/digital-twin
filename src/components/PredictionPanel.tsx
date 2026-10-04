@@ -1,3 +1,4 @@
+import { SheetNotesCard } from "@/components/SheetNotesCard";
 import { MissingInputsNotice } from "@/components/MissingInputsNotice";
 import { Button } from "@/components/ui/button";
 import {
@@ -237,6 +238,7 @@ export function PredictionPanel() {
         </CardHeader>
         <CardContent className="pt-4">
           <CaseSummary />
+          <SheetNotesCard />
 
           {/* 6 prediction value cards — extra top margin so floating overlays
               (e.g. CSPCA-by-zone popout from the 3D canvas) don't overlap. */}

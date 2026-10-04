@@ -99,6 +99,12 @@ interface PatientState {
   /** Wholesale-replaces one patient's record + lesions — used by patient view's "reset to original" after local-only edits (e.g. Modifiable Factors exploration). */
   restorePatientRecord: (id: string, record: Prostate3DInputV1, lesionRows: LesionRow[]) => void;
   setPreopReview: (review: Prostate3DInputV1["preop_review"]) => void;
+  /**
+   * Safe-sheet import: the surgeon's expected NS grade (plan.ns_expected_*, kept
+   * apart from ns_override) and the sheet's row text (sheet_notes, never read
+   * by a model). Neither is a clinical-form field, so they have their own action.
+   */
+  applySheetCaseData: (data: { nsExpectedL?: number; nsExpectedR?: number; notes?: Record<string, string> }) => void;
   newCase: () => void;
   /** Load a read-only demo template, replacing any existing copy of it. */
   loadDemoCase: (demo: import("@/data/demoCases").DemoCase) => void;
@@ -307,6 +313,24 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
       const threeZones = clone(createBaseThreeZones());
       const predictions = runCompassModels(S, working, entry.lesionRows, threeZones);
       return { S, predictions };
+    },
+
+    applySheetCaseData: ({ nsExpectedL, nsExpectedR, notes }) => {
+      const { activeId, patients } = get();
+      if (!activeId) return;
+      set({
+        patients: patients.map((p) => {
+          if (p.id !== activeId) return p;
+          const record = clone(p.record);
+          if (nsExpectedL !== undefined || nsExpectedR !== undefined) {
+            const PL = (record.plan ??= {});
+            if (nsExpectedL !== undefined) PL.ns_expected_l = nsExpectedL;
+            if (nsExpectedR !== undefined) PL.ns_expected_r = nsExpectedR;
+          }
+          if (notes && Object.keys(notes).length) record.sheet_notes = { ...record.sheet_notes, ...notes };
+          return { ...p, record };
+        }),
+      });
     },
 
     setPreopReview: (review) => {
@@ -593,6 +617,12 @@ export const usePatientStore = create<PatientState>()((set, get) => ({
         lesionsFromRows(p.lesionRows),
       );
       const out = buildProstateRecord(S, p.lesionRows);
+      // buildProstateRecord rebuilds from ClinicalState, which has no home for
+      // these two — carry them across or an export silently loses them.
+      const { ns_expected_l, ns_expected_r } = p.record.plan ?? {};
+      if (ns_expected_l !== undefined) out.plan = { ...out.plan, ns_expected_l };
+      if (ns_expected_r !== undefined) out.plan = { ...out.plan, ns_expected_r };
+      if (p.record.sheet_notes) out.sheet_notes = p.record.sheet_notes;
       out.zones = mergeZones(p.record.zones);
       mapLesionsToZones(out.zones, p.lesionRows, S);
       return JSON.stringify(out, null, 2);

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SurgicalPlanPanel } from "@/components/SurgicalPlanPanel";
+import { SheetNotesCard } from "@/components/SheetNotesCard";
 import { PlanningInputsPanel } from "@/components/PlanningInputsPanel";
 import { useUiStore } from "@/store/uiStore";
 
@@ -19,6 +20,7 @@ export function SurgicalPlanWorkspace() {
       <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
         {/* Left: surgical history & anatomy — feeds inflammation risk + the plan */}
         <div className="overflow-y-auto overflow-x-hidden overscroll-contain app-scroll border-b border-border px-5 py-5 lg:w-[360px] lg:shrink-0 lg:border-b-0 lg:border-r">
+          <SheetNotesCard />
           <PlanningInputsPanel />
         </div>
         {/* Right: operative plan + inflammation risk + impact */}

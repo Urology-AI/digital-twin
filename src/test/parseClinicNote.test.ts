@@ -81,3 +81,17 @@ Gleason 6 (3+3) 10% Right Apex PZ 1/1 cores 2mm
     expect(warnings.some((w) => /no gleason/i.test(w))).toBe(true);
   });
 });
+
+
+describe("abutment wording", () => {
+  const abut = (line: string) => parseClinicNote(`MUS\n${line}`).lesions[0]?.mriAbutment;
+
+  it("reads 'abut no' as no contact, not contact", () => {
+    expect(abut("PRIMUS 4, Right PL PZ Mid, abut no, EPE no.")).toBe(0);
+  });
+  it("still reads positive and negative forms", () => {
+    expect(abut("PRIMUS 3, Left PL PZ Mid, Abut yes, EPE no.")).toBe(1);
+    expect(abut("PRIMUS 3, Left PL PZ Mid, no abutment")).toBe(0);
+    expect(abut("PRIMUS 3, Left PL PZ Mid, abuts capsule")).toBe(1);
+  });
+});

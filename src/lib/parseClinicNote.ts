@@ -72,8 +72,9 @@ function parseZone(text: string): string {
 
 function parseAbutment(text: string): number {
   if (/\bbroad\s+contact\b|\bbroad\s+abut/i.test(text)) return 2;
+  // Negatives first: the bare-word check below also matches "abut no".
+  if (/no\s+abut|abut\w*\s*(no\b|absent|none)|abut\w*\s*:\s*no\b/i.test(text)) return 0;
   if (/abut\s*(yes|present|contact)/i.test(text) || /\babuts?\b/i.test(text)) return 1;
-  if (/no\s+abut|abut\s*(no|absent|none)|abut\s*:\s*no/i.test(text)) return 0;
   return -1;
 }
 
