@@ -15,7 +15,6 @@ import {
 import { predictSviPatient, predictSviSide } from "@/lib/models/svi";
 import { predictUpgrade } from "@/lib/models/upgrade";
 import { predictPsm } from "@/lib/models/psm";
-import { predictBcrPreop } from "@/lib/models/bcr";
 import { predictLni } from "@/lib/models/lni";
 
 const S = defaultClinicalState();
@@ -64,13 +63,6 @@ describe("COMPASS model output regression", () => {
   it("PSM high-risk", () =>
     expect(predictPsm({ ...S, gg: 4, psa: 18, vol: 20, bilateral: 1 }))
       .toBe(0.32921649472640463));
-
-  // BCR
-  it("BCR preop default state", () =>
-    expect(predictBcrPreop(S)).toBe(0.05146255542584055));
-  it("BCR preop high-risk", () =>
-    expect(predictBcrPreop({ ...S, gg: 4, psa: 25, vol: 30, mri_svi: 1, cores: 10 }))
-      .toBe(0.24622342651679394));
 
   // LNI
   it("LNI default state", () =>

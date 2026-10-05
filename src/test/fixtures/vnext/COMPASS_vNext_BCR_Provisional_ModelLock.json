@@ -1,0 +1,405 @@
+{
+  "model_name": "COMPASS vNext Preoperative BCR Survival",
+  "version": "vNext-bcr-preop-candidate-2026-09-27",
+  "status": "PROVISIONAL DEVELOPMENT LOCK — pending structured salvage RT/ADT adjudication and final absolute-risk recalibration",
+  "intended_role": "Preoperative ranking and 12/24/36-month biochemical recurrence risk after radical prostatectomy",
+  "endpoint": {
+    "primary": "Biochemical recurrence after RP; persistent PSA excluded as a separate state",
+    "event_time": "Exact interval from radical-prostatectomy date to stored postoperative PSA/BCR endpoint date",
+    "censor_time": "Exact interval from RP date to stored postoperative PSA/follow-up endpoint date for BCR-free patients",
+    "sensitivity": "Composite biochemical failure = BCR or persistent PSA"
+  },
+  "development_cohort": {
+    "surgery_year_max": 2023,
+    "n": 2219,
+    "events": 321
+  },
+  "temporal_validation_cohort": {
+    "surgery_years": "2024–2025",
+    "n": 556,
+    "events": 33
+  },
+  "architecture": {
+    "model": "L2-regularized Cox proportional hazards",
+    "l2_alpha": 0.001,
+    "ties": "Breslow",
+    "missingness": "Training-set mean imputation",
+    "standardization": "Training-set z-score after imputation",
+    "formula": "LP = sum(beta_k * z_k); risk(t) = 1 - exp(-H0(t) * exp(LP))"
+  },
+  "feature_order": [
+    "gg2",
+    "gg3",
+    "gg4_5",
+    "log_psad",
+    "pirads",
+    "mri_svi_clean",
+    "adc_mean",
+    "mri_epe"
+  ],
+  "coefficients_standardized": {
+    "gg2": 0.15674284114713927,
+    "gg3": 0.39305334290785354,
+    "gg4_5": 0.5537535687846893,
+    "log_psad": 0.23738471677077375,
+    "pirads": 0.18862118287721685,
+    "mri_svi_clean": 0.11095161648170719,
+    "adc_mean": -0.12250634502157372,
+    "mri_epe": 0.07301986166398523
+  },
+  "imputation_raw": {
+    "gg2": 0.40307275192046993,
+    "gg3": 0.23361952101220063,
+    "gg4_5": 0.23813827383642114,
+    "log_psad": -1.7767001600083165,
+    "pirads": 4.203431372549019,
+    "mri_svi_clean": 0.05732801595214357,
+    "adc_mean": 779.0122767857143,
+    "mri_epe": 0.17115054378935318
+  },
+  "scaler_mean": {
+    "gg2": 0.40307275192047,
+    "gg3": 0.23361952101220063,
+    "gg4_5": 0.23813827383642108,
+    "log_psad": -1.776700160008313,
+    "pirads": 4.2034313725490025,
+    "mri_svi_clean": 0.057328015952143326,
+    "adc_mean": 779.0122767857035,
+    "mri_epe": 0.1711505437893532
+  },
+  "scaler_scale": {
+    "gg2": 0.4898515402136896,
+    "gg3": 0.4225604413099129,
+    "gg4_5": 0.425367921062095,
+    "log_psad": 0.7901267056714066,
+    "pirads": 0.6006083682722367,
+    "mri_svi_clean": 0.22102966687586342,
+    "adc_mean": 132.15143999864623,
+    "mri_epe": 0.33419101664283546
+  },
+  "baseline_cumulative_hazard": {
+    "12_months": 0.06913325,
+    "24_months": 0.12034824,
+    "36_months": 0.18804861
+  },
+  "risk_tiers": {
+    "12_months": {
+      "low": "<5%",
+      "intermediate": "5–<15%",
+      "high": "≥15%"
+    },
+    "24_months": {
+      "low": "<10%",
+      "intermediate": "10–<25%",
+      "high": "≥25%"
+    },
+    "36_months": {
+      "low": "<15%",
+      "intermediate": "15–<35%",
+      "high": "≥35%"
+    }
+  },
+  "performance": {
+    "30x_repeated_5fold_development_cindex_mean": 0.7216169833309387,
+    "30x_repeated_5fold_development_cindex_sd": 0.0025804160312040123,
+    "fixed_seed_5fold_oof_cindex": 0.7204437176864465,
+    "development_calibration_slope_oof": 0.8975810648533135,
+    "temporal_2024_25_cindex": 0.698303647158609,
+    "temporal_calibration_slope": 1.0683962743300113
+  },
+  "horizon_calibration": {
+    "development_oof": {
+      "12m": {
+        "overall_pred": 0.08360498165771321,
+        "overall_km": 0.08339131977456571,
+        "low": {
+          "n": 865,
+          "pred": 0.035045426030828566,
+          "km": 0.02318646077752129
+        },
+        "intermediate": {
+          "n": 1095,
+          "pred": 0.08853457809426481,
+          "km": 0.0881987289822308
+        },
+        "high": {
+          "n": 259,
+          "pred": 0.22494130412578742,
+          "km": 0.26104802525732373
+        }
+      },
+      "24m": {
+        "overall_pred": 0.13800999909719489,
+        "overall_km": 0.13854648897603872,
+        "low": {
+          "n": 1042,
+          "pred": 0.0655783295513576,
+          "km": 0.06265643607260052
+        },
+        "intermediate": {
+          "n": 925,
+          "pred": 0.1602852088029437,
+          "km": 0.15708464686636958
+        },
+        "high": {
+          "n": 252,
+          "pred": 0.3557450415136425,
+          "km": 0.37428125980462645
+        }
+      },
+      "36m": {
+        "overall_pred": 0.2022070841033555,
+        "overall_km": 0.20382020901778475,
+        "low": {
+          "n": 1028,
+          "pred": 0.09995189558148228,
+          "km": 0.10544866793196572
+        },
+        "intermediate": {
+          "n": 908,
+          "pred": 0.23285915170639793,
+          "km": 0.242752166637052
+        },
+        "high": {
+          "n": 283,
+          "pred": 0.47530339653064596,
+          "km": 0.42307593609096583
+        }
+      }
+    },
+    "temporal_2024_25": {
+      "12m": {
+        "overall_pred": 0.07080982396921888,
+        "overall_km": 0.09469159643877989,
+        "low": {
+          "n": 236,
+          "pred": 0.03520786577614181,
+          "km": 0.07965006067078173
+        },
+        "intermediate": {
+          "n": 283,
+          "pred": 0.0847753303558739,
+          "km": 0.08618608224789037
+        },
+        "high": {
+          "n": 37,
+          "pred": 0.1910753327838898,
+          "km": 0.24486107281806202
+        }
+      },
+      "24m": {
+        "overall_pred": 0.11866709665545329,
+        "overall_km": 0.1332375238631356,
+        "low": {
+          "n": 284,
+          "pred": 0.0658324817048341,
+          "km": 0.07056155521797824
+        },
+        "intermediate": {
+          "n": 236,
+          "pred": 0.15313297178071125,
+          "km": 0.17130378465282503
+        },
+        "high": {
+          "n": 36,
+          "pred": 0.3095305443336468,
+          "km": 0.24980000000000002
+        }
+      },
+      "36m": {
+        "overall_pred": 0.1766490564155673,
+        "overall_km": 0.1332375238631356,
+        "note": "Immature follow-up; not a freeze criterion."
+      }
+    }
+  },
+  "bootstrap_coefficient_stability_300_refits": {
+    "gg2": {
+      "median": 0.16609086379449012,
+      "ci95": [
+        -0.060601966004885724,
+        0.4178491840489792
+      ],
+      "sign_stability": 0.9166666666666666
+    },
+    "gg3": {
+      "median": 0.3927285151769739,
+      "ci95": [
+        0.18811979537592885,
+        0.6392722370045172
+      ],
+      "sign_stability": 1.0
+    },
+    "gg4_5": {
+      "median": 0.5613185416835873,
+      "ci95": [
+        0.3690485935299596,
+        0.7774103053427243
+      ],
+      "sign_stability": 1.0
+    },
+    "log_psad": {
+      "median": 0.2360654142913035,
+      "ci95": [
+        0.13240740549673374,
+        0.3458657265223091
+      ],
+      "sign_stability": 1.0
+    },
+    "pirads": {
+      "median": 0.1833580192114302,
+      "ci95": [
+        0.07079427926752395,
+        0.31331295675914095
+      ],
+      "sign_stability": 1.0
+    },
+    "mri_svi_clean": {
+      "median": 0.11394944601445486,
+      "ci95": [
+        0.02825515906618899,
+        0.19261812503545392
+      ],
+      "sign_stability": 0.9933333333333333
+    },
+    "adc_mean": {
+      "median": -0.12936122410902623,
+      "ci95": [
+        -0.24357493165906138,
+        0.010062261040375404
+      ],
+      "sign_stability": 0.9633333333333334
+    },
+    "mri_epe": {
+      "median": 0.07205263043082868,
+      "ci95": [
+        -0.03932076176453324,
+        0.17051541255180652
+      ],
+      "sign_stability": 0.8766666666666667
+    }
+  },
+  "proportional_hazards_diagnostic": {
+    "note": "Schoenfeld-residual screening shows time dependence for some predictors, especially GG2, MRI SVI, and ADC. This is retained as a model limitation rather than adding time-varying terms to a 321-event development set.",
+    "gg2_p": 4.404508919901478e-12,
+    "gg3_p": 0.042049942091837086,
+    "gg4_5_p": 0.44201368423073906,
+    "log_psad_p": 0.05943056570111624,
+    "pirads_p": 0.47886289342679506,
+    "mri_svi_clean_p": 2.5856959647097474e-14,
+    "adc_mean_p": 0.00031515235316812714,
+    "mri_epe_p": 0.07956573796089712
+  },
+  "salvage_data_audit": {
+    "structured_salvage_rt_adt_fields_found": false,
+    "sources_checked": [
+      "Functional Outcomes",
+      "RARP Outcomes",
+      "Combined Data",
+      "Dataset 1-21-26",
+      "COMPASS Data",
+      "MRI",
+      "Additional MRI",
+      "PSMA",
+      "ExactVu",
+      "BCR file"
+    ],
+    "required_for_final_calibration_lock": [
+      "salvage RT yes/no and start date",
+      "salvage ADT yes/no and start date",
+      "PSA at salvage",
+      "salvage indication",
+      "exact qualifying BCR confirmation date"
+    ]
+  },
+  "regression_test_cases": {
+    "mean_reference": {
+      "raw": {
+        "gg2": 0.40307275192046993,
+        "gg3": 0.23361952101220063,
+        "gg4_5": 0.23813827383642114,
+        "log_psad": -1.7767001600083165,
+        "pirads": 4.203431372549019,
+        "mri_svi_clean": 0.05732801595214357,
+        "adc_mean": 779.0122767857143,
+        "mri_epe": 0.17115054378935318
+      },
+      "linear_predictor": 0.0,
+      "risk_12m": 0.06679767672599002,
+      "risk_24m": 0.11338837108318611,
+      "risk_36m": 0.1714255684338406
+    },
+    "gg1_low_risk": {
+      "raw": {
+        "gg2": 0,
+        "gg3": 0,
+        "gg4_5": 0,
+        "log_psad": -2.5668268656797197,
+        "pirads": 3,
+        "mri_svi_clean": 0,
+        "adc_mean": 911.1637167843497,
+        "mri_epe": 0
+      },
+      "linear_predictor": -1.4602973327886999,
+      "risk_12m": 0.015922352740000978,
+      "risk_24m": 0.027554180897207736,
+      "risk_36m": 0.042719402240325
+    },
+    "gg2_intermediate": {
+      "raw": {
+        "gg2": 1,
+        "gg3": 0,
+        "gg4_5": 0,
+        "log_psad": -1.776700160008313,
+        "pirads": 4,
+        "mri_svi_clean": 0,
+        "adc_mean": 779.0122767857035,
+        "mri_epe": 0
+      },
+      "linear_predictor": -0.4663757665315367,
+      "risk_12m": 0.042438489426679715,
+      "risk_24m": 0.07271194725481689,
+      "risk_36m": 0.11126621073032905
+    },
+    "gg45_high_risk": {
+      "raw": {
+        "gg2": 0,
+        "gg3": 0,
+        "gg4_5": 1,
+        "log_psad": -0.9865734543369064,
+        "pirads": 5,
+        "mri_svi_clean": 1,
+        "adc_mean": 646.8608367870573,
+        "mri_epe": 1
+      },
+      "linear_predictor": 1.9098813055571204,
+      "risk_12m": 0.37299926144615403,
+      "risk_24m": 0.5563085517980418,
+      "risk_36m": 0.7191004707424219
+    },
+    "missing_imaging_gg3": {
+      "raw": {
+        "gg2": 0,
+        "gg3": 1,
+        "gg4_5": 0,
+        "log_psad": -1.776700160008313,
+        "pirads": null,
+        "mri_svi_clean": null,
+        "adc_mean": null,
+        "mri_epe": null
+      },
+      "linear_predictor": 0.2738755459876826,
+      "risk_12m": 0.08690354474591389,
+      "risk_24m": 0.14637568096831854,
+      "risk_36m": 0.2190885635076345
+    }
+  },
+  "governance": {
+    "do_not_retune_predictors_during_salvage_adjudication": true,
+    "external_or_prospective_validation_required": true,
+    "not_for_clinical_deployment": true,
+    "absolute_risk_calibration_final": false,
+    "ranking_architecture_fixed_for_next_validation_step": true
+  },
+  "sha256_canonical_without_hash_field": "b364b7910c0b5356fbc3c8d5c99f142a9df1e11a0d3da915cc7868627a10a585"
+}

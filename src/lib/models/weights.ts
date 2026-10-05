@@ -194,28 +194,6 @@ export const PSM: ModelWeights = {
 };
 
 // ---------------------------------------------------------------------------
-// BCR — biochemical recurrence (preoperative)
-// N=2,399 | CV AUC 0.743
-// Note: salvage-censoring applies — see MODEL_CARD.md BCR section.
-// ---------------------------------------------------------------------------
-
-export const BCR_PREOP: ModelWeights = {
-  intercept: -2.182256,
-  features: [
-    { name: "log_psad",           coeff: 0.2346, mean: -1.7865, scale: 0.7740 },
-    { name: "grade_group_2",      coeff: 0.2256, mean:  0.4328, scale: 0.4955 },
-    { name: "grade_group_3",      coeff: 0.3019, mean:  0.2451, scale: 0.4302 },
-    { name: "grade_group_4_5",    coeff: 0.4495, mean:  0.2171, scale: 0.4123 },
-    { name: "positive_cores",     coeff: 0.0341, mean:  6.3653, scale: 3.7894 },
-    { name: "pirads",             coeff: 0.1757, mean:  4.1834, scale: 0.6965 },
-    { name: "mri_svi",            coeff: 0.1222, mean:  0.0447, scale: 0.2065 },
-    { name: "ece_concordance",    coeff: 0.0843, mean:  0.1463, scale: 0.3868 },
-    { name: "decipher_imputed",   coeff: 0.2157, mean:  0.5528, scale: 0.1681 },
-    { name: "decipher_available", coeff: 0.4597, mean:  0.4185, scale: 0.4933 },
-  ],
-};
-
-// ---------------------------------------------------------------------------
 // LNI — lymph node invasion
 // N=663 (PLND cohort) | CV AUC 0.842 | 35 events
 // Parsimonious 4-feature model; outperforms 17-feature expansion.

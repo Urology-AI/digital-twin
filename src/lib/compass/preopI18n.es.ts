@@ -227,8 +227,8 @@ export const ES: Record<string, string> = {
   "18 months": "18 meses",
   "Erection recovery isn't estimated because erections were already weak before surgery. Your surgeon can talk through options with you.":
     "No se estima la recuperación de la erección porque las erecciones ya eran débiles antes de la cirugía. Su cirujano puede hablar con usted sobre las opciones.",
-  "Chance the cancer comes back (PSA rises again) in the years after surgery: about {n} in 100.":
-    "Probabilidad de que el cáncer regrese (que el PSA vuelva a subir) en los años después de la cirugía: unos {n} de 100.",
+  "36-month recurrence risk: chance the cancer comes back (PSA rises again) within 3 years after surgery, about {n} in 100.":
+    "Riesgo de recurrencia a 36 meses: probabilidad de que el cáncer regrese (que el PSA vuelva a subir) dentro de los 3 años después de la cirugía, unos {n} de 100.",
   "These numbers describe groups of men, not you personally. Recovery is often slower in the first months and keeps improving for up to 2 years. They depend on the surgery actually performed and on your own effort with exercises. Talk them through with your surgeon.":
     "Estos números describen grupos de hombres, no a usted en particular. La recuperación suele ser más lenta los primeros meses y sigue mejorando hasta 2 años. Dependen de la cirugía que realmente se haga y de su propio esfuerzo con los ejercicios. Háblelos con su cirujano.",
 
@@ -426,10 +426,10 @@ export const ES: Record<string, string> = {
     "Este es un modelo 3D de su próstata, coloreado según el riesgo de cáncer y hecho con las medidas de sus propios estudios. Arrástrelo para girarlo.",
 
   // ── My case ──
-  "Chance of the cancer coming back": "Probabilidad de que el cáncer regrese",
+  "Chance of the cancer coming back (36-month recurrence risk)": "Probabilidad de que el cáncer regrese (riesgo de recurrencia a 36 meses)",
   "— so about {n} in 100 men like you would not see it return": "— es decir, en unos {n} de cada 100 hombres como usted no regresaría",
-  "This is the estimated chance that PSA rises again in the years after surgery, based on your PSA, biopsy grade and scans before the operation. It is an estimate for a group of men with a similar picture, not a prediction about you, and it does not account for any treatment given after surgery. Your surgeon is the person to talk this through with.":
-    "Es la probabilidad estimada de que el PSA vuelva a subir en los años después de la cirugía, según su PSA, el grado de la biopsia y los estudios antes de la operación. Es una estimación para un grupo de hombres con una situación parecida, no una predicción sobre usted, y no tiene en cuenta ningún tratamiento después de la cirugía. Su cirujano es quien puede hablarlo con usted.",
+  "This is the estimated chance that PSA rises again within 3 years after surgery, based on your PSA, biopsy grade and scans before the operation. It is an estimate for a group of men with a similar picture, not a prediction about you, and it does not account for any treatment given after surgery. Your surgeon is the person to talk this through with.":
+    "Es la probabilidad estimada de que el PSA vuelva a subir dentro de los 3 años después de la cirugía, según su PSA, el grado de la biopsia y los estudios antes de la operación. Es una estimación para un grupo de hombres con una situación parecida, no una predicción sobre usted, y no tiene en cuenta ningún tratamiento después de la cirugía. Su cirujano es quien puede hablarlo con usted.",
   "Your diagnosis in plain words": "Su diagnóstico en palabras sencillas",
   "Type of cancer": "Tipo de cáncer",
   "Biopsy": "Biopsia",
