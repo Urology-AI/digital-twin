@@ -702,20 +702,24 @@ export function SurgicalPlanPanel() {
                 <div className="mt-1 text-[10px] text-muted-foreground">SHIM &lt; 12 at baseline</div>
               </div>
             )}
-            <ImpactTile
-              label="BCR 1 year"
-              sub="cumulative incidence"
-              baseline={bcr.baseline.y1}
-              withPlan={bcr.withPlan.y1}
-              invert
-            />
-            <ImpactTile
-              label="BCR 2–3 years"
-              sub="cumulative incidence"
-              baseline={bcr.baseline.y23}
-              withPlan={bcr.withPlan.y23}
-              invert
-            />
+            {Number.isFinite(predictions.bcr36) && (
+              <>
+              <ImpactTile
+                label="BCR 1 year"
+                sub="cumulative incidence"
+                baseline={bcr.baseline.y1}
+                withPlan={bcr.withPlan.y1}
+                invert
+              />
+              <ImpactTile
+                label="BCR 2–3 years"
+                sub="cumulative incidence"
+                baseline={bcr.baseline.y23}
+                withPlan={bcr.withPlan.y23}
+                invert
+              />
+              </>
+            )}
           </div>
 
           {withPlan.healerTier && withPlan.healerBands && (

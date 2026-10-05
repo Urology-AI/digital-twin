@@ -55,7 +55,7 @@ export function bcrByPlan(
   const basePsm = baseRow.psm / 100;
   const baseBlended =
     basePsm * (baseRow.bcr_psm / 100) + (1 - basePsm) * (baseRow.bcr_no / 100);
-  const anchor = baseBlended > 0 && Number.isFinite(preopBcr) ? preopBcr / baseBlended : 1;
+  const anchor = baseBlended > 0 ? preopBcr / baseBlended : 1;
 
   const bmiPenalty =
     S.bmi >= 35 ? MODIFIABLE_BCR.value.bmi_ge_35 : S.bmi >= 30 ? MODIFIABLE_BCR.value.bmi_ge_30 : 0;

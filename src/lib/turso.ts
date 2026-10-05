@@ -9,7 +9,7 @@ const CASE_COLS: (keyof CaseRecord)[] = [
   "gg_left","gg_right","mri_epe","mri_svi","mri_size","mri_abutment","mri_adc",
   "mus_ece","mus_svi","suv","psma_ln","psma_lesions","psma_base","psma_svi",
   "ev_lesions","ev_base","lesion_count",
-  "pred_ece","pred_ece_l","pred_ece_r","pred_svi","pred_upgrade","pred_psm","pred_bcr","pred_lni",
+  "pred_ece","pred_ece_l","pred_ece_r","pred_svi","pred_upgrade","pred_psm","pred_bcr","pred_bcr36","bcr_model_version","pred_lni",
   "ns_left","ns_right",
   "path_ece","path_ece_l","path_ece_r","path_svi","path_upgrade","path_psm","path_lni","path_gg",
   "path_ns_l","path_ns_r","notes",
@@ -42,7 +42,7 @@ const CREATE_SQL = `CREATE TABLE IF NOT EXISTS case_log (
   mus_ece REAL, mus_svi REAL, suv REAL, psma_ln REAL, psma_lesions INTEGER,
   psma_base REAL, psma_svi REAL, ev_lesions INTEGER, ev_base REAL, lesion_count INTEGER,
   pred_ece INTEGER, pred_ece_l INTEGER, pred_ece_r INTEGER, pred_svi INTEGER,
-  pred_upgrade INTEGER, pred_psm INTEGER, pred_bcr INTEGER, pred_lni INTEGER,
+  pred_upgrade INTEGER, pred_psm INTEGER, pred_bcr INTEGER, pred_bcr36 INTEGER, bcr_model_version TEXT, pred_lni INTEGER,
   ns_left INTEGER, ns_right INTEGER,
   path_ece INTEGER, path_ece_l INTEGER, path_ece_r INTEGER, path_svi INTEGER,
   path_upgrade INTEGER, path_psm INTEGER, path_lni INTEGER, path_gg INTEGER,
@@ -65,6 +65,8 @@ const CREATE_SQL = `CREATE TABLE IF NOT EXISTS case_log (
 // existing tables silently gain the column on first connect.
 const MIGRATE_COLS: [string, string][] = [
   ["full_record",       "TEXT"],
+  ["pred_bcr36",        "INTEGER"],
+  ["bcr_model_version", "TEXT"],
   ["age",               "INTEGER"],
   ["bmi",               "REAL"],
   ["shim",              "INTEGER"],
