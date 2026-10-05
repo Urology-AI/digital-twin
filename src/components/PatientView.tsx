@@ -300,12 +300,13 @@ function RecurrenceOutlook() {
   const predictions = usePatientStore((s) => s.predictions);
   const { t } = usePatientT();
   if (!predictions) return null;
-  const risk = Math.round(predictions.bcr * 100);
+  if (!Number.isFinite(predictions.bcr36)) return null;
+  const risk = Math.round(predictions.bcr36 * 100);
 
   return (
     <div className="rounded-xl border border-border bg-card p-4">
       <h3 className="mb-1 text-base font-semibold text-foreground">
-        {t("Chance of the cancer coming back")}
+        {t("Chance of the cancer coming back (36-month recurrence risk)")}
       </h3>
       <div className="flex items-baseline gap-2">
         <span className="text-3xl font-bold tabular-nums text-foreground">{risk}%</span>
@@ -314,7 +315,7 @@ function RecurrenceOutlook() {
         </span>
       </div>
       <p className="mt-2 text-xs leading-snug text-muted-foreground">
-        {t("This is the estimated chance that PSA rises again in the years after surgery, based on your PSA, biopsy grade and scans before the operation. It is an estimate for a group of men with a similar picture, not a prediction about you, and it does not account for any treatment given after surgery. Your surgeon is the person to talk this through with.")}
+        {t("This is the estimated chance that PSA rises again within 3 years after surgery, based on your PSA, biopsy grade and scans before the operation. It is an estimate for a group of men with a similar picture, not a prediction about you, and it does not account for any treatment given after surgery. Your surgeon is the person to talk this through with.")}
       </p>
     </div>
   );

@@ -2,7 +2,8 @@
  * Biochemical-recurrence projection: a "grade alone" baseline arm vs. a
  * "with the operative plan" arm.
  *
- * `predictBcrPreop` gives a single "will recur" probability. Here we blend the
+ * The preoperative Cox model gives 12/24/36-month risk; the 36-month risk is the
+ * single anchor used here. We blend the
  * NS-grade positive-margin rate (NSG_DATA) with BCR-if-margin figures, nudged by
  * plan choices (hydrodissection lowers PSM, obliterated planes raise it), anchor
  * to the preop BCR, and project onto 1-year and 2–3-year cumulative incidence.
@@ -54,7 +55,7 @@ export function bcrByPlan(
   const basePsm = baseRow.psm / 100;
   const baseBlended =
     basePsm * (baseRow.bcr_psm / 100) + (1 - basePsm) * (baseRow.bcr_no / 100);
-  const anchor = baseBlended > 0 ? preopBcr / baseBlended : 1;
+  const anchor = baseBlended > 0 && Number.isFinite(preopBcr) ? preopBcr / baseBlended : 1;
 
   const bmiPenalty =
     S.bmi >= 35 ? MODIFIABLE_BCR.value.bmi_ge_35 : S.bmi >= 30 ? MODIFIABLE_BCR.value.bmi_ge_30 : 0;

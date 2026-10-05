@@ -349,7 +349,7 @@ export function counselingContext(S: ClinicalState, P: CompassPredictions | null
     prior_pelvic_radiation: S.prior_pelvic_radiation,
     grade_group: S.gg, psa: S.psa, psma: psmaSummary(S).lines,
     predicted_lni: P ? Math.round(P.lni * 100) : null,
-    predicted_bcr: P ? Math.round(P.bcr * 100) : null,
+    predicted_bcr_36mo: P && Number.isFinite(P.bcr36) ? Math.round(P.bcr36 * 100) : null,
     recovery_stretch: recoveryStretch(S),
     flags: counselingFlags(S, P).map((f) => ({ title: f.title, level: f.level })),
   };
@@ -423,7 +423,7 @@ export interface LikelyOutcomes {
   continence: number[];
   /** % with erections firm enough for sex at the same timepoints; null if baseline SHIM < 12 */
   potency: number[] | null;
-  /** % chance PSA rises again (biochemical recurrence) */
+  /** % chance PSA rises again (biochemical recurrence) within 36 months */
   recurrence: number | null;
 }
 
@@ -462,7 +462,7 @@ export function likelyOutcomes(S: ClinicalState, P: CompassPredictions | null): 
   return {
     continence: r.continenceTimeline.map(pct),
     potency: r.shimValid ? r.potencyTimeline.map((v) => pct(v ?? 0)) : null,
-    recurrence: Math.round(P.bcr * 100),
+    recurrence: Number.isFinite(P.bcr36) ? Math.round(P.bcr36 * 100) : null,
   };
 }
 

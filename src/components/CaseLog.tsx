@@ -66,7 +66,8 @@ export interface CaseRecord {
   pred_svi: number;
   pred_upgrade: number | null;
   pred_psm: number;
-  pred_bcr: number;
+  /** 36-month BCR risk (%). Column name kept for the stored schema; rows saved before the Cox model hold the older single-horizon value. */
+  pred_bcr: number | null;
   pred_lni: number;
   ns_left: number;
   ns_right: number;
@@ -295,7 +296,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       pred_svi: Math.round(predictions.svi * 100),
       pred_upgrade: Number.isFinite(predictions.upgrade) ? Math.round(predictions.upgrade * 100) : null,
       pred_psm: Number.isFinite(predictions.psmL) && Number.isFinite(predictions.psmR) ? Math.round(Math.max(predictions.psmL, predictions.psmR) * 100) : 0,
-      pred_bcr: Math.round(predictions.bcr * 100),
+      pred_bcr: Number.isFinite(predictions.bcr36) ? Math.round(predictions.bcr36 * 100) : null,
       pred_lni: Math.round(predictions.lni * 100),
       ns_left: predictions.nsL,
       ns_right: predictions.nsR,
@@ -420,7 +421,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       "path_ns_l","path_ns_r","notes",
     ];
     const csv = [
-      headers.join(","),
+      headers.map((h) => (h === "pred_bcr" ? "pred_bcr_36mo" : h)).join(","),
       ...rows.map((r) =>
         headers.map((h) => {
           const v = (r as unknown as Record<string, unknown>)[h];

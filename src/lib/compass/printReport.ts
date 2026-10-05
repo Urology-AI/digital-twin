@@ -330,7 +330,7 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
     { label: "SVI",     val: predictions.svi },
     { label: "Upgrade", val: predictions.upgrade },
     { label: "PSM (L / R)", val: Math.max(predictions.psmL, predictions.psmR), txt: `${pct(predictions.psmL)} / ${pct(predictions.psmR)}` },
-    { label: "BCR",     val: predictions.bcr },
+    { label: "36-mo BCR risk", val: predictions.bcr36 },
     { label: "LNI",     val: predictions.lni },
   ];
 

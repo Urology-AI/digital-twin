@@ -34,6 +34,7 @@ import {
 import { cn } from "@/lib/utils";
 import { PSM_TIER_CUTOFFS, PSM_TIER_LABELS } from "@/lib/models/vnext/psmSide";
 import { assignTier } from "@/lib/models/vnext/common";
+import { bcrTier, type BcrHorizon } from "@/lib/models/vnext/bcrCox";
 
 function riskCls(v: number) {
   if (v < 0.15) return "text-emerald-500";
@@ -73,6 +74,22 @@ function psmBarCls(v: number) {
   return "bg-red-500";
 }
 const psmPct = (v: number) => (Number.isFinite(v) ? `${(v * 100).toFixed(1)}%` : "N/A");
+
+/** BCR Cox tiers per horizon: Low / Intermediate / High. */
+function bcrHTier(h: BcrHorizon, v: number) {
+  return Number.isFinite(v) ? bcrTier(h, v).label : "N/A";
+}
+function bcrHCls(h: BcrHorizon, v: number) {
+  if (!Number.isFinite(v)) return "text-muted-foreground/50";
+  const i = bcrTier(h, v).index;
+  return i === 1 ? "text-emerald-500" : i === 2 ? "text-amber-500" : "text-red-500";
+}
+function bcrHBarCls(h: BcrHorizon, v: number) {
+  if (!Number.isFinite(v)) return "bg-muted-foreground/30";
+  const i = bcrTier(h, v).index;
+  return i === 1 ? "bg-emerald-500" : i === 2 ? "bg-amber-500" : "bg-red-500";
+}
+const bcrPct = (v: number) => (Number.isFinite(v) ? `${(v * 100).toFixed(1)}%` : "N/A");
 
 function bcrColor(pct: number) {
   if (pct === 0) return "text-emerald-500";
@@ -162,7 +179,7 @@ export function PredictionPanel() {
     { k: "SVI",     v: predictions.svi,     neutral: sviNeutral },
     { k: "Upgrade", v: predictions.upgrade, neutral: !Number.isFinite(predictions.upgrade) },
     { k: "PSM",     v: Math.max(predictions.psmL, predictions.psmR), neutral: false },
-    { k: "BCR",     v: predictions.bcr,     neutral: false },
+    { k: "BCR",     v: predictions.bcr36,   neutral: false },
     { k: "LNI",     v: predictions.lni,     neutral: false },
   ] as const;
 
@@ -276,6 +293,41 @@ export function PredictionPanel() {
                                 className={cn("h-full rounded-full transition-all", psmBarCls(x.v))}
                                 style={{ width: `${Number.isFinite(x.v) ? Math.min(100, Math.round(x.v * 100 * 5)) : 0}%` }}
                               />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[220px]">
+                      {PREDICTION_EXPLANATIONS[p.k] ?? p.k}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              }
+              if (p.k === "BCR") {
+                const rows: { h: BcrHorizon; v: number }[] = [
+                  { h: 12, v: predictions.bcr12 },
+                  { h: 24, v: predictions.bcr24 },
+                  { h: 36, v: predictions.bcr36 },
+                ];
+                return (
+                  <Tooltip key={p.k}>
+                    <TooltipTrigger asChild>
+                      <div className="relative overflow-hidden rounded-xl border border-border/70 bg-card px-2 py-2 text-center shadow-sm transition-shadow hover:shadow-md cursor-default sm:px-3 sm:py-3">
+                        <div className="absolute inset-x-0 top-0 flex h-[3px]">
+                          {rows.map((x) => (
+                            <div key={x.h} className={cn("h-full w-1/3", bcrHBarCls(x.h, x.v))} />
+                          ))}
+                        </div>
+                        <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:text-xs">BCR</div>
+                        <div className="space-y-0.5">
+                          {rows.map((x) => (
+                            <div key={x.h} className="flex items-baseline justify-between gap-1">
+                              <span className="text-[10px] font-semibold text-muted-foreground/70 sm:text-xs">{x.h} mo</span>
+                              <span className="text-right">
+                                <span className={cn("text-sm font-bold tabular-nums sm:text-base lg:text-lg", bcrHCls(x.h, x.v))}>{bcrPct(x.v)}</span>
+                                <span className="block text-[10px] leading-tight text-muted-foreground/60 sm:text-xs">{bcrHTier(x.h, x.v)}</span>
+                              </span>
                             </div>
                           ))}
                         </div>

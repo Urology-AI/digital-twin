@@ -510,7 +510,7 @@ export function SurgicalPlanPanel() {
 
     const bcr = bcrByPlan(
       S,
-      predictions.bcr,
+      predictions.bcr36,
       {
         nsGrade: Math.max(plan.left.recommendedGrade, plan.right.recommendedGrade),
         hydrodissection: false,

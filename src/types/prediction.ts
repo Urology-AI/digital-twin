@@ -22,7 +22,13 @@ export interface CompassPredictions {
   /** Side-specific positive surgical margin vulnerability. NaN when it cannot be computed. */
   psmL: number;
   psmR: number;
-  bcr: number;
+  /**
+   * Preoperative BCR (Cox) at 12, 24 and 36 months. NaN when required inputs
+   * are missing. Single-number displays use bcr36 and must say "36-month".
+   */
+  bcr12: number;
+  bcr24: number;
+  bcr36: number;
   lni: number;
   extensive: number;
   nsL: number;

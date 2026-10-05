@@ -65,13 +65,14 @@ function OverviewTab() {
         </p>
         <p className="text-muted-foreground mt-2 leading-relaxed">
           Developed on <strong className="text-foreground">3,454 consecutive RARP patients</strong> (ECE/SVI),
-          3,137 for Upgrade, 4,203 for PSM, 663 for LNI (PLND dataset), 2,399 for BCR.
+          3,137 for Upgrade, 4,203 for PSM, 663 for LNI (PLND dataset), 2,219 for BCR (surgery through 2023).
           Mount Sinai Health System, January 2015 — January 2026.
         </p>
         <p className="text-muted-foreground mt-1 leading-relaxed text-[11px]">
           All models: L2-regularized logistic regression (C=1.0), 5-fold stratified CV,
           StandardScaler-within-fold (no leakage), mean imputation + Decipher availability flag.
           Bootstrap-corrected AUC via Harrell method (500 iterations); 95% CI via 1,000 bootstrap iterations.
+          The exception is BCR, a Cox time-to-event model (see the BCR tab), reported by C-index.
         </p>
       </section>
 
@@ -90,7 +91,7 @@ function OverviewTab() {
               ["Grade Upgrade", "3,137", "422 (13.5%)", "0.8121", "—", "—", "—"],
               ["LNI", "663", "35 (5.3%)", "0.8422", "—", "—", "—"],
               ["PSM (left / right)", "4,203 pts / 8,406 sides", "616 (7.3%)", "0.6934", "—", "—", "—"],
-              ["BCR", "2,399", "297 (12.4%)", "0.743", "—", "0.738–0.800", "+12.8%"],
+              ["BCR (Cox, provisional)", "2,219", "321 (14.5%)", "0.722 (C-index)", "—", "—", "—"],
             ].map(([ep, n, ev, cv, bc, ci, bss]) => (
               <tr key={ep} className="border-b border-border/40">
                 <Td className="font-medium text-foreground">{ep}</Td>
@@ -104,12 +105,12 @@ function OverviewTab() {
             ))}
           </tbody>
         </Tbl>
-        <Note>BC AUC = Bootstrap-corrected AUC (Harrell optimism, 500 iterations). BSS = Brier Skill Score vs null model. All models independently verified from raw data 2026-05-03. ECE, SVI, Grade Upgrade, PSM and LNI rows report repeated cross-validated AUC; bootstrap-corrected AUC, CI and BSS were not recomputed.</Note>
+        <Note>BC AUC = Bootstrap-corrected AUC (Harrell optimism, 500 iterations). BSS = Brier Skill Score vs null model. All models independently verified from raw data 2026-05-03. BCR reports the repeated cross-validated C-index (0.722; 2024–25 temporal C-index 0.698). ECE, SVI, Grade Upgrade, PSM and LNI rows report repeated cross-validated AUC; bootstrap-corrected AUC, CI and BSS were not recomputed.</Note>
       </section>
 
       <section>
         <H2>Common 22-Feature Input Set</H2>
-        <p className="text-muted-foreground text-[11px] mb-2">BCR uses this identical set. ECE, SVI, Upgrade, PSM and LNI use their own smaller input sets (see each tab). Sparse-coverage features are mean-imputed; Decipher also has an availability flag.</p>
+        <p className="text-muted-foreground text-[11px] mb-2">ECE, SVI, Upgrade, PSM, LNI and BCR use their own smaller input sets (see each tab). Sparse-coverage features are mean-imputed; Decipher also has an availability flag.</p>
         <Tbl>
           <thead>
             <tr className="border-b border-border"><Th>#</Th><Th>Feature</Th><Th>Source</Th><Th>Coverage</Th></tr>
@@ -361,7 +362,7 @@ function OverviewTab() {
         <ul className="text-[11px] text-muted-foreground space-y-1 list-disc list-inside">
           <li>Single institution (Mount Sinai). External validation in progress.</li>
           <li>PSM discrimination is modest (AUC 0.69) because intraoperative surgical technique strongly influences margins.</li>
-          <li>BCR: median follow-up ~14 months (immature); negative imaging coefficients reflect salvage-therapy informative censoring, not biology.</li>
+          <li>BCR is a provisional model; see the BCR tab for its limitations.</li>
           <li>Zone-level cohort N=299 with MUS zone data — larger validation needed.</li>
           <li>Decipher coverage 37%; mean imputation + availability flag documented and calibrated.</li>
           <li>Side-specific ECE is a research model on a smaller cohort (606 patients, 1,212 sides); side-specific SVI uses 664 patients / 1,328 sides (92 events).</li>
@@ -922,100 +923,65 @@ function PsmTab() {
   );
 }
 
-// ── BCR (BCR Supplementary) ─────────────────────────────────────────────────
+// ── BCR ─────────────────────────────────────────────────────────────────────
 function BcrTab() {
   return (
     <>
       <section>
-        <H2>BCR Model — With Salvage Caveat</H2>
+        <H2>BCR Model (Provisional)</H2>
+        <p className="text-muted-foreground text-[11px] mb-2">
+          Preoperative Cox proportional-hazards model for biochemical recurrence after radical prostatectomy.
+          Output is the estimated recurrence risk at 12, 24 and 36 months. Research use only.
+        </p>
         <Tbl>
           <thead><tr className="border-b border-border"><Th>Metric</Th><Th>Value</Th></tr></thead>
           <tbody className="text-muted-foreground">
             {[
-              ["N (analytic cohort)", "2,399"],
-              ["BCR events", "297 (12.4%)"],
-              ["Median follow-up", "~14 months"],
-              ["CV AUC", "0.743 (SD 0.024)"],
-              ["Apparent AUC", "0.763"],
-              ["95% CI", "0.738–0.800"],
-              ["Brier Skill Score", "+12.8%"],
+              ["Development cohort", "N = 2,219, 321 events (surgery through 2023)"],
+              ["Temporal cohort (2024–25)", "N = 556, 33 events"],
+              ["Internal C-index (repeated 5-fold)", "0.722"],
+              ["2024–25 temporal C-index", "0.698"],
+              ["Inputs", "Grade Group, PSA density, PI-RADS, MRI SVI, MRI EPE, ADC mean"],
+              ["Missing MRI inputs", "Replaced by the training-cohort mean"],
             ].map(([k, v]) => (
               <tr key={k} className="border-b border-border/40">
-                <Td className="font-medium text-foreground">{k}</Td><Td className="tabular-nums">{v}</Td>
+                <Td className="font-medium text-foreground">{k}</Td><Td>{v}</Td>
               </tr>
             ))}
           </tbody>
         </Tbl>
-        <Note>BCR defined as PSA ≥ 0.2 ng/mL on two consecutive measurements ≥ 6 weeks apart following radical prostatectomy.</Note>
+        <Note>BCR defined as PSA ≥ 0.2 ng/mL on two consecutive measurements ≥ 6 weeks apart following radical prostatectomy. Persistent PSA is handled as a separate state.</Note>
       </section>
 
       <section>
-        <H2>BCR — Locked Coefficients (22 Features)</H2>
-        <p className="text-muted-foreground text-[11px] mb-2">⚠ Flagged features show negative coefficients due to salvage-therapy informative censoring — not biological protection.</p>
+        <H2>Risk Tiers</H2>
         <Tbl>
           <thead>
-            <tr className="border-b border-border"><Th>Feature</Th><Th>β (standardized)</Th><Th>Flag</Th></tr>
+            <tr className="border-b border-border"><Th>Horizon</Th><Th>Low</Th><Th>Intermediate</Th><Th>High</Th></tr>
           </thead>
           <tbody className="text-muted-foreground">
             {[
-              ["Decipher Available (flag)", "+0.4597", "Strong positive predictor", ""],
-              ["Grade Group 4–5", "+0.4495", "Strong positive predictor", ""],
-              ["Grade Group 3", "+0.3019", "Strong positive predictor", ""],
-              ["Bx Cribriform", "+0.2626", "Moderate predictor", ""],
-              ["log(PSA Density)", "+0.2346", "Moderate predictor", ""],
-              ["Bx IDC", "+0.2323", "Moderate predictor", ""],
-              ["Grade Group 2", "+0.2256", "Moderate predictor", ""],
-              ["Decipher Score (imputed)", "+0.2157", "Moderate predictor", ""],
-              ["PI-RADS", "+0.1757", "Moderate predictor", ""],
-              ["Bx PNI", "−0.1420", "⚠ Salvage censoring", "text-amber-400"],
-              ["ADC Mean", "−0.1282", "⚠ Salvage censoring", "text-amber-400"],
-              ["MRI SVI", "+0.1222", "Small contribution", ""],
-              ["Bilateral Cores", "−0.0986", "⚠ Salvage censoring", "text-amber-400"],
-              ["MRI EPE", "+0.0843", "Small contribution", ""],
-              ["Capsular Abutment", "+0.0691", "Small contribution", ""],
-              ["PSMA SUVmax", "−0.0445", "⚠ Salvage censoring", "text-amber-400"],
-              ["MUS ECE", "−0.0358", "⚠ Salvage censoring", "text-amber-400"],
-              ["Positive Cores", "+0.0341", "Small contribution", ""],
-              ["PRI-MUS Score", "−0.0185", "⚠ Salvage censoring", "text-amber-400"],
-              ["Max Core %", "−0.0141", "⚠ Salvage censoring", "text-amber-400"],
-              ["PSMA EPE", "−0.0125", "⚠ Salvage censoring", "text-amber-400"],
-              ["Lesion Size (mm)", "−0.0121", "⚠ Salvage censoring", "text-amber-400"],
-            ].map(([f, b, flag, cls]) => (
-              <tr key={f} className="border-b border-border/40">
-                <Td className="text-foreground">{f}</Td>
-                <Td className={`tabular-nums font-mono ${cls}`}>{b}</Td>
-                <Td className="text-muted-foreground">{flag}</Td>
+              ["12 months", "<5%", "5–<15%", "≥15%"],
+              ["24 months", "<10%", "10–<25%", "≥25%"],
+              ["36 months", "<15%", "15–<35%", "≥35%"],
+            ].map(([h, lo, mid, hi]) => (
+              <tr key={h} className="border-b border-border/40">
+                <Td className="font-medium text-foreground">{h}</Td>
+                <Td className="tabular-nums">{lo}</Td><Td className="tabular-nums">{mid}</Td><Td className="tabular-nums">{hi}</Td>
               </tr>
             ))}
           </tbody>
         </Tbl>
+        <Note>Places that show a single BCR number use the 36-month risk and label it as such.</Note>
       </section>
 
       <section>
-        <H2>Salvage Therapy Informative Censoring</H2>
-        <p className="text-muted-foreground text-[11px] leading-relaxed mb-2">
-          High-risk imaging findings at preop → closer post-op monitoring → earlier salvage therapy initiation → PSA suppressed below 0.2 ng/mL → patient recorded as <em>BCR-free</em> → imaging risk factors appear paradoxically inversely associated with observed BCR.
-        </p>
-        <Tbl>
-          <thead>
-            <tr className="border-b border-border"><Th>Use Case</Th><Th>Validity</Th></tr>
-          </thead>
-          <tbody className="text-muted-foreground">
-            {[
-              ["Discrimination / ranking patients", "Valid (AUC 0.743)", "text-emerald-500"],
-              ["Identifying low-risk patients (high NPV)", "Valid", "text-emerald-500"],
-              ["Absolute risk calibration", "Caveated — suppressed by salvage in high-risk patients", "text-amber-400"],
-              ["Imaging-feature β interpretation", "Do not interpret negative coefficients as causal", "text-red-400"],
-              ["Counterfactual ('what if no salvage')", "Cannot answer with current data", "text-red-400"],
-            ].map(([use, val, cls]) => (
-              <tr key={use} className="border-b border-border/40">
-                <Td className="font-medium text-foreground">{use}</Td>
-                <Td className={cls}>{val}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </Tbl>
-        <Note>Salvage therapy not abstracted. Median follow-up ~14 months (immature — full BCR maturation requires 5+ years). Single-institution. Decipher coverage 37%.</Note>
+        <H2>Limitations</H2>
+        <ul className="text-[11px] text-muted-foreground space-y-1 list-disc list-inside">
+          <li>Absolute recurrence estimates are provisional because retrospective salvage-treatment timing was not fully structured.</li>
+          <li>The proportional-hazards assumption is not met for Grade Group 2, MRI SVI and ADC (diagnostic tests); the model was kept as locked rather than altered. Treat the horizon estimates as approximate, and the ranking of patients as the better-supported use.</li>
+          <li>Single institution (Mount Sinai). Follow-up in the 2024–25 cohort is short.</li>
+        </ul>
       </section>
     </>
   );

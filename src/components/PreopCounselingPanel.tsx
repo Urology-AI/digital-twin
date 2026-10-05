@@ -433,7 +433,7 @@ function Outcomes({ S }: { S: ClinicalState }) {
           : <p className="text-[0.95em] text-muted-foreground">{t("Erection recovery isn't estimated because erections were already weak before surgery. Your surgeon can talk through options with you.")}</p>}
         {o.recurrence !== null && (
           <p className="text-[0.95em] text-foreground">
-            {t("Chance the cancer comes back (PSA rises again) in the years after surgery: about {n} in 100.", { n: o.recurrence })}
+            {t("36-month recurrence risk: chance the cancer comes back (PSA rises again) within 3 years after surgery, about {n} in 100.", { n: o.recurrence })}
           </p>
         )}
       </div>

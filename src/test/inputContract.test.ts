@@ -29,7 +29,6 @@ import { predictEcePatient } from "@/lib/models/ece";
 import { predictSviPatient } from "@/lib/models/svi";
 import { predictUpgrade } from "@/lib/models/upgrade";
 import { predictPsm } from "@/lib/models/psm";
-import { predictBcrPreop } from "@/lib/models/bcr";
 import { predictLni } from "@/lib/models/lni";
 
 /** Minimal valid record. Optional predictors deliberately absent. */
@@ -334,7 +333,6 @@ describe("4. Phase 1A moved no v22 model output", () => {
     ["SVI", predictSviPatient],
     ["Upgrade", predictUpgrade],
     ["PSM", predictPsm],
-    ["BCR", predictBcrPreop],
     ["LNI", predictLni],
   ];
 

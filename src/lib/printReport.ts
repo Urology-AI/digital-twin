@@ -48,7 +48,7 @@ export function printReport(
     { l: "SVI", v: predictions.svi },
     { l: "Upgrade", v: predictions.upgrade },
     { l: "PSM (L / R)", v: Math.max(predictions.psmL, predictions.psmR), t: `${pct(predictions.psmL)} / ${pct(predictions.psmR)}` },
-    { l: "BCR", v: predictions.bcr },
+    { l: "BCR (36-month risk)", v: predictions.bcr36 },
     { l: "LNI", v: predictions.lni },
   ];
   let predHtml = `<table><tr>${predFields.map((p) => `<th>${p.l}</th>`).join("")}</tr>`;

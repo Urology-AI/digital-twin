@@ -149,7 +149,7 @@ export function OverviewPanel({ tab }: { tab: DesktopTab }) {
         <Row label="Lymph-node involvement" value={pct(predictions.lni)} tone={riskTone(predictions.lni)} />
         <Row label="Grade upgrade at surgery" value={pct(predictions.upgrade)} tone={riskTone(predictions.upgrade)} />
         <Row label="Positive surgical margin" value={`left ${pct(predictions.psmL)} · right ${pct(predictions.psmR)}`} tone={riskTone(Math.max(predictions.psmL, predictions.psmR))} />
-        <Row label="Biochemical recurrence" value={pct(predictions.bcr)} tone={riskTone(predictions.bcr)} />
+        <Row label="36-month BCR risk" value={pct(predictions.bcr36)} tone={riskTone(predictions.bcr36)} />
       </>
     ) : tab === "outcomes" ? (
       <>
