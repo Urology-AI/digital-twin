@@ -121,15 +121,35 @@ export function PlanningInputsPanel() {
     );
   };
 
-  const Group = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <details open className="group space-y-2 border-t border-border/60 pt-3.5 first:border-t-0 first:pt-0">
+  const Group = ({
+    title,
+    children,
+    count = 0,
+    defaultOpen = true,
+  }: {
+    title: string;
+    children: React.ReactNode;
+    /** number of items recorded in this group, shown beside the title */
+    count?: number;
+    defaultOpen?: boolean;
+  }) => (
+    <details open={defaultOpen} className="group space-y-2 border-t border-border/60 pt-3.5 first:border-t-0 first:pt-0">
       <summary className="flex cursor-pointer list-none items-center justify-between text-[11px] font-bold uppercase tracking-wider text-muted-foreground [&::-webkit-details-marker]:hidden">
-        <h3>{title}</h3>
+        <span className="flex items-center gap-2">
+          <h3>{title}</h3>
+          {count > 0 && (
+            <span className="rounded-full bg-primary/10 px-1.5 py-px text-[10px] font-bold normal-case tracking-normal text-primary">
+              {count}
+            </span>
+          )}
+        </span>
         <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" aria-hidden />
       </summary>
       <div className="space-y-2 pt-2">{children}</div>
     </details>
   );
+
+  const on = (...keys: BoolKey[]) => keys.filter((k) => S[k]).length;
 
   // Count only factors that actually move the score; context-only toggles
   // (zero weight) are recorded but must not inflate the headline number.
@@ -186,7 +206,7 @@ export function PlanningInputsPanel() {
           )}
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Feeds the inflammation risk and the operative plan.
+          Feeds plane risk, bladder-neck and apical difficulty, and the operative plan.
         </p>
       </CardHeader>
 
@@ -233,7 +253,16 @@ export function PlanningInputsPanel() {
           </div>
         </Group>
 
-        <Group title="Median lobe">
+        <Group title="Gates — checked before the plan is scored" count={on("flag_active_infection","flag_imaging_discordant","flag_mri_artifact","flag_key_data_missing")} defaultOpen={on("flag_active_infection","flag_imaging_discordant","flag_mri_artifact","flag_key_data_missing") > 0}>
+          <div className="grid grid-cols-1 gap-2">
+            <Toggle k="flag_active_infection" label="Active infection (prostatitis, abscess, fistula, sepsis, or positive culture with symptoms) — defers surgery" />
+            <Toggle k="flag_imaging_discordant" label="Imaging discordant (MRI/PSMA/biopsy/micro-US disagree) — forces review" />
+            <Toggle k="flag_mri_artifact" label="MRI degraded by hip hardware or motion — downgrades confidence" />
+            <Toggle k="flag_key_data_missing" label="Key data missing (no MRI plane read, no baseline IIEF, or prior operative reports unavailable)" />
+          </div>
+        </Group>
+
+        <Group title="Median lobe" count={S.median_lobe_grade > 0 ? 1 : 0}>
           <Seg<number>
             value={S.median_lobe_grade}
             onChange={(v) => updateClinicalForm({ median_lobe_grade: v })}
@@ -244,47 +273,28 @@ export function PlanningInputsPanel() {
               { label: "3", value: 3 },
             ]}
           />
+          <p className="text-[11px] text-muted-foreground">Feeds the bladder-neck tier.</p>
         </Group>
 
-        <Group title="Prior BPH surgery">
+        <Group title="Prior BPH surgery" count={on("prior_turp","prior_urolift","prior_greenlight","prior_holep","prior_rezum","bph_procedure_complicated")}>
           <div className="grid grid-cols-2 gap-2">
             <Toggle k="prior_turp" label="TURP" />
             <Toggle k="prior_urolift" label="Urolift" />
             <Toggle k="prior_greenlight" label="GreenLight" />
             <Toggle k="prior_holep" label="HoLEP" />
             <Toggle k="prior_rezum" label="Rezūm" />
-            <Toggle k="five_ari_long_term" label="5-ARI ≥ 12 months" hint="Effect on the plane is uncertain in direction" wide />
-            <Toggle k="neoadjuvant_adt" label="Neoadjuvant ADT" hint="Weak evidence; not added on top of prior radiation" wide />
             <Toggle k="bph_procedure_complicated" label="Complicated TURP / HoLEP / laser" hint="Capsular perforation, extravasation, infection or reoperation" wide />
           </div>
         </Group>
 
-        <Group title="Urinary / prostatic history">
+        <Group title="Hormonal therapy" count={on("five_ari_long_term", "neoadjuvant_adt")}>
           <div className="grid grid-cols-2 gap-2">
-            <Toggle k="urinary_retention" label="Retention" />
-            <Toggle k="recurrent_uti" label="Recurrent UTI" />
-            <Toggle k="treated_prostatitis" label="Prostatitis Rx" />
-            <Toggle k="biopsy_shows_inflammation" label="Biopsy inflammation" />
-          </div>
-          <div className="flex items-center justify-between pt-1">
-            <span className="text-xs font-semibold text-foreground">Biopsy sessions</span>
-            <Input
-              type="number"
-              min={1}
-              max={10}
-              value={S.biopsy_sessions}
-              onChange={(e) =>
-                updateClinicalForm({ biopsy_sessions: Math.max(1, Number(e.target.value) || 1) })
-              }
-              className="h-8 w-16 text-sm"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <Toggle k="biopsy_recent_or_complicated" label="Recent or complicated biopsy" hint="Transrectal complication, or less than 6 weeks before surgery" wide />
+            <Toggle k="five_ari_long_term" label="5-ARI ≥ 12 months" hint="Effect on the plane is uncertain in direction" wide />
+            <Toggle k="neoadjuvant_adt" label="Neoadjuvant ADT" hint="Weak evidence; not added on top of prior radiation" wide />
           </div>
         </Group>
 
-        <Group title="Pelvic conditions">
+        <Group title="Pelvic conditions" count={on("prior_pelvic_radiation","radiation_brachytherapy","radiation_proctitis","crohns","ulcerative_colitis","diverticulitis","pelvic_abscess","hernia_mesh","rectal_fistula","catheter_prolonged_or_traumatic") + (S.prior_pelvic_surgery !== "none" ? 1 : 0) + (S.penile_prosthesis_reservoir !== "none" ? 1 : 0)}>
           <div className="grid grid-cols-2 gap-2">
             <Toggle k="prior_pelvic_radiation" label="Pelvic radiation" />
             <Toggle k="radiation_brachytherapy" label="Brachytherapy / combined" hint="Radiation modality (expert prior)" />
@@ -323,7 +333,7 @@ export function PlanningInputsPanel() {
           </div>
         </Group>
 
-        <Group title="Pelvic fat (imaging)">
+        <Group title="Pelvic fat (imaging)" count={S.pelvic_visceral_fat_cm3 !== null ? 1 : 0}>
           <div className="space-y-1">
             <label className="text-xs font-semibold text-foreground">
               Pelvic visceral fat <span className="font-normal text-muted-foreground">(cm³; ≥ 1400 prolongs surgery, replaces BMI term)</span>
@@ -343,53 +353,7 @@ export function PlanningInputsPanel() {
           </div>
         </Group>
 
-        <Group title="Systemic inflammatory markers">
-          <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-foreground">
-                hs-CRP <span className="font-normal text-muted-foreground">(mg/L)</span>
-              </label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step={0.1}
-                value={S.crp ?? ""}
-                onChange={(e) => {
-                  const n = parseFloat(e.target.value);
-                  updateClinicalForm({ crp: isNaN(n) ? null : n });
-                }}
-                className="h-8 w-20 text-sm"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-foreground">NLR</label>
-              <Input
-                type="number"
-                min={0}
-                max={20}
-                step={0.1}
-                value={S.nlr ?? ""}
-                onChange={(e) => {
-                  const n = parseFloat(e.target.value);
-                  updateClinicalForm({ nlr: isNaN(n) ? null : n });
-                }}
-                className="h-8 w-20 text-sm"
-              />
-            </div>
-          </div>
-        </Group>
-
-        <Group title="Gates — checked before the plan is scored">
-          <div className="grid grid-cols-1 gap-2">
-            <Toggle k="flag_active_infection" label="Active infection (prostatitis, abscess, fistula, sepsis, or positive culture with symptoms) — defers surgery" />
-            <Toggle k="flag_imaging_discordant" label="Imaging discordant (MRI/PSMA/biopsy/micro-US disagree) — forces review" />
-            <Toggle k="flag_mri_artifact" label="MRI degraded by hip hardware or motion — downgrades confidence" />
-            <Toggle k="flag_key_data_missing" label="Key data missing (no MRI plane read, no baseline IIEF, or prior operative reports unavailable)" />
-          </div>
-        </Group>
-
-        <Group title="MRI — periprostatic tissue">
+        <Group title="MRI — periprostatic tissue" count={on("mri_periprostatic_fat_stranding","mri_post_biopsy_hemorrhage") + (S.mri_periprostatic_inflammation !== "none" ? 1 : 0) + (S.mri_denonvilliers > 0 ? 1 : 0)}>
           <Seg
             value={S.mri_periprostatic_inflammation}
             onChange={(v) => updateClinicalForm({ mri_periprostatic_inflammation: v })}
@@ -495,6 +459,69 @@ export function PlanningInputsPanel() {
             ]}
           />
         </Group>
+
+        <Group title="Urinary / prostatic history" defaultOpen={false} count={on("urinary_retention","recurrent_uti","treated_prostatitis","biopsy_shows_inflammation","biopsy_recent_or_complicated")}>
+          <div className="grid grid-cols-2 gap-2">
+            <Toggle k="urinary_retention" label="Retention" />
+            <Toggle k="recurrent_uti" label="Recurrent UTI" />
+            <Toggle k="treated_prostatitis" label="Prostatitis Rx" />
+            <Toggle k="biopsy_shows_inflammation" label="Biopsy inflammation" />
+          </div>
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-xs font-semibold text-foreground">Biopsy sessions</span>
+            <Input
+              type="number"
+              min={1}
+              max={10}
+              value={S.biopsy_sessions}
+              onChange={(e) =>
+                updateClinicalForm({ biopsy_sessions: Math.max(1, Number(e.target.value) || 1) })
+              }
+              className="h-8 w-16 text-sm"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-2 pt-1">
+            <Toggle k="biopsy_recent_or_complicated" label="Recent or complicated biopsy" hint="Transrectal complication, or less than 6 weeks before surgery" wide />
+          </div>
+        </Group>
+
+        <Group title="Systemic inflammatory markers" defaultOpen={false} count={(S.crp !== null ? 1 : 0) + (S.nlr !== null ? 1 : 0)}>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-foreground">
+                hs-CRP <span className="font-normal text-muted-foreground">(mg/L)</span>
+              </label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.1}
+                value={S.crp ?? ""}
+                onChange={(e) => {
+                  const n = parseFloat(e.target.value);
+                  updateClinicalForm({ crp: isNaN(n) ? null : n });
+                }}
+                className="h-8 w-20 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-foreground">NLR</label>
+              <Input
+                type="number"
+                min={0}
+                max={20}
+                step={0.1}
+                value={S.nlr ?? ""}
+                onChange={(e) => {
+                  const n = parseFloat(e.target.value);
+                  updateClinicalForm({ nlr: isNaN(n) ? null : n });
+                }}
+                className="h-8 w-20 text-sm"
+              />
+            </div>
+          </div>
+        </Group>
+
       </CardContent>
     </Card>
   );

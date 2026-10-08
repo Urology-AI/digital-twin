@@ -4,6 +4,8 @@ import { useUiStore } from "@/store/uiStore";
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "./clinicalFromRecord";
 import { COMPASS_TO_3D } from "./constants";
+import { computePlanningView } from "./planningView";
+import { buildPlanningHtml } from "./printPlanning";
 
 // ── Sector map: positive sectors colored by cancer probability (green→red) ───
 // Same ramp as the 3D model's overlayColor("cancer").
@@ -294,7 +296,8 @@ const ZONE_PRINT_LABELS: Record<string, string> = {
   "A-RM":   "R Ant Mid",  "A-LM":   "L Ant Mid",
 };
 
-export function buildPrintHtml(canvasDataUrl?: string): string | null {
+/** `modelViews`: anterior and posterior snapshots of the 3D model (white background). */
+export function buildPrintHtml(modelViews: string[] = []): string | null {
   const { patients, activeId, predictions, threeZones } = usePatientStore.getState();
 
   const entry = patients.find((p) => p.id === activeId);
@@ -308,14 +311,9 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
 
   const pct = (v: number) => (Number.isFinite(v) ? Math.round(v * 100) + "%" : "N/A");
 
+  // Colour only values that need attention; everything else prints black.
   const riskColor = (v: number) =>
-    v >= 0.3 ? "#922B21" : v >= 0.15 ? "#7D6608" : "#1A6B2F";
-
-  const riskBgColor = (v: number) =>
-    v >= 0.3 ? "#FDECEA" : v >= 0.15 ? "#FEF9E7" : "#EAFAF1";
-
-  const riskBorderColor = (v: number) =>
-    v >= 0.3 ? "#F1948A" : v >= 0.15 ? "#F8C471" : "#82E0AA";
+    v >= 0.3 ? "#A11D1D" : v >= 0.15 ? "#8A5A00" : "#111";
 
   // ── Zone heatmap (columns per modality, colored by cancer probability) ──────
   const prostateMapSVG = buildZoneHeatmapSVG(
@@ -334,19 +332,15 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
     { label: "LNI",     val: predictions.lni },
   ];
 
-  const predCards = predFields
-    .map((f) => {
-      const { label, val } = f;
-      const txt = "txt" in f && f.txt ? f.txt : pct(val);
-      const color = riskColor(val);
-      const bg = riskBgColor(val);
-      const border = riskBorderColor(val);
-      return `<div style="flex:1;text-align:center;padding:8px 6px;background:${bg};border:1.5px solid ${border};border-radius:6px">
-        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#555;margin-bottom:2px">${label}</div>
-        <div style="font-size:22px;font-weight:800;color:${color};line-height:1">${txt}</div>
-      </div>`;
-    })
-    .join("");
+  const predHtml = `<table class="data">
+    <thead><tr>${predFields.map((f) => `<th>${f.label}</th>`).join("")}</tr></thead>
+    <tbody><tr>${predFields
+      .map((f) => {
+        const txt = "txt" in f && f.txt ? f.txt : pct(f.val);
+        return `<td style="font-size:14px;font-weight:700;color:${riskColor(f.val)}">${txt}</td>`;
+      })
+      .join("")}</tr></tbody>
+  </table>`;
 
   // ── DA Sparing helper ────────────────────────────────────────────────────
   function daLabel(grade: number): string {
@@ -363,59 +357,44 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
   // Mirrors the compact table surgeons use intraoperatively: ECE (standard +
   // extensive), SVI, PLND, NS grade, and DA sparing technique.
   const surgSummaryHtml = `
-  <table style="border-collapse:collapse;width:100%;margin:0 0 14px;font-size:11.5px">
+  <table style="border-collapse:collapse;width:100%;margin:0 0 14px;font-size:11px">
     <thead>
       <tr>
-        <th style="border:1.5px solid #000;padding:4px 8px;background:#e8eaf0;width:22%"></th>
-        <th colspan="2" style="border:1.5px solid #000;padding:4px 8px;background:#e8eaf0;text-align:center;font-weight:800">LEFT</th>
-        <th colspan="2" style="border:1.5px solid #000;padding:4px 8px;background:#ddeedd;text-align:center;font-weight:800">RIGHT</th>
+        <th style="border:1px solid #555;padding:4px 8px;background:#f2f2f2;width:22%"></th>
+        <th colspan="2" style="border:1px solid #555;padding:4px 8px;background:#f2f2f2;text-align:center;font-weight:700">Left</th>
+        <th colspan="2" style="border:1px solid #555;padding:4px 8px;background:#f2f2f2;text-align:center;font-weight:700">Right</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td style="border:1.5px solid #000;padding:4px 8px;font-weight:700">Prob of ECE (%)</td>
-        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.eceL)}">${Math.round(predictions.eceL * 100)}&nbsp;%</td>
-        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.extensive)}">${Math.round(predictions.extensive * 100)}&nbsp;%</td>
-        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.eceR)}">${Math.round(predictions.eceR * 100)}&nbsp;%</td>
-        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.extensive)}">${Math.round(predictions.extensive * 100)}&nbsp;%</td>
+        <td style="border:1px solid #555;padding:4px 8px;font-weight:700">Prob of ECE (%)</td>
+        <td style="border:1px solid #555;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.eceL)}">${Math.round(predictions.eceL * 100)}&nbsp;%</td>
+        <td style="border:1px solid #555;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.extensive)}">${Math.round(predictions.extensive * 100)}&nbsp;%</td>
+        <td style="border:1px solid #555;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.eceR)}">${Math.round(predictions.eceR * 100)}&nbsp;%</td>
+        <td style="border:1px solid #555;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.extensive)}">${Math.round(predictions.extensive * 100)}&nbsp;%</td>
       </tr>
       <tr>
-        <td style="border:1.5px solid #000;padding:4px 8px;font-weight:700">Prob of SVI (%)</td>
-        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.sviL)}">${Math.round(predictions.sviL * 100)}&nbsp;%</td>
-        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;color:#999">-</td>
-        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.sviR)}">${Math.round(predictions.sviR * 100)}&nbsp;%</td>
-        <td style="border:1.5px solid #000;padding:4px 8px;text-align:center;color:#999">-</td>
+        <td style="border:1px solid #555;padding:4px 8px;font-weight:700">Prob of SVI (%)</td>
+        <td style="border:1px solid #555;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.sviL)}">${Math.round(predictions.sviL * 100)}&nbsp;%</td>
+        <td style="border:1px solid #555;padding:4px 8px;text-align:center;color:#999">-</td>
+        <td style="border:1px solid #555;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.sviR)}">${Math.round(predictions.sviR * 100)}&nbsp;%</td>
+        <td style="border:1px solid #555;padding:4px 8px;text-align:center;color:#999">-</td>
       </tr>
       <tr>
-        <td style="border:1.5px solid #000;padding:4px 8px;font-weight:700"><span style="text-decoration:underline">PLND</span>(%)</td>
-        <td colspan="4" style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.lni)}">${Math.round(predictions.lni * 100)}&nbsp;%</td>
+        <td style="border:1px solid #555;padding:4px 8px;font-weight:700"><span style="text-decoration:underline">PLND</span>(%)</td>
+        <td colspan="4" style="border:1px solid #555;padding:4px 8px;text-align:center;font-weight:700;color:${riskColor(predictions.lni)}">${Math.round(predictions.lni * 100)}&nbsp;%</td>
       </tr>
       <tr>
-        <td style="border:1.5px solid #000;padding:4px 8px;font-weight:700">Grade of NS</td>
-        <td colspan="2" style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:900;font-size:15px;background:#fffacd;color:#333">${predictions.nsL}</td>
-        <td colspan="2" style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:900;font-size:15px;background:#fffacd;color:#333">${predictions.nsR}</td>
+        <td style="border:1px solid #555;padding:4px 8px;font-weight:700">Grade of NS</td>
+        <td colspan="2" style="border:1px solid #555;padding:4px 8px;text-align:center;font-weight:700;font-size:13px;background:#f2f2f2;color:#333">${predictions.nsL}</td>
+        <td colspan="2" style="border:1px solid #555;padding:4px 8px;text-align:center;font-weight:700;font-size:13px;background:#f2f2f2;color:#333">${predictions.nsR}</td>
       </tr>
       <tr>
-        <td style="border:1.5px solid #000;padding:4px 8px;font-weight:700">DA Sparing</td>
-        <td colspan="4" style="border:1.5px solid #000;padding:4px 8px;text-align:center;font-weight:700">${daText}</td>
+        <td style="border:1px solid #555;padding:4px 8px;font-weight:700">DA Sparing</td>
+        <td colspan="4" style="border:1px solid #555;padding:4px 8px;text-align:center;font-weight:700">${daText}</td>
       </tr>
     </tbody>
   </table>`;
-
-  // ── Side ECE row ─────────────────────────────────────────────────────────
-  const sideEceHtml = `
-    <div style="display:flex;gap:12px;margin:0 0 10px">
-      <div style="flex:1;padding:6px 10px;background:${riskBgColor(predictions.eceL)};border:1px solid ${riskBorderColor(predictions.eceL)};border-radius:5px">
-        <span style="font-size:9px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.8px">Left ECE</span>
-        <span style="font-size:16px;font-weight:800;color:${riskColor(predictions.eceL)};margin-left:8px">${pct(predictions.eceL)}</span>
-        &nbsp;<span style="font-size:10px;font-weight:700;color:#555">NS Grade ${predictions.nsL}</span>
-      </div>
-      <div style="flex:1;padding:6px 10px;background:${riskBgColor(predictions.eceR)};border:1px solid ${riskBorderColor(predictions.eceR)};border-radius:5px">
-        <span style="font-size:9px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.8px">Right ECE</span>
-        <span style="font-size:16px;font-weight:800;color:${riskColor(predictions.eceR)};margin-left:8px">${pct(predictions.eceR)}</span>
-        &nbsp;<span style="font-size:10px;font-weight:700;color:#555">NS Grade ${predictions.nsR}</span>
-      </div>
-    </div>`;
 
   // ── Patient table ─────────────────────────────────────────────────────────
   const abLabels: Record<string, string> = {
@@ -424,17 +403,24 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
   };
 
   let patHtml = `<table>
-    <thead><tr><th>PSA</th><th>Volume</th><th>PSAD</th><th>Grade Group</th><th>Cores</th><th>PI-RADS</th><th>Laterality</th></tr></thead>
+    <thead><tr><th>PSA</th><th>Volume</th><th>PSAD</th><th>Grade group</th><th>Cores</th><th>PI-RADS</th><th>Laterality</th></tr></thead>
     <tbody><tr>
       <td>${esc(S.psa)} ng/mL</td><td>${esc(S.vol)} cc</td><td>${S.psad.toFixed(3)}</td>
       <td>GG ${esc(S.gg)}</td><td>${esc(S.cores)}</td><td>${esc(S.pirads)}</td><td>${esc(S.laterality)}</td>
     </tr></tbody>
   </table>`;
 
+  patHtml += `<table>
+    <thead><tr><th>Age</th><th>BMI</th><th>SHIM</th><th>IPSS</th></tr></thead>
+    <tbody><tr>
+      <td>${esc(S.age)}</td><td>${S.bmi > 0 ? esc(S.bmi) : "—"}</td><td>${esc(S.shim)}</td><td>${esc(S.ipss)}</td>
+    </tr></tbody>
+  </table>`;
+
   const hasMri = S.mri_size > 0 || isObserved(S.mri_abutment) && S.mri_abutment >= 0 || isObserved(S.mri_adc) && S.mri_adc > 0;
   if (hasMri) {
     patHtml += `<table>
-      <thead><tr><th>MRI Size</th><th>Capsular Contact</th><th>ADC Mean</th><th>MRI EPE</th><th>MRI SVI</th></tr></thead>
+      <thead><tr><th>MRI size</th><th>Capsular contact</th><th>ADC mean</th><th>MRI EPE</th><th>MRI SVI</th></tr></thead>
       <tbody><tr>
         <td>${S.mri_size > 0 ? (S.mri_size * 10).toFixed(0) + " mm" : "—"}</td>
         <td>${abLabels[String(S.mri_abutment ?? -1)] ?? "—"}</td>
@@ -479,41 +465,36 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
     .sort((a, b) => (b.cancer ?? 0) - (a.cancer ?? 0))
     .map((z) => {
       const v = z.cancer ?? 0;
-      const bg = riskBgColor(v);
-      const border = riskBorderColor(v);
-      const col = riskColor(v);
       return `<tr>
         <td>${ZONE_PRINT_LABELS[z.id]}</td>
-        <td style="text-align:right;font-weight:700;color:${col};background:${bg};border-left:3px solid ${border}">${pct(v)}</td>
+        <td class="num" style="font-weight:700;color:${riskColor(v)}">${pct(v)}</td>
       </tr>`;
     });
   const zoneCancerHtml = zoneCancerItems.length > 0
     ? `<table>
-        <thead><tr><th>Zone</th><th style="text-align:right">csPCa Probability</th></tr></thead>
+        <thead><tr><th>Zone</th><th class="num">csPCa probability</th></tr></thead>
         <tbody>${zoneCancerItems.join("")}</tbody>
       </table>`
-    : `<p style="font-size:10px;color:#999">No zones above 5%</p>`;
+    : `<p class="muted">No zones above 5%.</p>`;
 
   const allAlerts: string[] = [];
   (L.alerts ?? []).forEach((a) => allAlerts.push("L — " + a.message));
   (R.alerts ?? []).forEach((a) => allAlerts.push("R — " + a.message));
   const alertHtml = allAlerts.length > 0
-    ? `<div style="margin:6px 0 10px">${allAlerts.map((a) => `<div style="color:#922B21;font-size:10px;padding:2px 0;display:flex;align-items:center;gap:6px"><span style="font-size:12px">⚠</span> ${esc(a)}</div>`).join("")}</div>`
+    ? `<ul class="alerts">${allAlerts.map((a) => `<li><b>Alert:</b> ${esc(a)}</li>`).join("")}</ul>`
     : "";
 
   // ── PLND decision ─────────────────────────────────────────────────────────
   const isHighRisk = S.gg >= 4 || S.psa >= 20;
   const plndDecision = predictions.lni >= 0.05 || isHighRisk || S.psma_ln;
-  const plndColor = plndDecision ? "#922B21" : "#1A6B2F";
-  const plndBg = plndDecision ? "#FDECEA" : "#EAFAF1";
 
   const plndHtml = `<table>
-    <thead><tr><th>LNI Risk</th><th>NCCN Category</th><th>PSMA LN</th><th>Recommendation</th></tr></thead>
+    <thead><tr><th>LNI risk</th><th>NCCN category</th><th>PSMA LN</th><th>Recommendation</th></tr></thead>
     <tbody><tr>
-      <td style="color:${riskColor(predictions.lni)};font-weight:700">${pct(predictions.lni)}</td>
-      <td>${isHighRisk ? "High Risk" : "Non-High Risk"}</td>
+      <td style="font-weight:700;color:${riskColor(predictions.lni)}">${pct(predictions.lni)}</td>
+      <td>${isHighRisk ? "High risk" : "Non-high risk"}</td>
       <td>${S.psma_ln ? "Positive" : "Negative"}</td>
-      <td style="font-weight:700;color:${plndColor};background:${plndBg};padding:4px 8px;border-radius:3px">${plndDecision ? "Perform PLND" : "Consider Omitting PLND"}</td>
+      <td style="font-weight:700">${plndDecision ? "Perform PLND" : "Consider Omitting PLND"}</td>
     </tr></tbody>
   </table>`;
 
@@ -532,7 +513,7 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
       </tr>`;
     }).join("");
     lesHtml = `
-      <h2>Lesion Data</h2>
+      <h2>Lesion data</h2>
       <table>
         <thead><tr><th>Source</th><th>Side</th><th>Level</th><th>Zone</th><th>Score</th><th>Core %</th><th>Size</th><th>EPE</th><th>SVI</th></tr></thead>
         <tbody>${rows}</tbody>
@@ -541,34 +522,53 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
 
   // ── CSS ───────────────────────────────────────────────────────────────────
   const css = `
-    @page { margin: 1.4cm 1.5cm; }
+    @page { margin: 1.5cm 1.6cm; }
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, "Helvetica Neue", Arial, sans-serif; padding: 0; color: #1a1a1a; max-width: 760px; margin: 0 auto; font-size: 11.5px; line-height: 1.45; }
-    .header { padding-bottom: 10px; margin-bottom: 18px; border-bottom: 3px solid #1a5276; }
-    .header-title { font-size: 17px; font-weight: 800; text-align: center; color: #1a5276; letter-spacing: 3px; text-transform: uppercase; margin: 0; }
-    .header-meta { display: flex; justify-content: space-between; margin-top: 5px; font-size: 10px; color: #888; }
-    h2 { font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; border-bottom: 1.5px solid #ddd; padding-bottom: 3px; margin: 18px 0 8px; color: #555; font-weight: 700; }
-    table { width: 100%; border-collapse: collapse; margin: 0 0 14px; font-size: 11px; }
-    thead tr { background: #f5f7fa; }
-    th { text-align: left; font-weight: 700; padding: 5px 8px; border-bottom: 2px solid #ddd; font-size: 9.5px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; }
-    td { padding: 4px 8px; border-bottom: 1px solid #f0f0f0; }
+    body { font-family: "Helvetica Neue", Arial, sans-serif; color: #111; max-width: 760px; margin: 0 auto; font-size: 11px; line-height: 1.45; }
+    .header { border-bottom: 1.5px solid #111; padding-bottom: 6px; margin-bottom: 14px; }
+    .header-title { font-size: 17px; font-weight: 700; }
+    .header-meta { display: flex; justify-content: space-between; margin-top: 3px; font-size: 10px; color: #555; }
+    h2 { font-size: 12px; font-weight: 700; border-bottom: 1px solid #999; padding-bottom: 2px; margin: 16px 0 6px; break-after: avoid; }
+    h2.break { break-before: page; }
+    table { width: 100%; border-collapse: collapse; margin: 0 0 10px; font-size: 11px; }
+    th { text-align: left; font-weight: 700; padding: 3px 6px; border-bottom: 1px solid #444; font-size: 10.5px; }
+    td { padding: 3px 6px; border-bottom: 1px solid #ddd; vertical-align: top; }
     tbody tr:last-child td { border-bottom: none; }
-    .pred-row { display: flex; gap: 7px; margin: 0 0 14px; }
-    .map-box { border: 1px solid #e4e4e4; border-radius: 6px; overflow: hidden; margin: 0 0 14px; }
-    .map-box-title { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #1a5276; padding: 5px 10px 4px; background: #f0f4f9; border-bottom: 1px solid #e4e4e4; display: flex; align-items: center; gap: 6px; }
-    .map-box-title span { font-weight: 400; color: #888; font-size: 9px; letter-spacing: 0; }
-    .print-btn { display: block; margin: 24px auto 0; padding: 10px 44px; background: #1a5276; color: #fff; border: none; border-radius: 5px; cursor: pointer; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
-    .footer { margin-top: 20px; font-size: 8.5px; color: #aaa; text-align: center; border-top: 1px solid #eee; padding-top: 8px; }
-    .risk-c-low  { color: #1A6B2F; }
-    .risk-c-mod  { color: #7D6608; }
-    .risk-c-high { color: #922B21; }
-    .alert-item { color: #922B21; font-size: 10px; display: flex; align-items: center; gap: 4px; padding: 1px 0; }
-    @media print { .print-btn { display: none; } .map-box { page-break-inside: avoid; } .model-dark { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+    table.data td { border-bottom: none; }
+    table.grid tbody th { width: 30%; font-weight: 600; border-bottom: 1px solid #ddd; }
+    table.compact td, table.compact th { padding: 2px 6px; }
+    table, .card, .notice, .figure { break-inside: avoid; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .muted { color: #666; font-weight: 400; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .figure { margin: 0 0 10px; text-align: center; }
+    .views { display: flex; justify-content: center; gap: 8px; }
+    .views > div { flex: 1; text-align: center; }
+    .figure img { max-width: 100%; max-height: 270px; object-fit: contain; }
+    .view-label { font-size: 10px; font-weight: 700; margin-top: 1px; }
+    .figure svg { max-width: 100%; }
+    .caption { font-size: 9.5px; color: #444; text-align: left; margin-top: 3px; }
+    .alerts { margin: 4px 0 8px; padding-left: 16px; font-size: 10.5px; }
+    .lead { margin: 0 0 6px; }
+    .note { margin: 4px 0 8px; font-size: 10.5px; color: #333; }
+    .tier { font-weight: 700; }
+    .notice { border: 1px solid #8A5A00; padding: 5px 8px; margin: 0 0 8px; font-size: 10.5px; }
+    .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 0 0 10px; }
+    .card { border: 1px solid #bbb; padding: 6px 8px; }
+    .card-head { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 3px; }
+    .card .flag { font-weight: 700; margin-bottom: 3px; }
+    .card ul { list-style: none; margin: 0; padding: 0; }
+    .card li { display: flex; justify-content: space-between; gap: 8px; padding: 1px 0; font-size: 10.5px; }
+    .refs { margin: 0; padding-left: 16px; font-size: 8.5px; color: #555; line-height: 1.35; }
+    .footer { margin-top: 18px; font-size: 8.5px; color: #666; border-top: 1px solid #ccc; padding-top: 5px; }
+    @media print { .map-box { break-inside: avoid; } }
   `;
 
   // ── Compose HTML ──────────────────────────────────────────────────────────
   const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   const patientId = entry.record.patient?.age ? `Age ${esc(entry.record.patient.age)}` : "";
+
+  const planningHtml = buildPlanningHtml(S, predictions, computePlanningView(S, predictions));
 
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>COMPASS Surgical Planning Report</title>
@@ -576,54 +576,46 @@ export function buildPrintHtml(canvasDataUrl?: string): string | null {
 <body>
 
 <div class="header">
-  <h1 class="header-title">COMPASS — Surgical Planning Report</h1>
+  <div class="header-title">COMPASS Surgical Planning Report</div>
   <div class="header-meta">
-    <span>IRB STUDY-14-00050 · Mount Sinai · Research Use Only</span>
+    <span>Mount Sinai Department of Urology · IRB STUDY-14-00050 · Research use only</span>
     <span>${patientId ? patientId + " · " : ""}${dateStr}</span>
   </div>
 </div>
 
-<h2>Clinical Data</h2>
+<h2>Clinical data</h2>
 ${patHtml}
 
-<h2>COMPASS Predictions</h2>
+<h2>Predictions</h2>
+${predHtml}
 ${surgSummaryHtml}
-<div class="pred-row">${predCards}</div>
-${sideEceHtml}
 
-${canvasDataUrl ? `<div class="map-box" style="margin-bottom:14px">
-  <div class="map-box-title">
-    3D Prostate Model — csPCa Heatmap
-    <span>Cancer probability overlay · Green &lt;10% · Amber 10–25% · Red &gt;25% · Rotate model before printing to capture preferred angle</span>
-  </div>
-  <div class="model-dark" style="padding:8px;background:#0d1220;text-align:center">
-    <img src="${canvasDataUrl}" style="max-width:100%;max-height:320px;object-fit:contain;border-radius:3px" alt="3D prostate model — cancer probability heatmap" />
-  </div>
+${modelViews.length ? `<div class="figure">
+  <div class="views">${["Anterior", "Posterior"].map((n, i) => modelViews[i] ? `<div><img src="${modelViews[i]}" alt="3D prostate model, ${n.toLowerCase()} view" /><div class="view-label">${n}</div></div>` : "").join("")}</div>
+  <div class="caption"><b>Figure 1.</b> 3D prostate model, anterior and posterior views. Coloured areas mark zones with csPCa probability of 15% or more (orange 15–50%, red above 50%); grey gland is below 15%. Each zone is shown on both faces, so a view can show disease that lies on the opposite face.</div>
 </div>` : ""}
 
-${prostateMapSVG ? `<div class="map-box">
-  <div class="map-box-title">
-    Prostate Sector Map — Imaging Findings by Modality
-    <span>Axial view · L on left · ANT = top · POST = bottom · Color = cancer probability (green → red) · White = no finding</span>
-  </div>
-  <div style="padding:10px 8px 4px">${prostateMapSVG}</div>
+${prostateMapSVG ? `<div class="figure">
+  ${prostateMapSVG}
+  <div class="caption"><b>Figure ${modelViews.length ? 2 : 1}.</b> Axial sector map by modality. Left on left, anterior at top. Colour shows cancer probability from green (low) to red (high); white means no finding.</div>
 </div>` : ""}
 
-<h2>Zone Cancer Probability</h2>
-${zoneCancerHtml}
-
-<h2>Nerve Sparing — 5-Zone Analysis</h2>
-${nsHtml}
+<div class="two-col">
+  <div><h2>Zone cancer probability</h2>${zoneCancerHtml}</div>
+  <div><h2>Nerve sparing, 5-zone analysis</h2>${nsHtml}</div>
+</div>
 ${alertHtml}
 
-<h2>PLND Decision</h2>
+<h2>PLND decision</h2>
 ${plndHtml}
+
+${planningHtml}
 
 ${lesHtml}
 
 <div class="footer">
-  COMPASS is a decision-support tool for prostate cancer surgical planning. Not FDA cleared. Not for autonomous clinical decision-making.<br>
-  Model card: MODEL_CARD.md · Data dictionary: DATA_DICTIONARY.md · IRB STUDY-14-00050
+  COMPASS is a research decision-support tool. It is not FDA cleared and does not replace clinical judgement.<br>
+  Model card: MODEL_CARD.md · Data dictionary: DATA_DICTIONARY.md
 </div>
 
 </body></html>`;

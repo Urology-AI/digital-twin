@@ -3,6 +3,7 @@ import { X, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useUiStore } from "@/store/uiStore";
 import { buildPrintHtml } from "@/lib/compass/printReport";
+import { captureSceneSnapshot } from "@/lib/three/zoomBridge";
 
 export function PrintReportModal() {
   const open = useUiStore((s) => s.printReportOpen);
@@ -28,26 +29,26 @@ export function PrintReportModal() {
     }
 
     // Save current state so we can restore it after capture
-    const { overlay: prevOverlay, heatmapVisible: prevHeatmap } = useUiStore.getState();
+    const { overlay: prevOverlay, heatmapVisible: prevHeatmap, lesionsOnly: prevLesions } = useUiStore.getState();
 
-    // Force cancer probability heatmap so the snapshot always shows where cancer is
-    useUiStore.setState({ overlay: "cancer", heatmapVisible: true });
+    // Show only the sites of cancer (>= 15%) on the anatomical gland, so the
+    // snapshot reads as "where is the tumour" and not as a green-to-red map.
+    useUiStore.setState({ overlay: "cancer", heatmapVisible: true, lesionsOnly: true });
 
     // Give React time to flush the state change → ThreeCanvas re-render →
     // useThreeProstate effect → updateZones → Three.js rAF renders new colors
     const timer = setTimeout(() => {
-      const canvas = document.querySelector("canvas") as HTMLCanvasElement | null;
-      const dataUrl = canvas?.toDataURL("image/jpeg", 0.88);
+      const shots = captureSceneSnapshot();
 
       // Restore the previous overlay state
-      useUiStore.setState({ overlay: prevOverlay, heatmapVisible: prevHeatmap });
+      useUiStore.setState({ overlay: prevOverlay, heatmapVisible: prevHeatmap, lesionsOnly: prevLesions });
 
-      setHtml(buildPrintHtml(dataUrl));
+      setHtml(buildPrintHtml(shots));
     }, 120);
 
     return () => {
       clearTimeout(timer);
-      useUiStore.setState({ overlay: prevOverlay, heatmapVisible: prevHeatmap });
+      useUiStore.setState({ overlay: prevOverlay, heatmapVisible: prevHeatmap, lesionsOnly: prevLesions });
     };
   }, [open]);
 

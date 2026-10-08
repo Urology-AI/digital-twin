@@ -640,3 +640,37 @@ describe("PIPS counseling output and per-side confidence", () => {
     expect(u).not.toMatch(/provisional/);
   });
 });
+
+describe("RARP bladder-neck and apical difficulty", () => {
+  it("defaults to low on both steps", async () => {
+    const { predictBladderNeckDifficulty, predictApicalDifficulty } = await import("@/lib/compass/rarpDifficulty");
+    const S = defaultClinicalState();
+    expect(predictBladderNeckDifficulty(S).tier).toBe("low");
+    expect(predictBladderNeckDifficulty(S).reconstructionLikely).toBe(false);
+    expect(predictApicalDifficulty(S).tier).toBe("low");
+  });
+
+  it("median lobe grade 3 or prior HoLEP flags bladder-neck reconstruction, without moving the apex", async () => {
+    const { predictBladderNeckDifficulty, predictApicalDifficulty } = await import("@/lib/compass/rarpDifficulty");
+    const lobe = { ...defaultClinicalState(), median_lobe_grade: 3 };
+    const holep = { ...defaultClinicalState(), prior_holep: true };
+    expect(predictBladderNeckDifficulty(lobe).reconstructionLikely).toBe(true);
+    expect(predictBladderNeckDifficulty(holep).reconstructionLikely).toBe(true);
+    expect(predictApicalDifficulty(lobe).points).toBe(0);
+  });
+
+  it("measured pelvic fat supersedes BMI for the apex", async () => {
+    const { predictApicalDifficulty } = await import("@/lib/compass/rarpDifficulty");
+    const base = defaultClinicalState();
+    const obese = predictApicalDifficulty({ ...base, bmi: 34 });
+    const obeseLowFat = predictApicalDifficulty({ ...base, bmi: 34, pelvic_visceral_fat_cm3: 900 });
+    expect(obese.points).toBeGreaterThan(0);
+    expect(obeseLowFat.points).toBe(0);
+  });
+
+  it("stacked apical factors reach the high tier", async () => {
+    const { predictApicalDifficulty } = await import("@/lib/compass/rarpDifficulty");
+    const S = { ...defaultClinicalState(), bmi: 33, vol: 85, prior_turp: true };
+    expect(predictApicalDifficulty(S).tier).toBe("high");
+  });
+});

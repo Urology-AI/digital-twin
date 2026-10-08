@@ -715,6 +715,88 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     usedFor: ["PIPS EPE x hostility decision matrix", "PIPS-H MRI plane-phenotype weights"],
     verified: true,
   },
+
+  // ── Bladder-neck / apical difficulty (matched to Europe PMC records) ──
+  {
+    key: "ou2012retroapical",
+    authors: "Ou YC, Hung SW, Wang J, Yang CK, Cheng CL, Tewari AK.",
+    title:
+      "Retro-apical transection of the urethra during robot-assisted laparoscopic radical prostatectomy in an Asian population.",
+    source: "BJU Int. 2012;110(2 Pt 2):E57-63.",
+    group: "tewari",
+    usedFor: ["Apical / anastomosis difficulty weights"],
+    verified: true,
+  },
+  {
+    key: "ou2016complications",
+    authors: "Ou YC, Yang CK, Chang KS, Wang J, Hung SW, Tung MC, Tewari A, et al.",
+    title:
+      "Prevention and Management of Complications During Robotic-assisted Laparoscopic Radical Prostatectomy Following Comprehensive Planning: A Large Series Involving a Single Surgeon.",
+    source: "Anticancer Res. 2016;36(4):1991-8.",
+    group: "tewari",
+    usedFor: ["Bladder-neck difficulty weights", "Apical / anastomosis difficulty weights"],
+    verified: true,
+  },
+  {
+    key: "huang2011median",
+    authors: "Huang AC, Kowalczyk KJ, Hevelone ND, et al.",
+    title:
+      "The impact of prostate size, median lobe, and prior benign prostatic hyperplasia intervention on robot-assisted laparoscopic prostatectomy: technique and outcomes.",
+    source: "Eur Urol. 2011;59(4):595-603.",
+    group: "external",
+    usedFor: ["Bladder-neck difficulty weights"],
+    verified: true,
+  },
+  {
+    key: "meeks2009median",
+    authors: "Meeks JJ, Zhao L, Greco KA, Macejko A, Nadler RB.",
+    title:
+      "Impact of prostate median lobe anatomy on robotic-assisted laparoscopic prostatectomy.",
+    source: "Urology. 2009;73(2):323-7.",
+    group: "external",
+    usedFor: ["Bladder-neck difficulty weights"],
+    verified: true,
+  },
+  {
+    key: "ditonno2026holep",
+    authors: "Ditonno F, Ronca M, Pettenuzzo G, et al.",
+    title:
+      "Impact of Prior Holmium Laser Enucleation of the Prostate on Robot-Assisted Radical Prostatectomy Outcomes: A Systematic Review and Meta-Analysis of Comparative Studies.",
+    source: "J Endourol. 2026;40(4):488-497.",
+    group: "external",
+    usedFor: ["Bladder-neck difficulty weights"],
+    verified: true,
+  },
+  {
+    key: "katsimperis2025holep",
+    authors: "Katsimperis S, Tzelves L, Markopoulos T, et al.",
+    title:
+      "Radical Prostatectomy Following Holmium Laser Enucleation of the Prostate (HoLEP): A Systematic Review of Perioperative, Oncological, and Functional Outcomes.",
+    source: "Cancers (Basel). 2025;17(22):3685.",
+    group: "external",
+    usedFor: ["Bladder-neck difficulty weights"],
+    verified: true,
+  },
+  {
+    key: "leyh2021tur",
+    authors: "Leyh-Bannurah SR, Liakos N, Oelke M, et al.",
+    title:
+      "Perioperative and Postoperative Outcomes of Robot-Assisted Radical Prostatectomy in Prostate Cancer Patients With Prior Transurethral Subvesical Deobstruction: Results of a High-Volume Center.",
+    source: "J Urol. 2021;206(2):308-318.",
+    group: "external",
+    usedFor: ["Bladder-neck difficulty weights"],
+    verified: true,
+  },
+  {
+    key: "uchida2021pvf",
+    authors: "Uchida T, Higure T, Kawakami M, et al.",
+    title:
+      "What factors affect the operative time of robot-assisted laparoscopic radical prostatectomy?",
+    source: "Surg Endosc. 2021;35(8):4436-4443.",
+    group: "external",
+    usedFor: ["Apical / anastomosis difficulty weights"],
+    verified: true,
+  },
 ];
 
 export const REFERENCES_VERIFIED = PLANNING_REFERENCES.every((r) => r.verified);

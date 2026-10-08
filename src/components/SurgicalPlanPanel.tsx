@@ -1,5 +1,6 @@
 import { useMemo } from "react";
-import { Activity, ChevronRight, Droplets, RotateCcw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Activity, ChevronRight, Droplets, Printer, RotateCcw, ShieldCheck, TriangleAlert } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { HealerBands } from "@/components/outcomes/HealerBands";
 import { usePatientStore } from "@/store/patientStore";
@@ -9,23 +10,15 @@ import {
 } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
 import { EvidenceInfo } from "@/components/EvidenceInfo";
-import {
-  computeFunctionalOutcomes,
-  type AlcoholLevel,
-  type ExerciseLevel,
-  type FunctionalInputs,
-  type Pde5Regimen,
-  type PfmtLevel,
-  type PlanModifiers,
-  type SmokingStatus,
-} from "@/lib/compass/functionalOutcomes";
-import { bcrByPlan } from "@/lib/compass/bcrByPlan";
+import { computePlanningView } from "@/lib/compass/planningView";
 import { useUiStore } from "@/store/uiStore";
+import { printReport } from "@/lib/compass/printReport";
 import { MODIFIABLE_BCR } from "@/lib/compass/planningEvidence";
 import { PeriprostaticRiskBySide } from "@/components/PipsCounselingCard";
-import { buildPipsCounseling } from "@/lib/compass/pipsCounseling";
 import { RecoveryReserveCard } from "@/components/RecoveryReserveCard";
-import { computeRecoveryReserve } from "@/lib/compass/recoveryReserve";
+import { PlanSummaryStrip } from "@/components/PlanSummaryStrip";
+import { RarpDifficultyCard } from "@/components/RarpDifficultyCard";
+import { predictApicalDifficulty, predictBladderNeckDifficulty } from "@/lib/compass/rarpDifficulty";
 import { PDI_ITEMS, PDI_MAX, pdiTotal } from "@/lib/compass/planeDifficultyIndex";
 import type { ClinicalState } from "@/types/patient";
 import type { SidePlan } from "@/types/prediction";
@@ -34,32 +27,6 @@ import { cn } from "@/lib/utils";
 /* ------------------------------------------------------------------ */
 /* helpers                                                            */
 /* ------------------------------------------------------------------ */
-
-const pf = (v: string): PfmtLevel =>
-  (["none", "basic", "moderate", "intensive"] as string[]).includes(v) ? (v as PfmtLevel) : "basic";
-const ex = (v: string): ExerciseLevel =>
-  (["sedentary", "light", "moderate", "active"] as string[]).includes(v) ? (v as ExerciseLevel) : "moderate";
-const sm = (v: string): SmokingStatus =>
-  (["never", "former", "current"] as string[]).includes(v) ? (v as SmokingStatus) : "never";
-const p5 = (v: string): Pde5Regimen =>
-  (["none", "prn", "daily"] as string[]).includes(v) ? (v as Pde5Regimen) : "prn";
-
-function baseInputs(S: ClinicalState): Omit<FunctionalInputs, "nsL" | "nsR" | "plan"> {
-  return {
-    age: S.age,
-    shim: S.shim,
-    ipss: S.ipss,
-    bmi: S.bmi,
-    pfmt: pf(S.pfmt),
-    exercise: ex(S.exercise),
-    smoking: sm(S.smoking),
-    pde5: p5(S.pde5),
-    alcohol: (S.alcohol || "moderate") as AlcoholLevel,
-    dm: S.dm,
-    htn: S.htn,
-    cad: S.cad,
-  };
-}
 
 const pct = (v: number) => `${Math.round(v * 100)}%`;
 
@@ -472,63 +439,10 @@ export function SurgicalPlanPanel() {
     [entry],
   );
 
-  const computed = useMemo(() => {
-    if (!predictions || !S) return null;
-    const { plan, inflammation } = predictions;
-    const base = baseInputs(S);
-
-    // Baseline = the model's recommended NS grade + standard technique, but the
-    // SAME patient (inflammation tier carries into both arms so the delta is
-    // purely the surgical choices).
-    const baselineMods: PlanModifiers = {
-      svPreservationL: true,
-      svPreservationR: true,
-      hydrodissectionL: false,
-      hydrodissectionR: false,
-      inflammationTier: inflammation.tier,
-    };
-    const baseline = computeFunctionalOutcomes({
-      ...base,
-      nsL: plan.left.recommendedGrade,
-      nsR: plan.right.recommendedGrade,
-      plan: baselineMods,
-    });
-
-    const planMods: PlanModifiers = {
-      svPreservationL: plan.left.svPreservation.value,
-      svPreservationR: plan.right.svPreservation.value,
-      hydrodissectionL: plan.left.hydrodissection.value,
-      hydrodissectionR: plan.right.hydrodissection.value,
-      inflammationTier: inflammation.tier,
-    };
-    const withPlan = computeFunctionalOutcomes({
-      ...base,
-      nsL: plan.left.nsGrade,
-      nsR: plan.right.nsGrade,
-      plan: planMods,
-    });
-
-    const bcr = bcrByPlan(
-      S,
-      predictions.bcr36,
-      {
-        nsGrade: Math.max(plan.left.recommendedGrade, plan.right.recommendedGrade),
-        hydrodissection: false,
-        inflammationTier: inflammation.tier,
-      },
-      {
-        nsGrade: Math.max(plan.left.nsGrade, plan.right.nsGrade),
-        hydrodissection: planMods.hydrodissectionL || planMods.hydrodissectionR,
-        inflammationTier: inflammation.tier,
-      },
-    );
-
-    const counseling = buildPipsCounseling(S, plan, predictions.eceL, predictions.eceR, base);
-
-    const reserve = computeRecoveryReserve(S, base);
-
-    return { baseline, withPlan, bcr, counseling, reserve };
-  }, [predictions, S]);
+  const computed = useMemo(
+    () => (predictions && S ? computePlanningView(S, predictions) : null),
+    [predictions, S],
+  );
 
   if (!predictions || !entry || !S || !computed) {
     return (
@@ -551,6 +465,8 @@ export function SurgicalPlanPanel() {
   ).some((k) => S[`${k}_l`] > 0 || S[`${k}_r`] > 0);
   const showMriReview = inflammation.reviewMri && !planeGradesRecorded;
   const { baseline, withPlan, bcr, counseling, reserve } = computed;
+  const bladderNeck = predictBladderNeckDifficulty(S);
+  const apex = predictApicalDifficulty(S);
 
   const tierTone =
     inflammation.tier === "high"
@@ -573,6 +489,16 @@ export function SurgicalPlanPanel() {
           <span className="rounded-full bg-amber-500/10 px-2 py-1 text-amber-700 ring-1 ring-inset ring-amber-500/30 dark:text-amber-400">
             Provisional weights
           </span>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => printReport()}
+            className="h-6 gap-1 px-2 text-[10px] font-semibold uppercase tracking-wide"
+          >
+            <Printer className="h-3 w-3" />
+            Export PDF report
+          </Button>
         </div>
       </header>
 
@@ -626,6 +552,38 @@ export function SurgicalPlanPanel() {
       )}
 
       {!plan.gates.activeInfection && (
+        <PlanSummaryStrip
+          left={plan.left}
+          right={plan.right}
+          bladderNeck={bladderNeck.tier}
+          apex={apex.tier}
+          reserve={reserve}
+        />
+      )}
+
+      {/* ── Per-side plan ──────────────────────────────────────── */}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <SideCard
+          plan={plan.left}
+          sideEce={predictions.eceL}
+          hydroOverride={S.plan_hydrodissection_l}
+          svOverride={S.plan_sv_preservation_l}
+          onOverride={(g) => updateClinicalForm({ plan_ns_override_l: g })}
+          onHydro={(v) => updateClinicalForm({ plan_hydrodissection_l: v })}
+          onSv={(v) => updateClinicalForm({ plan_sv_preservation_l: v })}
+        />
+        <SideCard
+          plan={plan.right}
+          sideEce={predictions.eceR}
+          hydroOverride={S.plan_hydrodissection_r}
+          svOverride={S.plan_sv_preservation_r}
+          onOverride={(g) => updateClinicalForm({ plan_ns_override_r: g })}
+          onHydro={(v) => updateClinicalForm({ plan_hydrodissection_r: v })}
+          onSv={(v) => updateClinicalForm({ plan_sv_preservation_r: v })}
+        />
+      </div>
+
+      {!plan.gates.activeInfection && (
         <PeriprostaticRiskBySide
           counseling={counseling}
           title={
@@ -656,7 +614,7 @@ export function SurgicalPlanPanel() {
         />
       )}
 
-      {!plan.gates.activeInfection && <RecoveryReserveCard reserve={reserve} />}
+      <RarpDifficultyCard bladderNeck={bladderNeck} apex={apex} />
 
       {/* ── Impact ─────────────────────────────────────────────── */}
       <Card>
@@ -756,27 +714,7 @@ export function SurgicalPlanPanel() {
         </CardContent>
       </Card>
 
-      {/* ── Per-side plan ──────────────────────────────────────── */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <SideCard
-          plan={plan.left}
-          sideEce={predictions.eceL}
-          hydroOverride={S.plan_hydrodissection_l}
-          svOverride={S.plan_sv_preservation_l}
-          onOverride={(g) => updateClinicalForm({ plan_ns_override_l: g })}
-          onHydro={(v) => updateClinicalForm({ plan_hydrodissection_l: v })}
-          onSv={(v) => updateClinicalForm({ plan_sv_preservation_l: v })}
-        />
-        <SideCard
-          plan={plan.right}
-          sideEce={predictions.eceR}
-          hydroOverride={S.plan_hydrodissection_r}
-          svOverride={S.plan_sv_preservation_r}
-          onOverride={(g) => updateClinicalForm({ plan_ns_override_r: g })}
-          onHydro={(v) => updateClinicalForm({ plan_hydrodissection_r: v })}
-          onSv={(v) => updateClinicalForm({ plan_sv_preservation_r: v })}
-        />
-      </div>
+      {!plan.gates.activeInfection && <RecoveryReserveCard reserve={reserve} />}
 
       {/* ── Intra-operative record ─────────────────────────────── */}
       <Card>
