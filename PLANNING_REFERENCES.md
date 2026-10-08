@@ -62,6 +62,22 @@ Bibliography for the effect sizes and decision rules in
 | ball2015 | Ball MW, et al. Extent of extraprostatic extension independently influences biochemical recurrence-free survival: evidence for further pT3 subclassification. *Urology.* 2015;85(1):161-164. | Zonal ECE distribution |
 | ficarra2012 | Ficarra V, Novara G, Ahlering TE, et al. Systematic review and meta-analysis of studies reporting potency rates after robot-assisted radical prostatectomy. *Eur Urol.* 2012;62(3):418-30. | Functional-outcome nomogram (recovery trajectory) |
 
+## Bladder-neck / apical difficulty
+
+Matched to Europe PMC records (title, authors, journal, year, volume and pages);
+abstracts only, not full text. Effect sizes behind these terms are provisional.
+
+| Key | Reference | Used for |
+|---|---|---|
+| ou2012retroapical | Ou YC, Hung SW, Wang J, Yang CK, Cheng CL, Tewari AK. Retro-apical transection of the urethra during robot-assisted laparoscopic radical prostatectomy in an Asian population. *BJU Int.* 2012;110(2 Pt 2):E57-63. | Apical / anastomosis difficulty weights |
+| ou2016complications | Ou YC, Yang CK, Chang KS, Wang J, Hung SW, Tung MC, Tewari A, et al. Prevention and management of complications during robotic-assisted laparoscopic radical prostatectomy following comprehensive planning: a large series involving a single surgeon. *Anticancer Res.* 2016;36(4):1991-8. | Bladder-neck and apical difficulty weights |
+| huang2011median | Huang AC, Kowalczyk KJ, Hevelone ND, et al. The impact of prostate size, median lobe, and prior benign prostatic hyperplasia intervention on robot-assisted laparoscopic prostatectomy: technique and outcomes. *Eur Urol.* 2011;59(4):595-603. | Bladder-neck difficulty weights |
+| meeks2009median | Meeks JJ, Zhao L, Greco KA, Macejko A, Nadler RB. Impact of prostate median lobe anatomy on robotic-assisted laparoscopic prostatectomy. *Urology.* 2009;73(2):323-7. | Bladder-neck difficulty weights |
+| ditonno2026holep | Ditonno F, Ronca M, Pettenuzzo G, et al. Impact of prior holmium laser enucleation of the prostate on robot-assisted radical prostatectomy outcomes: a systematic review and meta-analysis of comparative studies. *J Endourol.* 2026;40(4):488-497. | Bladder-neck difficulty weights |
+| katsimperis2025holep | Katsimperis S, Tzelves L, Markopoulos T, et al. Radical prostatectomy following holmium laser enucleation of the prostate (HoLEP): a systematic review of perioperative, oncological, and functional outcomes. *Cancers (Basel).* 2025;17(22):3685. | Bladder-neck difficulty weights |
+| leyh2021tur | Leyh-Bannurah SR, Liakos N, Oelke M, et al. Perioperative and postoperative outcomes of robot-assisted radical prostatectomy in prostate cancer patients with prior transurethral subvesical deobstruction: results of a high-volume center. *J Urol.* 2021;206(2):308-318. | Bladder-neck difficulty weights |
+| uchida2021pvf | Uchida T, Higure T, Kawakami M, et al. What factors affect the operative time of robot-assisted laparoscopic radical prostatectomy? *Surg Endosc.* 2021;35(8):4436-4443. | Apical / anastomosis difficulty weights |
+
 ## Modifiable-factor grounding
 
 One paper per lever in the `MF` table (`src/lib/compass/functionalOutcomes.ts`).

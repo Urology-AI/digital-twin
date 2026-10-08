@@ -914,3 +914,73 @@ export const INTAKE_ACTIVITY_BANDS = ev(
     "'moderate' band, so the erectile benefit starts at the guideline, not " +
     "above it.",
 );
+
+/* ================================================================== */
+/* RARP step-difficulty: bladder neck and apex (non-nerve-sparing)     */
+/* ================================================================== */
+
+/**
+ * Additive points (NOT a probability). Deliberately separate from the
+ * nerve-sparing grade, PIPS-H plane hostility and the EPE axis: this covers
+ * the bladder-neck and apical steps only, for a single high-volume surgeon.
+ */
+export const BLADDER_NECK_DIFFICULTY_WEIGHTS = ev(
+  {
+    median_lobe_per_grade: 0.6,
+    prior_turp: 1.0,
+    prior_holep: 1.6,
+    prior_greenlight: 0.8,
+    bph_procedure_complicated: 0.3,
+  },
+  "provisional",
+  "Bladder-neck difficulty weights",
+  "Median lobe >1 cm and prior BPH intervention lengthened operative time " +
+    "and (median lobe) raised EBL in adjusted analysis (Huang AC et al., Eur " +
+    "Urol 2011; Meeks JJ et al., Urology 2009: extra time in posterior " +
+    "bladder-neck and seminal-vesicle dissection). Prior HoLEP lengthened " +
+    "operative time and increased bladder-neck reconstruction in a 3-study " +
+    "meta-analysis of 63 patients (Ditonno F et al., J Endourol 2026), so it " +
+    "is weighted highest; Katsimperis 2025 reports the same direction. Prior " +
+    "TURP/laser prolonged operative time without changing overall margins " +
+    "(Huang 2011; Leyh-Bannurah SR et al., J Urol 2021). Median lobe is " +
+    "scored per recorded grade because the grade-to-cm mapping is not " +
+    "defined in the record. Magnitudes are expert-set and provisional; they " +
+    "can only be fitted against recorded bladder-neck reconstruction in the " +
+    "institutional cohort.",
+);
+
+export const APICAL_DIFFICULTY_WEIGHTS = ev(
+  {
+    bmi_gt_30: 0.6,
+    pvf_ge_1400: 0.6,
+    volume_gt_70: 0.5,
+    prior_turp: 0.5,
+    prior_pelvic_radiation: 1.0,
+    neoadjuvant_adt: 0.4,
+    prior_pelvic_surgery: 0.5,
+  },
+  "provisional",
+  "Apical / anastomosis difficulty weights",
+  "High BMI, larger prostate volume and previous TURP, but not pelvic bone " +
+    "size or apex shape, hindered retro-apical urethral transection in a " +
+    "single-surgeon series (Ou YC, ... Tewari AK, BJU Int 2012). The " +
+    "pre-operative difficulty checklist of neoadjuvant hormonal therapy, BMI " +
+    ">30, prostate >70 g, prior TURP, prior pelvic surgery and salvage " +
+    "surgery follows Ou YC et al., Anticancer Res 2016 (1,000 cases, single " +
+    "surgeon); it is a checklist with no published weights. Measured pelvic " +
+    "visceral fat >=1400 cm3 (Uchida T et al., Surg Endosc 2021) supersedes " +
+    "BMI, as elsewhere in the planning modules. Prior pelvic radiation " +
+    "stands in for the salvage setting. Bony pelvimetry is not scored: it did " +
+    "not affect the apical approach in that series. Magnitudes are expert-" +
+    "set and provisional.",
+);
+
+export const RARP_DIFFICULTY_CUTS = ev(
+  { moderate: 0.8, high: 1.6 },
+  "provisional",
+  "Bladder-neck / apical difficulty tier cutpoints",
+  "Expert-set tier bands on the additive points: low < 0.8, moderate 0.8-1.6, " +
+    "high >= 1.6. Not fitted; provisional pending recorded bladder-neck " +
+    "reconstruction and apical-technique outcomes from the institutional " +
+    "cohort.",
+);

@@ -239,6 +239,9 @@ function lookupZoneValue(
   return 0.01;
 }
 
+/** Set only while capturing the report snapshot: non-cancer gland prints neutral grey and zone highlights show on both faces. */
+let neutralTissue = false;
+
 /**
  * Paint vertex colours on the GLB prostate meshes.
  * When heatmapVisible is true each vertex is coloured by its zone risk;
@@ -268,7 +271,14 @@ function paintGlbProstate(
       // anterior apex data only shows on truly anterior (nz > 0) vertices.
       const apexClamp = ny < -0.35 ? 0 : -0.18;
       const nzQ = nz >= apexClamp ? Math.max(nz, 0.005) : nz;
-      const val = lookupZoneValue(nx, ny, nzQ, zones, overlay);
+      let val = lookupZoneValue(nx, ny, nzQ, zones, overlay);
+      if (neutralTissue) {
+        // Report snapshot: show each zone's highlight on both faces, so the anterior
+        // and posterior views each show the side and level of disease, whichever face it is on.
+        const mz = -nz;
+        const mzQ = mz >= apexClamp ? Math.max(mz, 0.005) : mz;
+        val = Math.max(val, lookupZoneValue(nx, ny, mzQ, zones, overlay));
+      }
       let cr: number, cg: number, cb: number;
       // SVI is visualised on the SV meshes directly; keep the prostate body
       // in anatomical colour so it doesn't compete with the SV highlight.
@@ -278,6 +288,11 @@ function paintGlbProstate(
       } else {
         // Anatomical tissue palette — lighter anterior, darker posterior.
         cr = 0.52; cg = 0.24; cb = 0.22;
+        if (neutralTissue) {
+          cr = cg = cb = nz > 0.08 ? 0.86 : nz < -0.12 ? 0.74 : 0.8;
+          col[i * 3] = cr; col[i * 3 + 1] = cg; col[i * 3 + 2] = cb;
+          continue;
+        }
         if (nz > 0.08)  { cr += 0.12; cg += 0.09; cb += 0.07; }
         if (nz < -0.12) { cr -= 0.05; cg -= 0.03; cb -= 0.02; }
         if (ny > 0.32)  { cr += 0.03; cg += 0.02; }
@@ -645,6 +660,8 @@ export interface ProstateSceneHandles {
   dispose: () => void;
   setSize: (w: number, h: number) => void;
   setBackground: (hex: number) => void;
+  /** Anterior and posterior views on white, non-cancer gland in neutral grey (for the printed report). */
+  snapshotViews: () => string[];
   updateZones: (
     zones: ThreeZoneRuntime[],
     overlay: OverlayType,
@@ -987,6 +1004,26 @@ export function createProstateScene(
     },
     setBackground: (hex: number) => {
       scene.background = new Color(hex);
+    },
+    snapshotViews: () => {
+      const prevBg = scene.background;
+      const prevRot = { x: model.rotation.x, y: model.rotation.y };
+      neutralTissue = true;
+      applyZones(lastZones, lastOverlay, lastOpts);
+      scene.background = new Color(0xffffff);
+      const shots = (["anterior", "posterior"] as const).map((v) => {
+        model.rotation.x = VIEWS[v]!.x;
+        model.rotation.y = VIEWS[v]!.y;
+        renderer.render(scene, camera);
+        return renderer.domElement.toDataURL("image/jpeg", 0.92);
+      });
+      neutralTissue = false;
+      applyZones(lastZones, lastOverlay, lastOpts);
+      scene.background = prevBg;
+      model.rotation.x = prevRot.x;
+      model.rotation.y = prevRot.y;
+      renderer.render(scene, camera);
+      return shots;
     },
     updateZones: (z, ov, opts) => {
       lastZones = z;

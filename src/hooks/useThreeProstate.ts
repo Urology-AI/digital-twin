@@ -4,7 +4,7 @@ import {
   type ProstateDims,
   type ProstateSceneHandles,
 } from "@/lib/three/prostateScene";
-import { ZOOM_NUDGE_EVENT } from "@/lib/three/zoomBridge";
+import { ZOOM_NUDGE_EVENT, registerSceneSnapshot } from "@/lib/three/zoomBridge";
 import { useUiStore } from "@/store/uiStore";
 import type { OverlayType } from "@/types/prediction";
 import type { ThreeZoneRuntime } from "@/types/prediction";
@@ -38,6 +38,7 @@ export function useThreeProstate(
     h.model.scale.setScalar(0.85 * volumeScale);
     h.setBackground(useUiStore.getState().dark ? 0x1e1e24 : 0xf5f5f7);
     el.style.touchAction = "none";
+    registerSceneSnapshot(() => h.snapshotViews());
 
     const applyOrbitDelta = (dx: number, dy: number) => {
       useUiStore.setState((s) => ({
@@ -204,6 +205,7 @@ export function useThreeProstate(
       el.style.touchAction = "";
       ro.disconnect();
       h.dispose();
+      registerSceneSnapshot(null);
       handlesRef.current = null;
     };
   }, [containerRef, dims.ap, dims.tr, dims.cc, medianLobeGrade, volumeScale]);
