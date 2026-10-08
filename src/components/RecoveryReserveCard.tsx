@@ -24,8 +24,9 @@ export function RecoveryReserveCard({ reserve }: { reserve: RecoveryReserve }) {
           Recovery reserve (PIPS-R)
         </div>
         <p className="max-w-3xl text-xs leading-relaxed text-muted-foreground">
-          How much erectile function this patient could recover if both bundles are preserved. It shapes
-          counseling and rehabilitation, never the plane.
+          The patient's own capacity to recover erectile function, independent of the operation. It shapes
+          counseling and rehabilitation, never the plane. Expected results for the planned operation are in
+          Impact below.
         </p>
 
         {!reserve.available || !tier || reserve.probability === null ? (
@@ -35,27 +36,13 @@ export function RecoveryReserveCard({ reserve }: { reserve: RecoveryReserve }) {
           </p>
         ) : (
           <div className="grid gap-4 md:grid-cols-[minmax(0,260px)_1fr]">
-            <div className="space-y-3 rounded-xl border border-border bg-card/60 p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <Eyebrow>Expected unassisted recovery, 18 months</Eyebrow>
-                  <div className={cn("mt-1 text-3xl font-semibold leading-none tabular-nums", tier.text)}>
-                    {Math.round(reserve.probability * 100)}%
-                  </div>
-                </div>
-                <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ring-1 ring-inset", tier.chip)}>
-                  {tier.label}
-                </span>
-              </div>
-              <div className="relative h-2 rounded-full bg-muted">
-                <div className={cn("h-full rounded-full", tier.bar)} style={{ width: `${reserve.probability * 100}%` }} />
-                {[35, 60].map((t) => (
-                  <span key={t} className="absolute top-0 h-full w-px bg-background/80" style={{ left: `${t}%` }} aria-hidden />
-                ))}
-              </div>
+            <div className="space-y-2 rounded-xl border border-border bg-card/60 p-4 shadow-sm">
+              <Eyebrow>Baseline capacity</Eyebrow>
+              <span className={cn("inline-block rounded-full px-3 py-1 text-sm font-semibold ring-1 ring-inset", tier.chip)}>
+                {tier.label}
+              </span>
               <p className="text-[11px] leading-snug text-muted-foreground">
-                Bilateral intrafascial preservation, no PDE5 or pelvic-floor training counted. Tiers: good
-                60% or more, reduced 35-60%, poor under 35% (provisional).
+                Rated good, reduced or poor from age, baseline SHIM and comorbidities (provisional cut-points).
               </p>
             </div>
 
@@ -88,10 +75,9 @@ export function RecoveryReserveCard({ reserve }: { reserve: RecoveryReserve }) {
           </div>
         )}
         <p className="text-[11px] leading-snug text-muted-foreground">
-          Best-case values from the functional-outcome nomogram (selected single-surgeon cohort). Unlike the
-          recovery scenarios above, this leaves out the patient's PDE5, exercise and pelvic-floor settings, so
-          it can read lower than the 12-month figures there. PDE5 response, erection hardness, testosterone,
-          neuropathy and penile Doppler are not inputs.
+          From the functional-outcome nomogram (selected single-surgeon cohort), with the patient's PDE5, exercise
+          and pelvic-floor settings held neutral. PDE5 response, erection hardness, testosterone, neuropathy and
+          penile Doppler are not inputs.
         </p>
       </CardContent>
     </Card>

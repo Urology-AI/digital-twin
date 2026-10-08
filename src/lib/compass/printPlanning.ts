@@ -168,8 +168,10 @@ export function buildPlanningHtml(S: ClinicalState, predictions: CompassPredicti
       <tr><th>Erectile-recovery phenotype</th><td>${hb(baseline.healerTier)}</td><td>${hb(withPlan.healerTier)}</td><td></td></tr>
     </tbody></table>
     <p class="note">${
-      reserve.available && reserve.tier && reserve.probability !== null
-        ? `<b>Recovery reserve (PIPS-R):</b> ${esc(reserve.tier)}. Expected unassisted erectile function at 18 months with bilateral preservation: ${pct(reserve.probability)}.`
+      reserve.available && reserve.tier
+        ? `<b>Recovery reserve (PIPS-R):</b> ${esc(cap(reserve.tier))}. Baseline capacity to recover, independent of the planned operation.${
+            reserve.notModelled.length ? ` Not modelled: ${esc(reserve.notModelled.join("; ").toLowerCase())}.` : ""
+          }`
         : `<b>Recovery reserve (PIPS-R):</b> not estimated (baseline SHIM below 12).`
     }</p>
     ${counseling.uncertainty.length ? `<p class="note"><b>Key uncertainty:</b> ${counseling.uncertainty.map(esc).join("; ")}.</p>` : ""}`;

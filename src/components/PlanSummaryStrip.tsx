@@ -70,7 +70,7 @@ export function PlanSummaryStrip({
         label="Recovery reserve"
         value={reserve.available && reserve.tier ? reserve.tier : "N/A"}
         tone={reserve.available && reserve.tier ? RESERVE_TONE[reserve.tier] : "muted"}
-        sub={reserve.available && reserve.probability !== null ? `${Math.round(reserve.probability * 100)}% at 18 mo` : "SHIM < 12"}
+        sub={reserve.available ? "Baseline capacity" : "SHIM < 12"}
       />
     </div>
   );
