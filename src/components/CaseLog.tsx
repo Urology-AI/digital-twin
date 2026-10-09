@@ -190,13 +190,14 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       const local = getCases();
       const { records: pulled, library: pulledLibrary } = await pullCases(local);
       // Merge: cloud is authoritative for clinical/prediction/path fields;
-      // local notes are preserved inside pullCases(). New cloud-only cases are added.
+      // local notes and dates are preserved. New cloud-only cases are added.
       const localIds = new Set(local.map((c) => c.id));
       const newFromCloud = pulled.filter((c) => !localIds.has(c.id));
       // Update existing local records' path fields from cloud
       const updated = local.map((lc) => {
         const remote = pulled.find((rc) => rc.id === lc.id);
-        return remote ? { ...remote, notes: lc.notes } : lc;
+        // Cloud stores the year only; keep the full local date.
+        return remote ? { ...remote, date: lc.date, notes: lc.notes } : lc;
       });
       const merged = [...newFromCloud, ...updated];
       saveCases(merged);

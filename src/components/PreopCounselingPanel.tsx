@@ -26,6 +26,7 @@ import {
   daysFromSurgery,
   expectedCourse,
   fmtLong,
+  fmtReviewDate,
   fmtShort,
   likelyOutcomes,
   parseSurgeryDate,
@@ -154,7 +155,7 @@ function ReviewStamp({ review, fingerprint, readOnly = false }: { review: Prosta
     state === "current" ? (
       <div role="status" className="flex items-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-900 dark:text-emerald-200">
         <UserCheck aria-hidden className="h-4 w-4 shrink-0" />
-        <span>{t("Reviewed by {name} on {date}", { name: review!.reviewer, date: fmtLong(new Date(review!.date), lang) })}</span>
+        <span>{t("Reviewed by {name} on {date}", { name: review!.reviewer, date: fmtReviewDate(review!.date, lang) })}</span>
       </div>
     ) : (
       <div role="status" className="flex items-center gap-2 rounded-xl border border-amber-500/50 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-900 dark:text-amber-200">

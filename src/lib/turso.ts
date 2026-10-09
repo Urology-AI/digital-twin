@@ -102,12 +102,16 @@ const MIGRATE_COLS: [string, string][] = [
   ["lymph_nodes_psma",  "TEXT"],
 ];
 
-async function sha256hex(s: string): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 24);
+// Random, not a hash of the local id: local ids embed their creation time
+// ("C" + Date.now()), which a hash would leave recoverable by brute force.
+function newCloudId(): string {
+  return crypto.randomUUID().replace(/-/g, "").slice(0, 24);
+}
+
+// Lesion ids embed their creation time (`lesion-${Date.now()}`); renumber them
+// before upload. Nothing references lesion ids outside the row itself.
+export function renumberLesions<T extends { id: string }>(rows: T[]): T[] {
+  return rows.map((r, i) => ({ ...r, id: `lesion-${i}` }));
 }
 
 /**
@@ -162,6 +166,8 @@ function getClient() {
  *  - id       → cloud hash (set by caller)
  *  - name     → non-identifying clinical label
  *  - age > 89 → capped at 89
+ *  - dates    → year only
+ *  - lesion ids → renumbered (they embed a creation timestamp)
  *  - media    → stripped (images may contain patient documents / photos)
  */
 function deidentifyEntry(entry: PatientEntry, cloudId: string): PatientEntry {
@@ -173,11 +179,14 @@ function deidentifyEntry(entry: PatientEntry, cloudId: string): PatientEntry {
   const psa = entry.record.patient?.psa ?? "?";
   const record = { ...entry.record, patient };
   delete record.media;
+  if (record.preop_review) {
+    record.preop_review = { ...record.preop_review, date: record.preop_review.date.slice(0, 4) };
+  }
   return {
     id: cloudId,
     name: `GG${gg} PSA ${psa}`,
     record,
-    lesionRows: entry.lesionRows,
+    lesionRows: renumberLesions(entry.lesionRows),
   };
 }
 
@@ -263,9 +272,9 @@ export async function pushCases(
   await ensureSchema(client);
 
   const idMap = loadIdMap();
-  await Promise.all(cases.map(async (c) => {
-    if (!idMap[c.id]) idMap[c.id] = await sha256hex(c.id);
-  }));
+  for (const c of cases) {
+    if (!idMap[c.id]) idMap[c.id] = newCloudId();
+  }
   saveIdMap(idMap);
 
   const libraryById = new Map(library.map((e) => [e.id, e]));
@@ -274,7 +283,8 @@ export async function pushCases(
 
   const stmts = cases.map((c) => {
     const cloudId = idMap[c.id]!;
-    const base: Record<string, unknown> = { ...c, id: cloudId, notes: "" };
+    // Safe Harbor: no date element more specific than the year leaves the browser.
+    const base: Record<string, unknown> = { ...c, id: cloudId, date: c.date?.slice(0, 4) ?? null, notes: "" };
     const entry = libraryById.get(c.id);
     const extra = entry ? recordColumns(entry, cloudId) : {};
     const row = { ...base, ...extra };
@@ -359,7 +369,8 @@ export async function saveShareCase(id: string, record: unknown): Promise<void> 
     [
       {
         sql: "INSERT OR REPLACE INTO patient_shares (id, record, created_at) VALUES (?, ?, ?)",
-        args: [id, JSON.stringify(record), new Date().toISOString()],
+        // Month only (the Worker overwrites it with its own clock anyway).
+        args: [id, JSON.stringify(record), new Date().toISOString().slice(0, 7)],
       },
     ],
     "write",

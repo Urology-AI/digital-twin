@@ -488,6 +488,14 @@ export const fmtLong = (d: Date, lang: Lang = "en") =>
   d.toLocaleDateString(locale(lang), { weekday: "short", month: "short", day: "numeric" });
 export const fmtShort = (d: Date, lang: Lang = "en") =>
   d.toLocaleDateString(locale(lang), { month: "short", day: "numeric" });
+/** Sign-off date. Shared/synced records keep only "YYYY-MM" or "YYYY" (no visit day). */
+export function fmtReviewDate(date: string, lang: Lang = "en"): string {
+  if (/^\d{4}$/.test(date)) return date;
+  if (/^\d{4}-\d{2}$/.test(date)) {
+    return new Date(`${date}-01T00:00:00Z`).toLocaleDateString(locale(lang), { month: "short", year: "numeric", timeZone: "UTC" });
+  }
+  return fmtLong(new Date(date), lang);
+}
 
 /** Relative label for a day offset, in English (translate with `tr`). */
 export function relDay(d: number): string {
@@ -534,7 +542,7 @@ export function buildPrintHtml({ S, surgery, done, questions, review, reviewCurr
   const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
   const T = (s: string) => esc(tr(s));
   const reviewLine = review && reviewCurrent
-    ? `${T("Reviewed by")} ${esc(review.reviewer)} · ${esc(fmtLong(new Date(review.date), lang))}`
+    ? `${T("Reviewed by")} ${esc(review.reviewer)} · ${esc(fmtReviewDate(review.date, lang))}`
     : T("Not yet reviewed by your care team");
   return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><title>${T("My surgery plan")}</title><style>
     body{font:14px/1.45 system-ui,sans-serif;color:#111;max-width:720px;margin:24px auto;padding:0 16px}
