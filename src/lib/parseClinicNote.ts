@@ -30,6 +30,11 @@ const VALID_ZONE_COMBOS: { side: "L" | "R"; pos: string; level: "Base" | "Mid" |
   { side: "L", pos: "Anterior",       level: "Mid" },
   { side: "R", pos: "Anterior",       level: "Apex" },
   { side: "L", pos: "Anterior",       level: "Apex" },
+  // Posterior apex: not a cell in the wizard grid, but lesionToZone() maps it to COMPASS 5p/10p.
+  { side: "R", pos: "Posterolateral", level: "Apex" },
+  { side: "R", pos: "Posterior",      level: "Apex" },
+  { side: "L", pos: "Posterior",      level: "Apex" },
+  { side: "L", pos: "Posterolateral", level: "Apex" },
 ];
 
 type Level = "Base" | "Mid" | "Apex";
@@ -38,21 +43,24 @@ function truncate(s: string, n = 60) {
   return s.length > n ? s.slice(0, n) + "…" : s;
 }
 
-/** Returns every level the lesion text covers. Unspecified → all levels. */
-function parseLevelRange(text: string): Level[] {
+/**
+ * Returns the levels the lesion text covers. Only explicit ranges expand;
+ * unspecified → ["Mid"] with `defaulted` set so callers can warn.
+ */
+function parseLevelRange(text: string): { levels: Level[]; defaulted: boolean } {
   const m = text.match(/\b(base|mid|apex|apical)\s+to\s+(base|mid|apex)\b/i);
   if (m) {
     const a = (m[1] ?? "").toLowerCase();
     const b = (m[2] ?? "").toLowerCase();
-    if ((a === "base" && b === "apex") || (a === "apex" && b === "base")) return ["Base", "Mid", "Apex"];
-    if ((a === "mid" && b === "base") || (a === "base" && b === "mid")) return ["Base", "Mid"];
-    if ((a === "apex" && b === "mid") || (a === "mid" && b === "apex")) return ["Mid", "Apex"];
-    return ["Base", "Mid", "Apex"];
+    if ((a === "base" && b === "apex") || (a === "apex" && b === "base")) return { levels: ["Base", "Mid", "Apex"], defaulted: false };
+    if ((a === "mid" && b === "base") || (a === "base" && b === "mid")) return { levels: ["Base", "Mid"], defaulted: false };
+    if ((a === "apex" && b === "mid") || (a === "mid" && b === "apex")) return { levels: ["Mid", "Apex"], defaulted: false };
+    return { levels: ["Base", "Mid", "Apex"], defaulted: false };
   }
-  if (/\bapex\b|\bapical\b/i.test(text)) return ["Apex"];
-  if (/\bmid\b/i.test(text)) return ["Mid"];
-  if (/\bbase\b/i.test(text)) return ["Base"];
-  return ["Base", "Mid", "Apex"]; // unspecified = full gland
+  if (/\bapex\b|\bapical\b/i.test(text)) return { levels: ["Apex"], defaulted: false };
+  if (/\bmid\b/i.test(text)) return { levels: ["Mid"], defaulted: false };
+  if (/\bbase\b/i.test(text)) return { levels: ["Base"], defaulted: false };
+  return { levels: ["Mid"], defaulted: true };
 }
 
 function parseSide(text: string): "L" | "R" | "" {
@@ -62,7 +70,10 @@ function parseSide(text: string): "L" | "R" | "" {
 }
 
 function parseZone(text: string): string {
-  // Order matters: check PL before PZ so "PL PZ" hits PL branch
+  // Most specific tokens first: pathology location codes, then generic terms.
+  if (/\bpza\b|\batz\b/i.test(text)) return "Anterior";
+  if (/\bpzpl\b/i.test(text)) return "Posterolateral";
+  if (/\bpzpm\b/i.test(text)) return "Posterior";
   if (/\bpl\s+pz\b|\bpl\b/i.test(text)) return "Posterolateral";
   if (/\bpz\b/i.test(text)) return "Posterior";
   if (/\btz\b|\baz\b|\banterior\b/i.test(text)) return "Anterior";
@@ -123,13 +134,10 @@ function expandToZoneRows(
 ): { rows: LesionRow[]; levelFallback: Level | null } {
   const sides: ("L" | "R")[] = side === "" ? ["L", "R"] : [side];
   const rows: LesionRow[] = [];
-  const apexOnlyInAnterior = pos === "Posterior" || pos === "Posterolateral";
   for (const s of sides) {
     for (const lv of levels) {
-      // Apex only exists in the Anterior zone; remap Posterior/Posterolateral+Apex → Anterior+Apex
-      const effectivePos = apexOnlyInAnterior && lv === "Apex" ? "Anterior" : pos;
-      if (!VALID_ZONE_COMBOS.some((c) => c.side === s && c.pos === effectivePos && c.level === lv)) continue;
-      rows.push({ ...emptyLesion(uid()), ...base, side: s, zone: effectivePos, level: lv });
+      if (!VALID_ZONE_COMBOS.some((c) => c.side === s && c.pos === pos && c.level === lv)) continue;
+      rows.push({ ...emptyLesion(uid()), ...base, side: s, zone: pos, level: lv });
     }
   }
   if (rows.length > 0) return { rows, levelFallback: null };
@@ -153,7 +161,7 @@ function expandToZoneRows(
   return { rows, levelFallback: null };
 }
 
-function mergeBiopsyZones(rows: LesionRow[]): LesionRow[] {
+function mergeBiopsyZones(rows: LesionRow[], warnings: string[]): LesionRow[] {
   const map = new Map<string, LesionRow>();
   const nonBx: LesionRow[] = [];
   for (const row of rows) {
@@ -163,6 +171,7 @@ function mergeBiopsyZones(rows: LesionRow[]): LesionRow[] {
     if (!ex) {
       map.set(key, { ...row });
     } else {
+      warnings.push(`Biopsy: duplicate ${row.side} ${row.level} ${row.zone} entries merged`);
       ex.corePct = Math.min(100, (ex.corePct ?? 0) + (row.corePct ?? 0));
       const newGG = parseInt(row.score) || 0;
       const exGG = parseInt(ex.score) || 0;
@@ -194,7 +203,8 @@ function parseBiopsyLines(lines: string[], warnings: string[]): LesionRow[] {
         }
         const side = parseSide(t);
         const pos = parseZone(t);
-        const levels = parseLevelRange(t);
+        const { levels, defaulted } = parseLevelRange(t);
+        if (defaulted) warnings.push(`Biopsy: "${m[0]}" — level not specified, defaulted to Mid`);
         const base = {
           source: "Bx" as const,
           zone: pos,
@@ -254,7 +264,8 @@ function parseMriLines(
       }
       const side = parseSide(seg);
       const pos = parseZone(seg);
-      const levels = parseLevelRange(seg);
+      const { levels, defaulted } = parseLevelRange(seg);
+      if (defaulted) warnings.push(`MRI: PIRADS ${pirads} — level not specified, defaulted to Mid`);
       const abut = parseAbutment(seg);
       const epe = parseEpe(seg);
       const svi = parseSvi(seg);
@@ -303,7 +314,8 @@ function parseMusLines(lines: string[], warnings: string[]): LesionRow[] {
     const primus = parseInt(pm[1] ?? "0");
     const side = parseSide(t);
     const pos = parseZone(t);
-    const levels = parseLevelRange(t);
+    const { levels, defaulted } = parseLevelRange(t);
+    if (defaulted) warnings.push(`MUS: PRIMUS ${primus} — level not specified, defaulted to Mid`);
     const abut = parseAbutment(t);
     const epe = parseEpe(t);
     const base = {
@@ -358,7 +370,8 @@ function parsePsmaLines(lines: string[], warnings: string[]): LesionRow[] {
     const suv = parseFloat(sm[1] ?? "0");
     const side = parseSide(t);
     const pos = parseZone(t);
-    const levels = parseLevelRange(t);
+    const { levels, defaulted } = parseLevelRange(t);
+    if (defaulted) warnings.push(`PSMA: SUV ${suv} — level not specified, defaulted to Mid`);
     const base = {
       source: "PSMA" as const,
       zone: pos,
@@ -438,7 +451,7 @@ export function parseClinicNote(text: string): ParsedNote {
     }
   }
 
-  const bxLesions = mergeBiopsyZones(parseBiopsyLines(sections.biopsy, warnings));
+  const bxLesions = mergeBiopsyZones(parseBiopsyLines(sections.biopsy, warnings), warnings);
   const { lesions: mriLesions, volumeCc, psaFromHeader } = parseMriLines(sections.mri, warnings);
   const musLesions = parseMusLines(sections.mus, warnings);
   const psmaLesions = parsePsmaLines(sections.psma, warnings);

@@ -95,3 +95,54 @@ describe("abutment wording", () => {
     expect(abut("PRIMUS 3, Left PL PZ Mid, abuts capsule")).toBe(1);
   });
 });
+
+describe("zone and level parsing", () => {
+  const lesions = (note: string) => parseClinicNote(note).lesions;
+
+  it("reads PZPL as Left posterolateral at Mid (level defaulted, not expanded)", () => {
+    const r = parseClinicNote("Biopsy\nGleason 7 (3+4) 20% Left PZPL");
+    expect(r.lesions).toHaveLength(1);
+    expect(r.lesions[0]).toMatchObject({ side: "L", zone: "Posterolateral", level: "Mid", score: "2" });
+    expect(r.warnings.some((w) => /level not specified, defaulted to Mid/.test(w))).toBe(true);
+  });
+
+  it("reads PZA as Right anterior", () => {
+    const l = lesions("Biopsy\nGleason 6 (3+3) 5% Right PZA");
+    expect(l).toHaveLength(1);
+    expect(l[0]).toMatchObject({ side: "R", zone: "Anterior", score: "1" });
+  });
+
+  it("reads ATZ as anterior and PZPM as posterior", () => {
+    expect(lesions("Biopsy\nGleason 6 (3+3) 5% Left ATZ Mid")[0]?.zone).toBe("Anterior");
+    expect(lesions("Biopsy\nGleason 6 (3+3) 5% Left PZPM Mid")[0]?.zone).toBe("Posterior");
+  });
+
+  it("keeps PL PZ mid-to-apex posterolateral (no remap to anterior)", () => {
+    const l = lesions("MRI\nPIRADS 4 Right PL PZ mid to apex");
+    expect(l.map((x) => [x.side, x.zone, x.level])).toEqual([
+      ["R", "Posterolateral", "Mid"],
+      ["R", "Posterolateral", "Apex"],
+    ]);
+  });
+
+  it("keeps a posterior apex lesion posterior", () => {
+    const l = lesions("Biopsy\nGleason 6 (3+3) 10% Right Apex PZ");
+    expect(l[0]).toMatchObject({ zone: "Posterior", level: "Apex" });
+  });
+
+  it("parses PSMA SUV Left PZ base as posterior base", () => {
+    const l = lesions("PSMA\nSUV 5.2 Left PZ base");
+    expect(l).toHaveLength(1);
+    expect(l[0]).toMatchObject({ side: "L", zone: "Posterior", level: "Base" });
+  });
+
+  it("still expands explicit base-to-apex ranges", () => {
+    const l = lesions("MRI\nPIRADS 4 Right PZ base to apex");
+    expect(l.map((x) => x.level)).toEqual(["Base", "Mid", "Apex"]);
+  });
+
+  it("warns when duplicate biopsy entries merge", () => {
+    const r = parseClinicNote(SAMPLE_NOTE);
+    expect(r.warnings.some((w) => /duplicate .* merged/i.test(w))).toBe(true);
+  });
+});
