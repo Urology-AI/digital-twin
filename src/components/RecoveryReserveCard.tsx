@@ -15,7 +15,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
 
 /** PIPS-R: baseline capacity of nerve, vessel and corporal tissue to recover. */
 export function RecoveryReserveCard({ reserve }: { reserve: RecoveryReserve }) {
-  const tier = reserve.tier ? TIER[reserve.tier] : null;
+  const tier = TIER[reserve.tier];
   return (
     <Card>
       <CardContent className="space-y-4 p-4">
@@ -29,44 +29,43 @@ export function RecoveryReserveCard({ reserve }: { reserve: RecoveryReserve }) {
           Impact below.
         </p>
 
-        {!reserve.available || !tier || reserve.probability === null ? (
+        {reserve.lowShimModel && (
           <p className="rounded-lg bg-muted/40 p-3 text-xs text-muted-foreground">
-            Not estimated: baseline SHIM is below 12, so unassisted recovery is not modelled. Counsel on
-            assisted recovery and rehabilitation options instead.
+            Baseline SHIM is below 12, so this comes from a separate low-SHIM model built on a small published
+            group (n=34): low confidence. Counsel on assisted recovery and rehabilitation options as well.
           </p>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-[minmax(0,260px)_1fr]">
-            <div className="space-y-2 rounded-xl border border-border bg-card/60 p-4 shadow-sm">
-              <Eyebrow>Baseline capacity</Eyebrow>
-              <span className={cn("inline-block rounded-full px-3 py-1 text-sm font-semibold ring-1 ring-inset", tier.chip)}>
-                {tier.label}
-              </span>
-              <p className="text-[11px] leading-snug text-muted-foreground">
-                Rated good, reduced or poor from age, baseline SHIM and comorbidities (provisional cut-points).
-              </p>
-            </div>
+        )}
+        <div className="grid gap-4 md:grid-cols-[minmax(0,260px)_1fr]">
+          <div className="space-y-2 rounded-xl border border-border bg-card/60 p-4 shadow-sm">
+            <Eyebrow>Baseline capacity</Eyebrow>
+            <span className={cn("inline-block rounded-full px-3 py-1 text-sm font-semibold ring-1 ring-inset", tier.chip)}>
+              {tier.label}
+            </span>
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Rated good, reduced or poor from age, baseline SHIM and comorbidities (provisional cut-points).
+            </p>
+          </div>
 
-            <div className="space-y-3">
-              <div>
-                <Eyebrow>What lowers it</Eyebrow>
-                {reserve.drivers.length === 0 ? (
-                  <p className="mt-2 text-xs text-muted-foreground">Nothing recorded lowers the reserve.</p>
-                ) : (
-                  <ul className="mt-1 divide-y divide-border/60">
-                    {reserve.drivers.map((d) => (
-                      <li key={d.label} className="flex items-baseline gap-2 py-2 text-xs">
-                        <span className="min-w-0 flex-1 text-foreground/90">
-                          {d.label} <span className="text-muted-foreground">({d.detail})</span>
-                        </span>
-                        <span className="w-14 shrink-0 text-right font-medium tabular-nums text-foreground/80">-{d.cost} pp</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+          <div className="space-y-3">
+            <div>
+              <Eyebrow>What lowers it</Eyebrow>
+              {reserve.drivers.length === 0 ? (
+                <p className="mt-2 text-xs text-muted-foreground">Nothing recorded lowers the reserve.</p>
+              ) : (
+                <ul className="mt-1 divide-y divide-border/60">
+                  {reserve.drivers.map((d) => (
+                    <li key={d.label} className="flex items-baseline gap-2 py-2 text-xs">
+                      <span className="min-w-0 flex-1 text-foreground/90">
+                        {d.label} <span className="text-muted-foreground">({d.detail})</span>
+                      </span>
+                      <span className="w-14 shrink-0 text-right font-medium tabular-nums text-foreground/80">-{d.cost} pp</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
-        )}
+        </div>
 
         {reserve.notModelled.length > 0 && (
           <div className="rounded-lg bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">

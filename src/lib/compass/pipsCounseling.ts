@@ -86,8 +86,10 @@ export interface SideCounseling {
 
 export interface RecoveryScenario {
   label: string;
-  /** potency at 12 months, %; null when baseline SHIM < 12 */
-  potency12: number | null;
+  /** potency at 12 months, % */
+  potency12: number;
+  /** baseline SHIM < 12: potency is from the separate low-SHIM model, low confidence */
+  lowShimModel: boolean;
   continence12: number;
 }
 
@@ -162,7 +164,7 @@ export function buildPipsCounseling(
   const kept = (sp: SidePlan) => Math.min(sp.nsGrade, 2);
   const run = (nsL: number, nsR: number, label: string): RecoveryScenario => {
     const r = computeFunctionalOutcomes({ ...functionalBase, nsL, nsR });
-    return { label, potency12: r.potency12, continence12: r.continence12 };
+    return { label, potency12: r.potency12, lowShimModel: r.lowShimModel, continence12: r.continence12 };
   };
   const recovery = [
     run(kept(plan.left), kept(plan.right), "Nerve sparing both sides, as planned"),

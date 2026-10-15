@@ -17,6 +17,7 @@ import {
   MODIFIABLE_BCR,
   PLAN_DELTAS,
   DIET_FUNCTIONAL_DELTA,
+  LOW_SHIM_POTENCY,
 } from "@/lib/compass/planningEvidence";
 // type-only: biologicalAge.ts imports the level types from here, so this must
 // never become a runtime import.
@@ -65,17 +66,18 @@ export interface FunctionalInputs {
 }
 
 export interface FunctionalOutcomesResult {
-  potency12: number | null;   // null if SHIM < 12
+  potency12: number;
   continence12: number;
-  potencyTimeline: (number | null)[];  // [6wk, 3mo, 6mo, 12mo, 18mo] — null when SHIM < 12
+  potencyTimeline: number[];  // [6wk, 3mo, 6mo, 12mo, 18mo]
   continenceTimeline: number[];
   potencyAdj: number;
   continenceAdj: number;
-  shimValid: boolean;
-  /** erectile-recovery phenotype from time-to-potency (null when SHIM < 12) */
-  healerTier: HealerTier | null;
-  /** probability mass in each recovery window, 0–1 (null when SHIM < 12) */
-  healerBands: { super: number; healer: number; delayed: number } | null;
+  /** baseline SHIM < 12: potency comes from the separate low-SHIM model, low confidence */
+  lowShimModel: boolean;
+  /** erectile-recovery phenotype from time-to-potency */
+  healerTier: HealerTier;
+  /** probability mass in each recovery window, 0–1 */
+  healerBands: { super: number; healer: number; delayed: number };
   /** net pp effect of the operative-plan modifiers (0 when no plan passed) */
   planPotencyAdj: number;
   planContinenceAdj: number;
@@ -170,9 +172,7 @@ function planDeltas(p: PlanModifiers | undefined): {
   return { pot, cont, contEarly };
 }
 
-function healerTierFromTimeline(timeline: (number | null)[]): HealerTier | null {
-  if (timeline.some((v) => v === null)) return null;
-  const t = timeline as number[];
+function healerTierFromTimeline(t: number[]): HealerTier {
   const thr = HEALER_THRESHOLD.value;
   const full = FULL_RECOVERY_THRESHOLD.value;
   // [6wk, 3mo, 6mo, 12mo, 18mo]
@@ -182,11 +182,7 @@ function healerTierFromTimeline(timeline: (number | null)[]): HealerTier | null 
   return "non-recovery";
 }
 
-function healerBandsFromTimeline(
-  timeline: (number | null)[],
-): { super: number; healer: number; delayed: number } | null {
-  if (timeline.some((v) => v === null)) return null;
-  const t = timeline as number[];
+function healerBandsFromTimeline(t: number[]): { super: number; healer: number; delayed: number } {
   const sup = clamp(t[0]! / 100, 0, 1);
   const heal = clamp((t[3]! - t[0]!) / 100, 0, 1);
   const del = clamp((t[4]! - t[3]!) / 100, 0, 1);
@@ -236,6 +232,26 @@ export function ageAdjustment(age: number): number {
   );
 }
 
+/** Nomogram columns for the timeline points [6wk, 3mo, 6mo, 12mo, 18mo]. */
+const TIMELINE_COLS = [0, 1, 2, 4, 5];
+
+/**
+ * Potency below baseline SHIM 12: the observed SHIM 1-11 recovery curve
+ * (LOW_SHIM_POTENCY), scaled by this patient's nerve-sparing and age effect
+ * relative to that group's own mix. Lifestyle and plan deltas are not applied.
+ */
+function lowShimTimeline(nsL: number, nsR: number, age: number): number[] {
+  const { observed, referenceMix: m, referenceAge } = LOW_SHIM_POTENCY.value;
+  const patient = getPot(nsL, nsR);
+  const n = m.bilateral + m.unilateral + m.wide;
+  return TIMELINE_COLS.map((col, t) => {
+    const ref =
+      ((m.bilateral * (getPot(1, 1)[col] ?? 0) + m.unilateral * (getPot(1, 4)[col] ?? 0) + m.wide * (getPot(4, 4)[col] ?? 0)) / n) *
+      ageAdjustment(referenceAge);
+    return clamp(Math.round(((observed[t] ?? 0) * (patient[col] ?? 0) * ageAdjustment(age)) / ref), 1, 99);
+  });
+}
+
 export function computeFunctionalOutcomes(inputs: FunctionalInputs): FunctionalOutcomesResult {
   const { nsL, nsR, age, shim, ipss, bmi, pfmt, exercise, smoking, pde5, alcohol, dm, htn, cad } = inputs;
   const diet = inputs.diet ?? "average";
@@ -245,12 +261,11 @@ export function computeFunctionalOutcomes(inputs: FunctionalInputs): FunctionalO
 
   const aA = ageAdjustment(age);
 
-  // SHIM adjustment factor
+  // SHIM adjustment factor (below 12, lowShimTimeline replaces the nomogram)
   const sA =
     shim >= 21 ? 1.0 :
     shim >= 17 ? 0.92 + (shim - 17) * 0.02 :
-    shim >= 12 ? 0.85 + (shim - 12) * 0.014 :
-    0.70;
+    0.85 + (shim - 12) * 0.014;
 
   // IPSS adjustment (continence)
   const iA =
@@ -300,18 +315,18 @@ export function computeFunctionalOutcomes(inputs: FunctionalInputs): FunctionalO
   const pF = clamp(pB + pA, 15, 98);
   const cF = clamp(cB + cA + iA, 40, 99);
 
-  const shimValid = shim >= 12;
+  const lowShimModel = shim < LOW_SHIM_POTENCY.value.below;
 
   // Potency timeline: [6wk, 3mo, 6mo, 12mo, 18mo]
-  const potencyTimeline: (number | null)[] = shimValid
-    ? [
+  const potencyTimeline: number[] = lowShimModel
+    ? lowShimTimeline(nsL, nsR, age)
+    : [
         clamp(Math.round((pd[0] ?? 0) * aA * sA) + Math.round(pA * 0.5), 10, 90),
         clamp(Math.round((pd[1] ?? 0) * aA * sA) + Math.round(pA * 0.7), 15, 92),
         clamp(Math.round((pd[2] ?? 0) * aA * sA) + Math.round(pA * 0.9), 20, 95),
         pF,
         clamp(Math.round((pd[5] ?? 0) * aA * sA) + pA, 20, 99),
-      ]
-    : [null, null, null, null, null];
+      ];
 
   // Continence timeline: [6wk, 3mo, 6mo, 12mo, 18mo]
   const continenceTimeline: number[] = [
@@ -323,16 +338,16 @@ export function computeFunctionalOutcomes(inputs: FunctionalInputs): FunctionalO
   ];
 
   return {
-    potency12: shimValid ? pF : null,
+    potency12: potencyTimeline[3]!,
     continence12: cF,
     potencyTimeline,
     continenceTimeline,
-    potencyAdj: pA,
+    potencyAdj: lowShimModel ? 0 : pA,
     continenceAdj: cA,
-    shimValid,
+    lowShimModel,
     healerTier: healerTierFromTimeline(potencyTimeline),
     healerBands: healerBandsFromTimeline(potencyTimeline),
-    planPotencyAdj,
+    planPotencyAdj: lowShimModel ? 0 : planPotencyAdj,
     planContinenceAdj,
   };
 }

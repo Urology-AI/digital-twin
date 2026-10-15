@@ -461,7 +461,8 @@ export function likelyOutcomes(S: ClinicalState, P: CompassPredictions | null): 
   const pct = (v: number) => Math.round(Math.min(99, Math.max(1, v)));
   return {
     continence: r.continenceTimeline.map(pct),
-    potency: r.shimValid ? r.potencyTimeline.map((v) => pct(v ?? 0)) : null,
+    // Patient-facing: the low-confidence SHIM < 12 model is not shown to patients.
+    potency: r.lowShimModel ? null : r.potencyTimeline.map(pct),
     recurrence: Number.isFinite(P.bcr36) ? Math.round(P.bcr36 * 100) : null,
   };
 }

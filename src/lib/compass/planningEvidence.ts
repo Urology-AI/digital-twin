@@ -734,6 +734,32 @@ export const MF_AGE_SHIM = ev(
     "×1.10 (age ≤50) to ×0.85 (age 65-70) and SHIM 12-16 ×0.85-0.92 factors.",
 );
 
+export const LOW_SHIM_POTENCY = ev(
+  {
+    /** baseline SHIM below this uses this model instead of the nomogram's SHIM multiplier */
+    below: 12,
+    /** observed potency %, SHIM 1-11 group, at [6 wk (1-mo value), 3 mo, 6 mo, 12 mo, 18 mo] */
+    observed: [6.1, 6.5, 6.5, 13.9, 14.8],
+    /** that group's nerve sparing (bilateral / unilateral / wide excision, n) and median age */
+    referenceMix: { bilateral: 19, unilateral: 5, wide: 10 },
+    referenceAge: 63,
+  },
+  "literature",
+  "Potency model below baseline SHIM 12",
+  "Alenizi AM, Zorn KC, Bienz M, et al. Can J Urol. 2016;23(5):8451-8456, " +
+    "Tables 1-2: men with pre-op SHIM 1-11 (n=34, single-surgeon RARP) were " +
+    "potent (EHS ≥3, with or without PDE5-I) in 6.1% at 1 month, 6.5% at 3 " +
+    "and 6 months, 13.9% at 12 months and 14.8% at 18 months, with no " +
+    "significant improvement over follow-up. The patient's estimate scales " +
+    "that curve by the nomogram's nerve-sparing and age effects relative to " +
+    "the group's own mix (19 bilateral, 5 unilateral, 10 wide excision; " +
+    "median age 63). Lifestyle and operative-plan deltas are not applied: " +
+    "there are no data for them below SHIM 12, and the group was already " +
+    "encouraged to use PDE5-I rehabilitation. SHIM 12 is the IIEF-5 boundary " +
+    "between mild-moderate and moderate ED (Rosen 1999). Small group, wide " +
+    "uncertainty: low confidence.",
+);
+
 export const MF_BMI_FUNCTION = ev(
   { pot: -8, cont: -5, threshold: 30 },
   "literature",

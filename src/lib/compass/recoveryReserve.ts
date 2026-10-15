@@ -19,7 +19,7 @@
  * rather than being given invented numeric penalties.
  */
 import { computeFunctionalOutcomes, type FunctionalInputs } from "@/lib/compass/functionalOutcomes";
-import { PIPS_R_CUTS } from "@/lib/compass/planningEvidence";
+import { LOW_SHIM_POTENCY, PIPS_R_CUTS } from "@/lib/compass/planningEvidence";
 import type { ClinicalState } from "@/types/patient";
 
 export type ReserveTier = "good" | "reduced" | "poor";
@@ -32,11 +32,11 @@ export interface ReserveDriver {
 }
 
 export interface RecoveryReserve {
-  /** false when baseline SHIM < 12 (the nomogram does not estimate unassisted recovery) */
-  available: boolean;
+  /** baseline SHIM < 12: from the separate low-SHIM model, low confidence */
+  lowShimModel: boolean;
   /** expected unassisted erectile function at 18 months with bilateral preservation, 0-1 */
-  probability: number | null;
-  tier: ReserveTier | null;
+  probability: number;
+  tier: ReserveTier;
   drivers: ReserveDriver[];
   /** risk factors present in this record that the nomogram does not model */
   notModelled: string[];
@@ -49,10 +49,9 @@ function neutral(base: Base): Base {
   return { ...base, pde5: "none", pfmt: "none", exercise: "light", alcohol: "moderate", diet: undefined };
 }
 
-/** Expected unassisted potency at 18 months (0-100), or null when SHIM < 12. */
-function reserveAt(base: Base): number | null {
-  const r = computeFunctionalOutcomes({ ...neutral(base), nsL: 1, nsR: 1 });
-  return r.potencyTimeline[4] ?? null;
+/** Expected unassisted potency at 18 months (0-100). */
+function reserveAt(base: Base): number {
+  return computeFunctionalOutcomes({ ...neutral(base), nsL: 1, nsR: 1 }).potencyTimeline[4]!;
 }
 
 export function reserveTier(p: number): ReserveTier {
@@ -67,9 +66,6 @@ export function computeRecoveryReserve(S: ClinicalState, base: Base): RecoveryRe
   if (S.prior_pelvic_surgery === "bladder_fracture_urethroplasty") notModelled.push("Pelvic fracture, urethral injury or bladder surgery");
 
   const actual = reserveAt(base);
-  if (actual === null) {
-    return { available: false, probability: null, tier: null, drivers: [], notModelled };
-  }
 
   const refs: { label: string; detail: string; ref: Partial<Base> }[] = [
     { label: "Age", detail: `${Math.round(base.age)} yrs, vs 55`, ref: { age: 55 } },
@@ -83,11 +79,17 @@ export function computeRecoveryReserve(S: ClinicalState, base: Base): RecoveryRe
   const drivers = refs
     .map((r) => {
       const better = reserveAt({ ...base, ...r.ref });
-      return { label: r.label, detail: r.detail, cost: Math.max(0, (better ?? actual) - actual) };
+      return { label: r.label, detail: r.detail, cost: Math.max(0, better - actual) };
     })
     .filter((d) => d.cost > 0)
     .sort((a, b) => b.cost - a.cost);
 
   const probability = actual / 100;
-  return { available: true, probability, tier: reserveTier(probability), drivers, notModelled };
+  return {
+    lowShimModel: base.shim < LOW_SHIM_POTENCY.value.below,
+    probability,
+    tier: reserveTier(probability),
+    drivers,
+    notModelled,
+  };
 }
