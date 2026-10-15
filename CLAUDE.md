@@ -53,7 +53,7 @@ Path alias: `@/*` → `src/*` (configured in `vite.config.ts` and `tsconfig.json
 
 ## Architecture
 
-Single-page React + TypeScript app. All COMPASS prediction models run in the browser, and patient data never leaves it: there is no database, no case sharing and no AI/LLM call. The Cloudflare Worker (`cf-worker/`) only serves the desktop-app update feed and the `/clinical` SPA fallback.
+Single-page React + TypeScript app. All COMPASS prediction models run in the browser, and patient data never leaves it: there is no database, no case sharing and no AI/LLM call. The app is hosted on Cloudflare: the Worker in `cf-worker/` serves the built `dist/` as static assets, plus the desktop-app update feed (`/api/updates/*`). Deploy with `npm run build && (cd cf-worker && npx wrangler deploy)`, or let `.github/workflows/deploy-cloudflare.yml` do it on push to `main`.
 
 ### Data flow (the spine)
 

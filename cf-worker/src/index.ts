@@ -1,25 +1,22 @@
 /**
- * Narrow jobs only (see wrangler.jsonc routes — bound to exactly these
- * path patterns, nothing else). No patient data passes through this Worker:
- * there is no database, no share-link store and no AI proxy. Everything
- * clinical stays in the clinician's browser.
+ * Hosts the COMPASS web app on Cloudflare (Workers static assets — see the
+ * `assets` block in wrangler.jsonc). No patient data passes through this
+ * Worker: there is no database, no share-link store and no AI proxy.
+ * Everything clinical stays in the clinician's browser.
+ *
+ * Static files (the built app in ../dist) are served by the asset layer
+ * directly, with single-page-application fallback for client-side routes such
+ * as /clinical/... . Only the paths in `run_worker_first` reach this code:
  *
  * 1. /api/updates/* — update feed for the desktop app and the web app's
  *    version check. Holds RELEASES_READ_PAT so the shipped app carries no
  *    credential of its own.
  *
- * 2. /clinical/* — SPA fallback. GitHub Pages has no server-side rewrite
- *    capability, so a fresh visit to a client-side route (no matching file)
- *    404s. This fetches /index.html from the same custom domain instead — a
- *    same-zone fetch, which Cloudflare docs confirm bypasses Worker routing
- *    entirely and goes straight to the zone's normal origin (the plain
- *    proxied CNAME to GitHub Pages), preserving the custom-domain Host header
- *    GitHub Pages needs to serve this project without redirecting.
- *    /clinical/download is a Worker-rendered page (see downloadPage.ts).
+ * 2. /clinical/download — a Worker-rendered page (see downloadPage.ts).
  *
- * Root ("/") and anything else passes straight through untouched — this
- * Worker never sees it. Cloudflare Access has exactly one application,
- * scoped to /clinical/*; it authenticates before requests reach this Worker.
+ * Cloudflare Access has exactly one application, scoped to /clinical/*; it
+ * authenticates at the edge before requests reach this Worker or the assets.
+ * Root ("/") is the public demo.
  */
 import { downloadPageHtml } from "./downloadPage";
 
@@ -29,6 +26,8 @@ interface Env {
   // before this, every build carried the token inside the bundle, where any
   // user could extract it and it could not be rotated without a new release.
   RELEASES_READ_PAT?: string;
+  // The built app (../dist), served by the static-assets layer.
+  ASSETS: Fetcher;
 }
 
 /**
@@ -36,7 +35,6 @@ interface Env {
  */
 const ALLOWED_ORIGINS = new Set([
   "https://digital-twin.urology.edu.eu.org",
-  "https://urology-ai.github.io",
   "http://localhost:5173", // vite dev
   "http://localhost:4173", // vite preview
 ]);
@@ -85,15 +83,6 @@ async function handleDownloadPage(env: Env): Promise<Response> {
       },
     }),
   );
-}
-
-async function handleSpaFallback(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  const indexUrl = new URL("/index.html", url.origin);
-  const response = await fetch(new Request(indexUrl, request));
-  // Report 200, not GitHub Pages' 404 for the (nonexistent) deep-link path
-  // — the content itself is index.html, so the client-side router can run.
-  return withSecurityHeaders(response, response.status === 404 ? 200 : response.status);
 }
 
 // ── /api/updates/* — update feed for the desktop app and the web app ─────────
@@ -210,15 +199,13 @@ export default {
         }
         return await handleUpdateAsset(pathname.slice("/api/updates/".length), request, env);
       }
-      // Before the SPA fallback: this path is a Worker-rendered page, not a
-      // client-side route.
+      // Any other /api path is not an endpoint — never answer it with the SPA.
+      if (pathname.startsWith("/api/")) return jsonError("Not found", 404);
+      // A Worker-rendered page, not a client-side route.
       if (pathname === "/clinical/download" || pathname === "/clinical/download/") {
         return await handleDownloadPage(env);
       }
-      if (pathname.startsWith("/clinical")) {
-        return await handleSpaFallback(request);
-      }
-      return jsonError("Not found", 404);
+      return await env.ASSETS.fetch(request);
     } catch (err) {
       return jsonError(`Unhandled error: ${err instanceof Error ? err.message : String(err)}`, 500);
     }
