@@ -44,7 +44,6 @@ export type ZoneMap = Partial<Record<CompassZoneKey, ZoneData>>;
 
 export interface Prostate3DInputV1 {
   _schema: "prostate-3d-input-v1";
-  _shareId?: string;
   patient: {
     age: number | null;
     psa: number | null;

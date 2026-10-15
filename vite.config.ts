@@ -23,13 +23,13 @@ const appVersion = process.env.VITE_APP_VERSION || pkgVersion;
  * Build-only on purpose: the dev server's React Fast Refresh preamble is an
  * INLINE script, so applying this in dev would break `npm run dev` outright.
  *
- * Two deliberate relaxations:
+ * One deliberate relaxation:
  *  - style-src 'unsafe-inline': React style props and the Three.js canvas set
  *    element styles directly; without it the UI loses its layout entirely.
- *  - connect-src allows https: and localhost, because the AI settings dialog
- *    lets a site point COMPASS at its OWN vLLM endpoint (src/lib/api.ts) —
- *    typically a lab host or http://localhost:8000. So connect-src is not the
- *    exfiltration boundary here; the opt-in AI gate and de-identification are.
+ *
+ * connect-src is 'self' only: the app's sole network calls are same-origin
+ * (Access identity, update check), so the browser itself refuses to send
+ * patient data anywhere else.
  */
 const CSP = [
   "default-src 'self'",
@@ -37,7 +37,7 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "font-src 'self' data:",
-  "connect-src 'self' https: http://localhost:* http://127.0.0.1:*",
+  "connect-src 'self'",
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'none'",
@@ -61,11 +61,9 @@ function cspPlugin() {
 }
 
 export default defineConfig({
-  // Absolute asset URLs, required for deep-link routes like /patient/<id> —
+  // Absolute asset URLs, required for deep-link routes like /clinical/... —
   // with a relative base, a browser landing directly on that path would
-  // resolve assets relative to /patient/ instead of the real root and 404.
-  // (Previously "./" for hosting under an unknown subpath e.g. GitHub Pages;
-  // not compatible with patient-link routing, so fixed to the real root.)
+  // resolve assets relative to it instead of the real root and 404.
   base: "/",
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),

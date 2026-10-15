@@ -40,14 +40,11 @@ Include:
 In scope:
 
 - The React frontend (`src/`) and its build/deploy pipeline.
-- The optional FastAPI backend (`backend/`), including the admin-token-gated
-  `/api/config` and `/api/test` endpoints.
+- The Cloudflare Worker (`cf-worker/`): update feed and `/clinical` SPA fallback.
 - Handling of clinical input JSON and `localStorage` persistence.
 
 Out of scope:
 
-- The external vLLM-compatible chat endpoint proxied by the backend (report to
-  its operator).
 - Findings that require a compromised host or physical access.
 - Missing security headers on third-party static hosting without a demonstrated
   impact.

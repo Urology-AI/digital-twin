@@ -5,8 +5,7 @@ locally: all prediction models, the 3D viewer, case entry, and the local
 case log / patient library (stored in the app's own storage on the Mac).
 
 Network-only features are compiled out of this build (`VITE_OFFLINE=1`):
-LLM chat / "paste clinic note", Turso cloud sync (push/pull), Cloudflare
-Access sign-in, and cloud share links.
+Cloudflare Access sign-in and the web app's update check.
 
 ## Build locally
 

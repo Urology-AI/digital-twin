@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { X, CloudUpload, CloudDownload, Cloud, CloudOff, AlertTriangle } from "lucide-react";
+import { X, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePatientStore, savePatientToLibrary, loadPatientFromLibrary, hydratePatientsFromCaseLog, hydratePatientLibrary, getPatientLibrary, mergePatientLibrary, syncPatientLibraryToStore, type PatientEntry } from "@/store/patientStore";
 import { cn } from "@/lib/utils";
 import { BCR_COX_VERSION } from "@/lib/models/vnext/bcrCox";
-import { pushCases, pullCases, checkTursoHealth, hasCloudId } from "@/lib/turso";
 import { isOfflineBuild } from "@/lib/offlineBuild";
 import { deidentifyBundle } from "@/lib/deidentify";
 
@@ -153,73 +152,7 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
 
   const [cases, setCases] = useState<CaseRecord[]>([]);
   const [savedPatientIds, setSavedPatientIds] = useState<Set<string>>(() => getSavedPatientIds());
-  const [syncStatus, setSyncStatus] = useState<string>("");
-  const [syncing, setSyncing] = useState(false);
-  // null = still checking. A real round-trip to the Worker/Turso, not just
-  // "does the code path exist" — reflects whether sync will actually work.
-  const [tursoAvailable, setTursoAvailable] = useState<boolean | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (isOfflineBuild()) { setTursoAvailable(false); return; }
-    let cancelled = false;
-    checkTursoHealth().then((ok) => { if (!cancelled) setTursoAvailable(ok); });
-    return () => { cancelled = true; };
-  }, []);
-
-  const handlePush = async () => {
-    setSyncing(true);
-    setSyncStatus("Pushing…");
-    try {
-      const all = getCases();
-      const library = getPatientLibrary();
-      const n = await pushCases(all, library);
-      setSyncStatus(`Pushed ${n} case${n !== 1 ? "s" : ""} ✓`);
-      setCases([...all]); // re-render so the per-case "Synced" badges pick up the updated cloud-id map
-    } catch (err) {
-      setSyncStatus(`Push failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setSyncing(false);
-    }
-  };
-
-  const handlePull = async () => {
-    setSyncing(true);
-    setSyncStatus("Pulling…");
-    try {
-      const local = getCases();
-      const { records: pulled, library: pulledLibrary } = await pullCases(local);
-      // Merge: cloud is authoritative for clinical/prediction/path fields;
-      // local notes are preserved inside pullCases(). New cloud-only cases are added.
-      const localIds = new Set(local.map((c) => c.id));
-      const newFromCloud = pulled.filter((c) => !localIds.has(c.id));
-      // Update existing local records' path fields from cloud
-      const updated = local.map((lc) => {
-        const remote = pulled.find((rc) => rc.id === lc.id);
-        return remote ? { ...remote, notes: lc.notes } : lc;
-      });
-      const merged = [...newFromCloud, ...updated];
-      saveCases(merged);
-      setCases(merged);
-      // Restore full patient entries (zones, lesions, demographics) from cloud.
-      // mergePatientLibrary upserts into localStorage; syncPatientLibraryToStore
-      // then upserts into the live store (updating existing patients, not just adding).
-      if (pulledLibrary.length) {
-        mergePatientLibrary(pulledLibrary);
-        syncPatientLibraryToStore();
-      }
-      // Always also run the minimal fallback — it only adds entries for
-      // cases not already in the store (existingIds filter), so any pulled
-      // case that lacked a parseable full record (older rows, etc.) still
-      // shows up in the dropdown instead of silently disappearing.
-      hydratePatientsFromCaseLog();
-      setSyncStatus(`Pulled ${pulled.length} case${pulled.length !== 1 ? "s" : ""} ✓`);
-    } catch (err) {
-      setSyncStatus(`Pull failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setSyncing(false);
-    }
-  };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -485,10 +418,8 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
       <div className="mx-auto max-w-4xl">
         <h2 className="mb-1 text-lg font-semibold text-primary">Prospective Case Log</h2>
         <p className="mb-2 text-xs text-muted-foreground">
-          Save COMPASS predictions per case. Enter pathology results when available. Data stored locally
-          {isOfflineBuild()
-            ? " on this Mac."
-            : "; cloud sync de-identifies records (ID hashed, notes never uploaded)."}
+          Save COMPASS predictions per case. Enter pathology results when available. Data stays on
+          {isOfflineBuild() ? " this Mac" : " this device, in this browser"} — nothing is uploaded.
         </p>
         {/*
           The notes field becomes the case's display name, so it is the one place
@@ -521,46 +452,10 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
           <Button size="sm" variant="outline" onClick={() => exportJSON(true)} title="No dates, no names/MRNs, age as a range">
             Export JSON (PHI removed)
           </Button>
-          {tursoAvailable && (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1 text-sky-500 border-sky-500/40 hover:bg-sky-500/10"
-                onClick={handlePush}
-                disabled={syncing}
-              >
-                <CloudUpload className="h-3.5 w-3.5" />
-                Push
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1 text-indigo-500 border-indigo-500/40 hover:bg-indigo-500/10"
-                onClick={handlePull}
-                disabled={syncing}
-              >
-                <CloudDownload className="h-3.5 w-3.5" />
-                Pull
-              </Button>
-            </>
-          )}
           <Button size="sm" variant="outline" className="text-red-500 border-red-500/40 hover:bg-red-500/10" onClick={clearAll}>
             Clear All
           </Button>
         </div>
-
-        {tursoAvailable && syncStatus && (
-          <p className="mb-3 text-[11px] text-muted-foreground">{syncStatus}</p>
-        )}
-        {tursoAvailable === null && (
-          <p className="mb-3 text-[11px] text-muted-foreground">Checking cloud sync…</p>
-        )}
-        {tursoAvailable === false && !isOfflineBuild() && (
-          <p className="mb-3 rounded border border-amber-500/30 bg-amber-500/5 px-3 py-1.5 text-[10px] text-amber-500">
-            Cloud sync unavailable — the Worker/Turso didn't respond to a health check.
-          </p>
-        )}
 
         {/* Stats row */}
         <div className="mb-4 flex flex-wrap gap-3">
@@ -675,21 +570,6 @@ export function CaseLog({ onClose }: { onClose: () => void }) {
                     <span className="text-[11px] text-muted-foreground">
                       GG{c.gg} | PSA {c.psa} | PIRADS {c.pirads} | {c.laterality}
                     </span>
-                    {hasCloudId(c.id) ? (
-                      <span
-                        title="Pushed to cloud"
-                        className="flex items-center gap-1 rounded bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-sky-400"
-                      >
-                        <Cloud className="h-2.5 w-2.5" /> Synced
-                      </span>
-                    ) : (
-                      <span
-                        title="Not yet pushed to cloud — use Push in the toolbar above"
-                        className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground"
-                      >
-                        <CloudOff className="h-2.5 w-2.5" /> Local only
-                      </span>
-                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <button
