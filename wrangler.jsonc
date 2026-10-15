@@ -10,6 +10,9 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
+  // Workers Builds runs `npx wrangler preview` for every PR branch (Worker
+  // Previews); that command requires this block, even empty.
+  "previews": {},
   // The web app is served from here as static assets. No patient data is
   // handled by this Worker — no database, no share links, no AI proxy.
   "assets": {
