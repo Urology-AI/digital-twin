@@ -53,7 +53,7 @@ Path alias: `@/*` → `src/*` (configured in `vite.config.ts` and `tsconfig.json
 
 ## Architecture
 
-Single-page React + TypeScript app. All COMPASS prediction models run in the browser, and patient data never leaves it: there is no database, no case sharing and no AI/LLM call. The app is hosted on Cloudflare: the Worker in `cf-worker/` serves the built `dist/` as static assets, plus the desktop-app update feed (`/api/updates/*`). Deploy with `npm run build && (cd cf-worker && npx wrangler deploy)`, or let `.github/workflows/deploy-cloudflare.yml` do it on push to `main`.
+Single-page React + TypeScript app. All COMPASS prediction models run in the browser, and patient data never leaves it: there is no database, no case sharing and no AI/LLM call. The app is hosted on Cloudflare: the Worker in `cf-worker/` serves the built `dist/` as static assets, plus the desktop-app update feed (`/api/updates/*`). The Worker is `digital-twin` (config: root `wrangler.jsonc`; code: `cf-worker/src/`). Cloudflare Workers Builds deploys it on push to `main` (`npm run build`, then `npx wrangler deploy`); locally, run the same two commands. It is behind Cloudflare Access, so `/api/updates/*` and `/clinical/download` are served by a second Worker, `compass-spa-fallback` (`cf-worker/wrangler.jsonc`, same code, holds `RELEASES_READ_PAT`), whose more specific routes win; the desktop updater cannot pass an Access login.
 
 ### Data flow (the spine)
 
