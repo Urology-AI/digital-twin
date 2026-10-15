@@ -554,10 +554,14 @@ describe("computeFunctionalOutcomes — healer tiers + plan deltas", () => {
     expect(r.healerBands).not.toBeNull();
   });
 
-  it("returns null healer fields when SHIM < 12", () => {
-    const r = computeFunctionalOutcomes({ ...base, shim: 8, nsL: 1, nsR: 1 });
-    expect(r.healerTier).toBeNull();
-    expect(r.healerBands).toBeNull();
+  it("switches to the separate low-SHIM model below SHIM 12", () => {
+    const low = computeFunctionalOutcomes({ ...base, shim: 8, nsL: 1, nsR: 1 });
+    const normal = computeFunctionalOutcomes({ ...base, nsL: 1, nsR: 1 });
+    expect(low.lowShimModel).toBe(true);
+    expect(normal.lowShimModel).toBe(false);
+    expect(low.potency12).toBeLessThan(normal.potency12);
+    expect(low.healerTier).not.toBeNull();
+    expect(computeFunctionalOutcomes({ ...base, shim: 12, nsL: 1, nsR: 1 }).lowShimModel).toBe(false);
   });
 
   it("high inflammation drags potency down", () => {
@@ -672,5 +676,56 @@ describe("RARP bladder-neck and apical difficulty", () => {
     const { predictApicalDifficulty } = await import("@/lib/compass/rarpDifficulty");
     const S = { ...defaultClinicalState(), bmi: 33, vol: 85, prior_turp: true };
     expect(predictApicalDifficulty(S).tier).toBe("high");
+  });
+});
+
+describe("potency model below baseline SHIM 12 (Alenizi 2016, SHIM 1-11 group)", () => {
+  const low = {
+    age: 63, shim: 6, ipss: 5, bmi: 24, pfmt: "none" as const, exercise: "light" as const,
+    smoking: "never" as const, pde5: "none" as const, alcohol: "moderate" as const,
+    dm: false, htn: false, cad: false, nsL: 1, nsR: 1,
+  };
+
+  it("stays close to the observed group rates for a bilateral nerve-sparing patient at the group's age", () => {
+    const r = computeFunctionalOutcomes(low);
+    expect(r.lowShimModel).toBe(true);
+    expect(r.potency12).toBeGreaterThanOrEqual(10);
+    expect(r.potency12).toBeLessThanOrEqual(20);
+    expect(r.potencyTimeline[0]).toBeLessThan(10); // the nomogram's 10% 6-week floor does not apply
+  });
+
+  it("ignores lifestyle and operative-plan deltas", () => {
+    const plain = computeFunctionalOutcomes(low);
+    const optimised = computeFunctionalOutcomes({
+      ...low, pde5: "daily", pfmt: "intensive", exercise: "active", alcohol: "none",
+      plan: { svPreservationL: true, svPreservationR: true, hydrodissectionL: true, hydrodissectionR: true, inflammationTier: "low" },
+    });
+    expect(optimised.potencyTimeline).toEqual(plain.potencyTimeline);
+    expect(optimised.potencyAdj).toBe(0);
+    expect(optimised.planPotencyAdj).toBe(0);
+  });
+
+  it("still responds to nerve sparing and age", () => {
+    const base12 = computeFunctionalOutcomes(low).potency12;
+    expect(computeFunctionalOutcomes({ ...low, nsL: 4, nsR: 4 }).potency12).toBeLessThan(base12);
+    expect(computeFunctionalOutcomes({ ...low, age: 72 }).potency12).toBeLessThan(base12);
+  });
+
+  it("matches the mirror in models/surgicalPlanning.json", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { LOW_SHIM_POTENCY } = await import("@/lib/compass/planningEvidence");
+    const json = JSON.parse(readFileSync("models/surgicalPlanning.json", "utf8"));
+    const mirror = json.modifiable_factor_deltas_pp.low_shim_potency_model;
+    const v = LOW_SHIM_POTENCY.value;
+    expect(mirror.below).toBe(v.below);
+    expect(mirror.observed_pct_6wk_3mo_6mo_12mo_18mo).toEqual(v.observed);
+    expect(mirror.reference_mix).toEqual(v.referenceMix);
+    expect(mirror.reference_age).toBe(v.referenceAge);
+  });
+
+  it("is cited by a bibliography entry", async () => {
+    const { PLANNING_REFERENCES } = await import("@/lib/compass/planningReferences");
+    const { LOW_SHIM_POTENCY } = await import("@/lib/compass/planningEvidence");
+    expect(PLANNING_REFERENCES.some((r) => r.usedFor.includes(LOW_SHIM_POTENCY.label))).toBe(true);
   });
 });

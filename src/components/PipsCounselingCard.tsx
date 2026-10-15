@@ -272,7 +272,8 @@ export function PeriprostaticRiskBySide({
                   <tr key={r.label} className="border-t border-border/60">
                     <td className="px-3 py-2">{r.label}</td>
                     <td className="px-3 py-2 text-right font-medium tabular-nums">
-                      {r.potency12 == null ? <span className="font-normal text-muted-foreground">n/a (baseline SHIM &lt; 12)</span> : `${r.potency12}%`}
+                      {r.potency12}%
+                      {r.lowShimModel && <span className="ml-1 font-normal text-muted-foreground">(SHIM &lt; 12 model, low confidence)</span>}
                     </td>
                     <td className="px-3 py-2 text-right font-medium tabular-nums">{r.continence12}%</td>
                   </tr>

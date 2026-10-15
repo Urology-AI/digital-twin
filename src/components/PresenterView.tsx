@@ -132,7 +132,7 @@ function FunctionalTiles({
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <RecoveryTile title="Sexual function (potency)" value={result.shimValid ? result.potency12 : null} />
+      <RecoveryTile title="Sexual function (potency)" value={result.lowShimModel ? null : result.potency12} />
       <RecoveryTile title="Urinary continence" value={result.continence12} />
     </div>
   );

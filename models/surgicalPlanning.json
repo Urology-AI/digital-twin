@@ -252,8 +252,17 @@
       },
       "shim_multiplier": {
         "ge_21": 1.0,
-        "lt_12": 0.7
+        "lt_12": "not used: see low_shim_potency_model"
       }
+    },
+    "low_shim_potency_model": {
+      "source": "literature",
+      "_note": "Mirrors LOW_SHIM_POTENCY in planningEvidence.ts. Baseline SHIM below `below` uses this observed curve, scaled by the nomogram's nerve-sparing and age effect relative to the reference group; lifestyle and plan deltas are not applied.",
+      "citation": "Alenizi AM, et al. Can J Urol. 2016;23(5):8451-8456, Tables 1-2, SHIM 1-11 group (n=34). Cutoff: IIEF-5 bands, Rosen RC, et al. Int J Impot Res. 1999;11(6):319-326.",
+      "below": 12,
+      "observed_pct_6wk_3mo_6mo_12mo_18mo": [6.1, 6.5, 6.5, 13.9, 14.8],
+      "reference_mix": { "bilateral": 19, "unilateral": 5, "wide": 10 },
+      "reference_age": 63
     },
     "obesity": {
       "source": "literature",

@@ -302,10 +302,27 @@ neutral, so no new coefficients are introduced; only the tier cutpoints (good >=
 reduced 35-60%, poor < 35%) are PIPS-specific and provisional. Drivers are counterfactual
 costs (age vs 55, baseline SHIM vs 25, diabetes, hypertension, coronary disease, smoking,
 BMI vs 22). Prior pelvic radiation, ADT exposure and pelvic fracture/urethral injury are
-shown as "present but not modelled" flags rather than given invented penalties. Not
-estimated when baseline SHIM < 12. Absolute values are best-case (selected single-surgeon
+shown as "present but not modelled" flags rather than given invented penalties. Below
+baseline SHIM 12 it comes from the separate low-SHIM model below and is flagged low
+confidence. Absolute values are best-case (selected single-surgeon
 cohort); it modifies counseling and rehabilitation, never the plane. Code:
 `src/lib/compass/recoveryReserve.ts`; tests: `src/test/recoveryReserve.test.ts`.
+
+**Potency below baseline SHIM 12.** The functional-outcome nomogram's SHIM multipliers
+(1.0 at SHIM >= 21, 0.85-0.98 at 12-20) apply from SHIM 12 up. Below 12 (moderate erectile
+dysfunction or worse on the IIEF-5 severity bands, Rosen RC et al., Int J Impot Res
+1999;11(6):319-326) a separate model is used (`LOW_SHIM_POTENCY` in `planningEvidence.ts`).
+Its base is the observed potency of the SHIM 1-11 group in Alenizi AM et al., Can J Urol
+2016;23(5):8451-8456 (single-surgeon RARP, n=34; potency = EHS >= 3 with or without a PDE5
+inhibitor): 6.1% at 1 month (used for the 6-week point), 6.5% at 3 and 6 months, 13.9% at 12
+months and 14.8% at 18 months. Each time point is scaled by the nomogram's nerve-sparing and
+age effect for the patient relative to that group's own mix (19 bilateral, 5 unilateral, 10
+wide excision; median age 63). Lifestyle and operative-plan deltas are not applied, since
+there are no data for them below SHIM 12 and the group was already encouraged to use PDE5
+rehabilitation; the nomogram's 10-20% timeline floors do not apply either. Potency and the
+recovery reserve are shown on clinician views flagged "SHIM < 12 model, low confidence";
+patient-facing views (presenter mode, the pre-op counseling handout) do not show it. Before
+this model, potency was not estimated below SHIM 12.
 
 *Effect of the re-weighting on the bundled demo cases:* across the 16 demo cases the
 whole-patient and per-side scores change in 3 cases (by 2 to 5 percentage points, all
