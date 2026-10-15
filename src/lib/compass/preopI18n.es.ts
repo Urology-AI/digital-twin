@@ -19,7 +19,6 @@ export const ES: Record<string, string> = {
   "Questions": "Preguntas",
   "Call us if": "Llámenos si",
   "Your health": "Su salud",
-  "AI letter": "Carta de IA",
   "Step {n} of {total}": "Paso {n} de {total}",
   "Back": "Atrás",
   "Next": "Siguiente",
@@ -382,14 +381,6 @@ export const ES: Record<string, string> = {
   "Sleep apnea": "Apnea del sueño",
   "Blood thinner": "Anticoagulante",
   "Past belly surgery": "Cirugía abdominal previa",
-
-  // ── AI letter ──
-  "Your personal letter": "Su carta personal",
-  "A plain-language letter written by AI that pulls all of this together.": "Una carta en lenguaje sencillo, escrita por IA, que reúne todo esto.",
-  "Write my letter": "Escribir mi carta",
-  "Write it again": "Escribirla de nuevo",
-  "No name or dates are sent. AI can make mistakes, so go over it with your surgeon.":
-    "No se envían nombres ni fechas. La IA puede equivocarse, así que revísela con su cirujano.",
 
   // ── Printout ──
   "My surgery plan": "Mi plan de cirugía",

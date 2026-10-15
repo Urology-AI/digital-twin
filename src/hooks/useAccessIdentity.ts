@@ -8,9 +8,8 @@ import { isOfflineBuild } from "@/lib/offlineBuild";
  * login and returns the identity as JSON. No server code of ours involved.
  *
  * Returns null when there's no Access session — locally in dev (endpoint
- * doesn't exist), on the unauthenticated /patient/* path (Access is
- * configured to bypass it there), or if Access isn't set up on the domain
- * yet. Never throws.
+ * doesn't exist), on the public demo, or if Access isn't set up on the
+ * domain yet. Never throws.
  */
 export interface AccessIdentity {
   email: string;

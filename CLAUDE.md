@@ -43,12 +43,9 @@ npm run preview          # serve the built bundle
 npm run typecheck        # tsc --noEmit (strict)
 npm test                 # vitest run (one-shot)
 npm run test:watch       # vitest in watch mode
-./run-dev.sh             # run frontend + FastAPI backend together; pass LLM_ENDPOINT as $1 or env var
 ```
 
 Run a single test file: `npx vitest run src/test/models.test.ts`. Run a single test by name: `npx vitest run -t "predictEcePatient"`.
-
-Backend (optional, for LLM chat/analyze): `cd backend && python3 -m uvicorn main:app --reload`. Requires `LLM_ENDPOINT` env var; `ADMIN_TOKEN` gates `/api/config` and pre-save `/api/test`.
 
 Path alias: `@/*` → `src/*` (configured in `vite.config.ts` and `tsconfig.json`). Use it in all imports.
 
@@ -56,7 +53,7 @@ Path alias: `@/*` → `src/*` (configured in `vite.config.ts` and `tsconfig.json
 
 ## Architecture
 
-Single-page React + TypeScript app. All COMPASS prediction models run in the browser; the optional FastAPI backend (`backend/main.py`) only proxies an external vLLM-compatible chat endpoint for the chat/analyze features.
+Single-page React + TypeScript app. All COMPASS prediction models run in the browser, and patient data never leaves it: there is no database, no case sharing and no AI/LLM call. The Cloudflare Worker (`cf-worker/`) only serves the desktop-app update feed and the `/clinical` SPA fallback.
 
 ### Data flow (the spine)
 
@@ -116,14 +113,6 @@ Layout: desktop has three tabs (`viewer`, `input`, `predictions`) controlled by 
 - `CompassPredictions` / `ThreeZoneRuntime` (`src/types/prediction.ts`) — outputs.
 
 Form validation uses `zod` schemas in `src/schemas/clinicalForm.ts` with React Hook Form.
-
-### LLM integration
-
-Two paths exist; pick based on whether the user has a backend running:
-- Direct browser → vLLM: `src/lib/api.ts` reads endpoint/model/key from `localStorage` (or `VITE_LLM_*` env vars) and calls the chat-completions endpoint directly.
-- Browser → FastAPI → vLLM: `backend/main.py` exposes `/api/chat`, `/api/analyze`, `/api/config` (admin-token gated), `/api/test`, `/health`. Used when CORS or key secrecy matters.
-
-Both share the same system prompt structure (`VIEWER_CONTEXT` + `GUARDRAILS` + clinical block); keep them in sync if you change one.
 
 ---
 

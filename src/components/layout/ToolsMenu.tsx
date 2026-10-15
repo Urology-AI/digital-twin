@@ -7,31 +7,26 @@ import {
   MoreHorizontal,
   Monitor,
   Printer,
-  Share2,
   UserRound,
 } from "lucide-react";
 import { useUiStore } from "@/store/uiStore";
 import { printReport } from "@/lib/compass/printReport";
-import { isOfflineBuild } from "@/lib/offlineBuild";
 import { cn } from "@/lib/utils";
 
 /**
  * "More" dropdown for the header's secondary actions — the clinician tools
  * that don't need to be one click away (case log, patient summary, overview
- * mode, presenter view, share, print, about). Keeps the top bar from overflowing on smaller
+ * mode, presenter view, print, about). Keeps the top bar from overflowing on smaller
  * screens. Only rendered outside demo mode (AppHeader gates it).
  */
 export function ToolsMenu() {
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
   const setCaseLogOpen = useUiStore((s) => s.setCaseLogOpen);
-  const setShareOpen = useUiStore((s) => s.setShareOpen);
   const setPatientView = useUiStore((s) => s.setPatientView);
   const presenterView = useUiStore((s) => s.presenterView);
   const overview = useUiStore((s) => s.overview);
   const setOverview = useUiStore((s) => s.setOverview);
   const setPresenterView = useUiStore((s) => s.setPresenterView);
-
-  const offline = isOfflineBuild();
 
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ right: number; top: number }>({ right: 0, top: 0 });
@@ -79,7 +74,6 @@ export function ToolsMenu() {
       onClick: run(() => setPresenterView(!presenterView)),
       active: presenterView,
     },
-    ...(!offline ? [{ label: "Share case", Icon: Share2, onClick: run(() => setShareOpen(true)) }] : []),
     { label: "Print report", Icon: Printer, onClick: run(() => printReport()) },
     { label: "About COMPASS", Icon: Info, onClick: run(() => setInfoOpen(true)) },
   ];

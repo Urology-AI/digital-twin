@@ -41,7 +41,7 @@ function lesionRowToSectors(row: import("@/types/lesion").LesionRow): string[] {
 /**
  * The report is assembled as an HTML string and handed to an <iframe srcDoc>,
  * so React does no escaping for us here. Record fields reach this file from
- * imported JSON and from /patient/<id> shares, i.e. they are not necessarily
+ * imported JSON, i.e. they are not necessarily
  * the well-formed numbers the schema promises — escape before interpolating.
  * (The iframe is also sandboxed without allow-scripts, in PrintReportModal;
  * these are two independent layers and both should stay.)

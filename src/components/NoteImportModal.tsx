@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { parseSafeSheet, sheetImportPatch, type SheetImportPatch } from "@/lib/safeSheet";
-import { isAiParsingEnabled, parseClinicalText } from "@/lib/api";
 import { emptyLesion, type LesionRow, type LesionSource } from "@/types/lesion";
 import { cn } from "@/lib/utils";
 
@@ -165,8 +164,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
       // Zone/lesion table always comes from the deterministic text parser —
       // it's the source of truth for the per-zone grid the "fix" step edits.
       // Identifiers are removed in the browser before anything else reads the
-      // text, so no name, MRN or date can reach the parsed case — or a later
-      // AI request, which is given the scrubbed text below.
+      // text, so no name, MRN or date can reach the parsed case.
       const sheet = parseSafeSheet(noteText);
       setPhi(sheet.phi);
       const parsed = sheet.note;
@@ -175,17 +173,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
         return;
       }
       const noteWarnings = [...(sheet.warnings ?? [])];
-      let demographics: NoteImportClinical = {};
-      if (isAiParsingEnabled()) {
-        try {
-          const llm = await parseClinicalText(sheet.phi.text);
-          demographics = { age: llm.age, psa: llm.psa, bmi: llm.bmi, decipher: llm.decipher, shim: llm.shim, ipss: llm.ipss };
-        } catch {
-          noteWarnings.push("AI demographic extraction failed — used offline text patterns only for zone/volume data.");
-        }
-      } else {
-        noteWarnings.push("Parsed in your browser — the note text was not sent anywhere. Anything the offline parser could not find is left blank for you to fill in.");
-      }
+      noteWarnings.push("Parsed in your browser — the note text was not sent anywhere. Anything the parser could not find is left blank for you to fill in.");
 
       // Per-side biopsy results (no location on the sheet) replace the note
       // parser's invented Bx rows — see SheetImportPatch.dropBxRows.
@@ -196,10 +184,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
       // label disambiguates the value, where a whole-document regex cannot
       // (a bare "64" on the Patient row is an age; the same digits elsewhere
       // are an MRN fragment or a date).
-      setClinical({
-        ...patch.clinical,
-        ...demographics,
-      });
+      setClinical({ ...patch.clinical });
       setWarnings(noteWarnings);
       setStep("check");
     } finally {
@@ -344,15 +329,8 @@ export function NoteImportModal({ onClose, onApply }: Props) {
           <>
             <div className="flex-1 overflow-y-auto px-5 py-4">
               <p className="mb-2 text-sm text-muted-foreground">Paste a clinic note or a pre-operative safe sheet. Names, MRN and dates are removed in your browser before anything is parsed.</p>
-              <p className={cn(
-                "mb-3 rounded-md border px-2.5 py-1.5 text-xs",
-                isAiParsingEnabled()
-                  ? "border-amber-500/30 bg-amber-500/5 text-amber-600"
-                  : "border-emerald-500/30 bg-emerald-500/5 text-emerald-600",
-              )}>
-                {isAiParsingEnabled()
-                  ? "AI parsing ON — note text is de-identified, then sent to Google Gemini."
-                  : "Offline parsing — note text stays in your browser. Nothing is sent out."}
+              <p className="mb-3 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2.5 py-1.5 text-xs text-emerald-600">
+                Offline parsing — note text stays in your browser. Nothing is sent out.
               </p>
               <textarea
                 className="h-60 w-full resize-none rounded-lg border border-input bg-muted/20 p-3 font-mono text-xs text-foreground placeholder:text-muted-foreground/40 focus:bg-background focus:outline-none focus:ring-1 focus:ring-ring/60"
@@ -421,7 +399,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
                 </div>
               )}
 
-              {/* Demographics (LLM-extracted) */}
+              {/* Demographics (from the safe-sheet rows) */}
               {(clinical.age !== undefined || clinical.psa !== undefined || clinical.bmi !== undefined || clinical.decipher !== undefined || clinical.shim !== undefined || clinical.ipss !== undefined) && (
                 <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5">
                   <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Demographics extracted</p>
