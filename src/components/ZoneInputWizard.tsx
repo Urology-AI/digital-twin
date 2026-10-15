@@ -33,18 +33,27 @@ const POST_ZONES: ZoneDef[] = [
   { id: "P-RM-M", label: "R Mid Med",   shortLabel: "M-RM", side: "R", level: "Mid",  pos: "Posterior" },
   { id: "P-LM-M", label: "L Mid Med",   shortLabel: "M-LM", side: "L", level: "Mid",  pos: "Posterior" },
   { id: "P-LM-L", label: "L Mid Lat",   shortLabel: "M-LL", side: "L", level: "Mid",  pos: "Posterolateral" },
+  { id: "P-RA-L", label: "R Apex Lat",  shortLabel: "A-RL", side: "R", level: "Apex", pos: "Posterolateral" },
+  { id: "P-RA-M", label: "R Apex Med",  shortLabel: "A-RM", side: "R", level: "Apex", pos: "Posterior" },
+  { id: "P-LA-M", label: "L Apex Med",  shortLabel: "A-LM", side: "L", level: "Apex", pos: "Posterior" },
+  { id: "P-LA-L", label: "L Apex Lat",  shortLabel: "A-LL", side: "L", level: "Apex", pos: "Posterolateral" },
 ];
+
+// The 3D model has one posterior apex zone per side (COMPASS 5p/10p).
+const POST_APEX_3D: Record<string, string> = {
+  "P-RA-L": "P-RA", "P-RA-M": "P-RA", "P-LA-M": "P-LA", "P-LA-L": "P-LA",
+};
 
 const ANT_ZONES: ZoneDef[] = [
   { id: "A-RB", label: "R Base Ant", shortLabel: "B-R", side: "R", level: "Base", pos: "Anterior" },
   { id: "A-LB", label: "L Base Ant", shortLabel: "B-L", side: "L", level: "Base", pos: "Anterior" },
   { id: "A-RM", label: "R Mid Ant",  shortLabel: "M-R", side: "R", level: "Mid",  pos: "Anterior" },
   { id: "A-LM", label: "L Mid Ant",  shortLabel: "M-L", side: "L", level: "Mid",  pos: "Anterior" },
-  { id: "A-RA", label: "R Apex",     shortLabel: "A-R", side: "R", level: "Apex", pos: "Anterior" },
-  { id: "A-LA", label: "L Apex",     shortLabel: "A-L", side: "L", level: "Apex", pos: "Anterior" },
+  { id: "A-RA", label: "R Apex Ant", shortLabel: "A-R", side: "R", level: "Apex", pos: "Anterior" },
+  { id: "A-LA", label: "L Apex Ant", shortLabel: "A-L", side: "L", level: "Apex", pos: "Anterior" },
 ];
 
-const ALL_ZONES: ZoneDef[] = [...POST_ZONES, ...ANT_ZONES];
+export const ALL_ZONES: ZoneDef[] = [...POST_ZONES, ...ANT_ZONES];
 
 // ── Per-zone modality data ────────────────────────────────────────────────────
 interface ZoneModality {
@@ -71,7 +80,7 @@ interface ZoneModality {
 type ZoneDataMap = Record<string, ZoneModality>;
 
 // ── Conversion helpers ────────────────────────────────────────────────────────
-function rowsToZoneData(rows: LesionRow[]): ZoneDataMap {
+export function rowsToZoneData(rows: LesionRow[]): ZoneDataMap {
   const map: ZoneDataMap = {};
   for (const row of rows) {
     const zone = ALL_ZONES.find(
@@ -118,7 +127,7 @@ function rowsToZoneData(rows: LesionRow[]): ZoneDataMap {
   return map;
 }
 
-function zoneDataToRows(zoneData: ZoneDataMap): LesionRow[] {
+export function zoneDataToRows(zoneData: ZoneDataMap): LesionRow[] {
   const rows: LesionRow[] = [];
   for (const zone of ALL_ZONES) {
     const d = zoneData[zone.id];
@@ -863,13 +872,14 @@ export function ZoneInputWizard() {
   const hasMus  = filledZones.some((z) => (zoneData[z.id]?.primus ?? 0) > 0);
   const hasPsma = filledZones.some((z) => (zoneData[z.id]?.suv ?? 0) > 0);
   const hasBx   = filledZones.some((z) => (zoneData[z.id]?.gg ?? 0) > 0);
-  const getCancer   = (id: string) => threeZones.find((z) => z.id === id)?.cancer ?? 0.02;
+  const getCancer   = (id: string) => threeZones.find((z) => z.id === (POST_APEX_3D[id] ?? id))?.cancer ?? 0.02;
   const selDef      = selectedZone ? ALL_ZONES.find((z) => z.id === selectedZone) : null;
   const toggle      = (id: string) => setSelectedZone(selectedZone === id ? null : id);
 
   const postRows = [
     { level: "BASE", cells: [{ id: "P-RB-L" }, { id: "P-RB-M" }, { id: "P-LB-M" }, { id: "P-LB-L" }] },
     { level: "MID",  cells: [{ id: "P-RM-L" }, { id: "P-RM-M" }, { id: "P-LM-M" }, { id: "P-LM-L" }] },
+    { level: "APEX", cells: [{ id: "P-RA-L" }, { id: "P-RA-M" }, { id: "P-LA-M" }, { id: "P-LA-L" }] },
   ];
 
   const TABS = [

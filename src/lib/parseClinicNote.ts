@@ -30,11 +30,18 @@ const VALID_ZONE_COMBOS: { side: "L" | "R"; pos: string; level: "Base" | "Mid" |
   { side: "L", pos: "Anterior",       level: "Mid" },
   { side: "R", pos: "Anterior",       level: "Apex" },
   { side: "L", pos: "Anterior",       level: "Apex" },
-  // Posterior apex: not a cell in the wizard grid, but lesionToZone() maps it to COMPASS 5p/10p.
+  // Posterior apex: lesionToZone() maps it to COMPASS 5p/10p.
   { side: "R", pos: "Posterolateral", level: "Apex" },
   { side: "R", pos: "Posterior",      level: "Apex" },
   { side: "L", pos: "Posterior",      level: "Apex" },
   { side: "L", pos: "Posterolateral", level: "Apex" },
+  // Medial (CZ) shares the Posterior cells — ZoneInputWizard and lesionToZone() alias it.
+  { side: "R", pos: "Medial",         level: "Base" },
+  { side: "L", pos: "Medial",         level: "Base" },
+  { side: "R", pos: "Medial",         level: "Mid" },
+  { side: "L", pos: "Medial",         level: "Mid" },
+  { side: "R", pos: "Medial",         level: "Apex" },
+  { side: "L", pos: "Medial",         level: "Apex" },
 ];
 
 type Level = "Base" | "Mid" | "Apex";
@@ -61,6 +68,20 @@ function parseLevelRange(text: string): { levels: Level[]; defaulted: boolean } 
   if (/\bmid\b/i.test(text)) return { levels: ["Mid"], defaulted: false };
   if (/\bbase\b/i.test(text)) return { levels: ["Base"], defaulted: false };
   return { levels: ["Mid"], defaulted: true };
+}
+
+/**
+ * Systematic core labels — side, lateral/medial, level: RLB = Right Lateral
+ * Base … LMA = Left Medial Apex. Spelled out into the words the side, zone and
+ * level parsers read (lateral → PL PZ, medial → CZ), so the location is known
+ * before any default applies.
+ */
+function expandCoreSites(text: string): string {
+  const LEVEL: Record<string, Level> = { B: "Base", M: "Mid", A: "Apex" };
+  return text.replace(/\b[RL][LM][BMA]\b/gi, (code) => {
+    const [s, p, l] = code.toUpperCase();
+    return `${s === "R" ? "Right" : "Left"} ${p === "L" ? "PL PZ" : "CZ"} ${LEVEL[l ?? ""]}`;
+  });
 }
 
 function parseSide(text: string): "L" | "R" | "" {
@@ -193,7 +214,7 @@ function parseBiopsyLines(lines: string[], warnings: string[]): LesionRow[] {
       const gleasonRe = /(?=gleason\s*\d+\s*\(\d+\+\d+\))/i;
       const subsegs = tabSeg.split(gleasonRe).filter((s) => s.trim().length > 0);
       for (const seg of subsegs) {
-        const t = seg.trim();
+        const t = expandCoreSites(seg.trim());
         const m = t.match(/gleason\s*\d+\s*\((\d+)\+(\d+)\)/i);
         if (!m) continue;
         const gg = gleasonToGG(parseInt(m[1] ?? "0"), parseInt(m[2] ?? "0"));
@@ -356,13 +377,16 @@ function parsePsaLine(lines: string[]): { psa?: number; shim?: number; totalCore
   };
 }
 
-function parsePsmaLines(lines: string[], warnings: string[]): LesionRow[] {
+function parsePsmaLines(lines: string[], warnings: string[]): { lesions: LesionRow[]; negative: boolean } {
   const result: LesionRow[] = [];
+  let negative = false;
   for (const line of lines) {
     const t = line.trim();
     const sm = t.match(/suv\s*(\d+(?:\.\d+)?)/i);
     if (!sm) {
-      if (t.length >= 6) {
+      if (/\bno\s+focal\s+abnormalit(?:y|ies)\b/i.test(t)) {
+        negative = true;
+      } else if (t.length >= 6) {
         warnings.push(`PSMA: no SUV value found — line skipped: "${truncate(t)}"`);
       }
       continue;
@@ -387,11 +411,13 @@ function parsePsmaLines(lines: string[], warnings: string[]): LesionRow[] {
     }
     result.push(...rows);
   }
-  return result;
+  return { lesions: result, negative };
 }
 
 export interface ParsedNote {
   lesions: LesionRow[];
+  /** PSMA read "No focal abnormality" — a negative study, not a missing one. */
+  psmaNegative?: boolean;
   prostateVolumeCc?: number;
   biopsyTotalCores?: number;
   biopsyMaxCorePct?: number;
@@ -454,7 +480,7 @@ export function parseClinicNote(text: string): ParsedNote {
   const bxLesions = mergeBiopsyZones(parseBiopsyLines(sections.biopsy, warnings), warnings);
   const { lesions: mriLesions, volumeCc, psaFromHeader } = parseMriLines(sections.mri, warnings);
   const musLesions = parseMusLines(sections.mus, warnings);
-  const psmaLesions = parsePsmaLines(sections.psma, warnings);
+  const { lesions: psmaLesions, negative: psmaNegative } = parsePsmaLines(sections.psma, warnings);
   const psaData = parsePsaLine(sections.psa);
 
   const biopsyText = sections.biopsy.join(" ");
@@ -472,6 +498,7 @@ export function parseClinicNote(text: string): ParsedNote {
 
   return {
     lesions: [...bxLesions, ...mriLesions, ...musLesions, ...psmaLesions],
+    ...(psmaNegative && { psmaNegative }),
     prostateVolumeCc: volumeCc,
     biopsyTotalCores,
     biopsyMaxCorePct: maxCorePct,

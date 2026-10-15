@@ -146,3 +146,68 @@ describe("zone and level parsing", () => {
     expect(r.warnings.some((w) => /duplicate .* merged/i.test(w))).toBe(true);
   });
 });
+
+describe("systematic core labels", () => {
+  const noDefaultOrMerge = (warnings: string[]) =>
+    expect(warnings.filter((w) => /defaulted to Mid|duplicate .* merged/i.test(w))).toEqual([]);
+
+  it("reads RLB as Right PL PZ base, keeping grade and core %", () => {
+    const r = parseClinicNote("Biopsy\nGleason 7 (4+3) 2 cores, 15%, RLB");
+    expect(r.lesions).toHaveLength(1);
+    expect(r.lesions[0]).toMatchObject({ side: "R", zone: "Posterolateral", level: "Base", score: "3", corePct: 15 });
+    noDefaultOrMerge(r.warnings);
+  });
+
+  it("reads LLA as Left PL PZ apex", () => {
+    const r = parseClinicNote("Biopsy\nGleason 6 (3+3) 3 cores, 40%, LLA");
+    expect(r.lesions).toHaveLength(1);
+    expect(r.lesions[0]).toMatchObject({ side: "L", zone: "Posterolateral", level: "Apex", score: "1", corePct: 40 });
+    noDefaultOrMerge(r.warnings);
+  });
+
+  it("keeps distinct cores apart instead of merging them at Mid", () => {
+    const r = parseClinicNote(
+      "Biopsy\nGleason 7 (3+4) 1 core, 10%, RLB\nGleason 6 (3+3) 1 core, 20%, RLA\n" +
+      "Gleason 6 (3+3) 2 cores, 30%, LLB\nGleason 6 (3+3) 1 core, 5%, LLM",
+    );
+    expect(r.lesions.map((l) => [l.side, l.zone, l.level])).toEqual([
+      ["R", "Posterolateral", "Base"],
+      ["R", "Posterolateral", "Apex"],
+      ["L", "Posterolateral", "Base"],
+      ["L", "Posterolateral", "Mid"],
+    ]);
+    noDefaultOrMerge(r.warnings);
+  });
+
+  it("reads core codes in any letter case", () => {
+    const l = parseClinicNote("Biopsy\nGleason 6 (3+3) 10% rlb\nGleason 6 (3+3) 10% Lma\nGleason 6 (3+3) 10% rLm").lesions;
+    expect(l.map((x) => [x.side, x.zone, x.level])).toEqual([
+      ["R", "Posterolateral", "Base"],
+      ["L", "Medial", "Apex"],
+      ["R", "Posterolateral", "Mid"],
+    ]);
+  });
+
+  it("reads medial cores as CZ at their stated level", () => {
+    const l = parseClinicNote("Biopsy\nGleason 6 (3+3) 1 core, 10%, RMM\nGleason 6 (3+3) 1 core, 10%, LMA").lesions;
+    expect(l.map((x) => [x.side, x.zone, x.level])).toEqual([
+      ["R", "Medial", "Mid"],
+      ["L", "Medial", "Apex"],
+    ]);
+  });
+});
+
+describe("PSMA negative read", () => {
+  it("records 'No focal abnormality' as a negative study, not a skipped line", () => {
+    const r = parseClinicNote("PSMA\nNo focal abnormality");
+    expect(r.psmaNegative).toBe(true);
+    expect(r.lesions).toHaveLength(0);
+    expect(r.warnings.some((w) => /no SUV value/i.test(w))).toBe(false);
+  });
+
+  it("still warns on other PSMA lines without an SUV", () => {
+    const r = parseClinicNote("PSMA\nRead pending at outside facility");
+    expect(r.psmaNegative).toBeUndefined();
+    expect(r.warnings.some((w) => /no SUV value/i.test(w))).toBe(true);
+  });
+});
