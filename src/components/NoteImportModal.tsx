@@ -31,10 +31,12 @@ function uid() {
   return `re-${Math.random().toString(36).slice(2, 9)}`;
 }
 
-function collapseToReviewEntries(lesions: LesionRow[]): ReviewEntry[] {
+export function collapseToReviewEntries(lesions: LesionRow[]): ReviewEntry[] {
   const map = new Map<string, ReviewEntry>();
   for (const l of lesions) {
-    const key = `${l.source}|${l.side}|${l.zone}|${l.score}`;
+    // Core % in the key: two cores of the same grade at different levels are
+    // separate findings, not one lesion spanning both (the entry keeps one %).
+    const key = `${l.source}|${l.side}|${l.zone}|${l.score}|${l.corePct}`;
     const existing = map.get(key);
     const lv = l.level as Level | "";
     if (existing) {
@@ -62,7 +64,7 @@ function collapseToReviewEntries(lesions: LesionRow[]): ReviewEntry[] {
   return Array.from(map.values());
 }
 
-function reviewEntriesToRows(entries: ReviewEntry[]): LesionRow[] {
+export function reviewEntriesToRows(entries: ReviewEntry[]): LesionRow[] {
   const rows: LesionRow[] = [];
   for (const e of entries) {
     const sides: ("L" | "R")[] = e.side === "" ? ["L", "R"] : [e.side];
@@ -153,6 +155,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
   const [clinical, setClinical] = useState<NoteImportClinical>({});
   const [parseError, setParseError] = useState("");
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [psmaNegative, setPsmaNegative] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [phi, setPhi] = useState<{ removed: string[]; count: number } | null>(null);
   const [sheetPatch, setSheetPatch] = useState<SheetImportPatch | null>(null);
@@ -186,6 +189,8 @@ export function NoteImportModal({ onClose, onApply }: Props) {
       // are an MRN fragment or a date).
       setClinical({ ...patch.clinical });
       setWarnings(noteWarnings);
+      // Display only: not written to psma_avail or any model input.
+      setPsmaNegative(parsed.psmaNegative === true);
       setStep("check");
     } finally {
       setExtracting(false);
@@ -396,6 +401,13 @@ export function NoteImportModal({ onClose, onApply }: Props) {
                     {clinical.cores !== undefined && <span className="text-muted-foreground">+ve cores <span className="font-semibold text-foreground">{clinical.cores}</span></span>}
                     {clinical.maxcore !== undefined && <span className="text-muted-foreground">Max core% <span className="font-semibold text-foreground">{clinical.maxcore}%</span></span>}
                   </div>
+                </div>
+              )}
+
+              {psmaNegative && (
+                <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2.5" data-testid="psma-negative">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">PSMA</p>
+                  <p className="text-sm font-semibold text-foreground">No focal abnormality</p>
                 </div>
               )}
 
