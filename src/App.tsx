@@ -15,8 +15,6 @@ import { ThreeCanvas } from "@/components/ThreeCanvas";
 import { ZoneLabelsOverlay } from "@/components/ZoneLabelsOverlay";
 import { OrientationBadge } from "@/components/OrientationBadge";
 import { CaseLog } from "@/components/CaseLog";
-import { ShareLinkModal } from "@/components/ShareLinkModal";
-import { ChatWidget } from "@/components/ChatWidget";
 import { InfoPanel } from "@/components/InfoPanel";
 import { ReferencePanel } from "@/components/ReferencePanel";
 import { PredictionPanel } from "@/components/PredictionPanel";
@@ -37,8 +35,6 @@ import {
   hydrateFromLocalStorage,
   hydratePatientsFromCaseLog,
   hydratePatientLibrary,
-  loadSharedCaseFromPath,
-  loadSharedCaseFromUrl,
   usePatientStore,
 } from "@/store/patientStore";
 import { useUiStore, type DesktopTab } from "@/store/uiStore";
@@ -95,8 +91,6 @@ export default function App() {
   const setInfoOpen = useUiStore((s) => s.setInfoOpen);
   const caseLogOpen = useUiStore((s) => s.caseLogOpen);
   const setCaseLogOpen = useUiStore((s) => s.setCaseLogOpen);
-  const shareOpen = useUiStore((s) => s.shareOpen);
-  const setShareOpen = useUiStore((s) => s.setShareOpen);
   const referenceOpen = useUiStore((s) => s.referenceOpen);
   const setReferenceOpen = useUiStore((s) => s.setReferenceOpen);
   const explainKey = useUiStore((s) => s.explainKey);
@@ -131,7 +125,7 @@ export default function App() {
     }
     // Demo mode (public "/" — no Access): a frozen, read-only preview.
     // Load one fixed demo case so the preview isn't blank; never touch
-    // saved cases, the patient library, or Turso share links.
+    // saved cases or the patient library.
     if (isDemoMode()) {
       if (DEMO_CASES[0]) usePatientStore.getState().loadDemoCase(DEMO_CASES[0]);
       return;
@@ -139,11 +133,7 @@ export default function App() {
     // Load saved library entries (full records) then fall back to case log snapshots.
     hydratePatientLibrary();
     hydratePatientsFromCaseLog();
-    // Load a case embedded in the URL hash (clinical share links), or — if
-    // there's no hash — fetch it from Turso by the /patient/<id> path (short
-    // patient links). The path itself is deliberately left in place either
-    // way — see readPatientViewPath in uiStore for why.
-    // Offline app: no cloud share links. On first run, preload editable
+    // Offline app: on first run, preload editable
     // copies of the demo cases so the app opens on a populated example
     // (all four are also in the case picker); after that, respect whatever
     // cases the user has kept.
@@ -154,10 +144,7 @@ export default function App() {
           localStorage.setItem("compass-offline-seeded", "1");
         }
       } catch { /* private mode */ }
-      return;
     }
-    void loadSharedCaseFromUrl();
-    void loadSharedCaseFromPath();
   }, [bootstrapFromJson]);
 
   // A clinician already signed in via Cloudflare Access shouldn't sit on the
@@ -356,18 +343,12 @@ export default function App() {
         </button>
       </footer>
 
-      {!demo && !isOfflineBuild() && <ChatWidget />}
-
       {infoOpen && (
         <InfoPanel onClose={() => setInfoOpen(false)} />
       )}
 
       {caseLogOpen && (
         <CaseLog onClose={() => setCaseLogOpen(false)} />
-      )}
-
-      {shareOpen && !isOfflineBuild() && (
-        <ShareLinkModal onClose={() => setShareOpen(false)} />
       )}
 
       {referenceOpen && (

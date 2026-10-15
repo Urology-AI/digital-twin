@@ -6,7 +6,6 @@ import {
   FlaskConical,
   Info,
   Layers,
-  MessageCircle,
   Moon,
   Redo2,
   Sun,
@@ -21,7 +20,6 @@ import { ToolsMenu } from "@/components/layout/ToolsMenu";
 import { cn } from "@/lib/utils";
 import { useAccessIdentity } from "@/hooks/useAccessIdentity";
 import { isDemoMode } from "@/lib/demoMode";
-import { isOfflineBuild } from "@/lib/offlineBuild";
 
 const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[] = [
   { id: "input",        label: "Input",       Icon: ClipboardList },
@@ -32,8 +30,6 @@ const DESKTOP_TABS: { id: DesktopTab; label: string; Icon: React.ElementType }[]
 
 export function AppHeader() {
   const accessIdentity = useAccessIdentity();
-  const chatOpen = useUiStore((s) => s.chatOpen);
-  const setChatOpen = useUiStore((s) => s.setChatOpen);
   const saveStatus = useUiStore((s) => s.saveStatus);
 
   const dark = useUiStore((s) => s.dark);
@@ -50,7 +46,6 @@ export function AppHeader() {
 
   const active = patients.find((p) => p.id === activeId);
   const demo = isDemoMode();
-  const offline = isOfflineBuild();
 
   return (
     <header className="z-40 flex h-14 shrink-0 items-center gap-2 overflow-x-auto border-b border-border bg-card/95 px-3 backdrop-blur-md sm:px-4 supports-[backdrop-filter]:bg-card/85">
@@ -88,14 +83,6 @@ export function AppHeader() {
             <FilePlus2 className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">New</span>
           </button>
-        )}
-        {!demo && !offline && active?.record._shareId && (
-          <span
-            title={`Share ID: ${active.record._shareId}`}
-            className="hidden shrink-0 cursor-default rounded bg-sky-500/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-sky-400 sm:inline"
-          >
-            Shared · {active.record._shareId.slice(0, 8)}
-          </span>
         )}
       </div>
 
@@ -225,22 +212,6 @@ export function AppHeader() {
             {saveStatus === "saving" ? "Saving…" : "Saved locally"}
           </span>
         </div>
-        )}
-
-        {/* Chat assistant — clinician tool, hidden in the public preview */}
-        {!demo && (
-          <button
-            type="button"
-            className={cn(
-              "flex items-center rounded-md px-1.5 py-1 transition-colors hover:bg-muted/60 hover:text-foreground",
-              chatOpen ? "text-primary" : "text-muted-foreground",
-            )}
-            aria-label="Open chat assistant"
-            onClick={() => setChatOpen(!chatOpen)}
-            title="Ask the assistant"
-          >
-            <MessageCircle className="h-[15px] w-[15px]" />
-          </button>
         )}
       </div>
 

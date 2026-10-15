@@ -121,7 +121,7 @@ export function downloadPageHtml(
   <p>
     The offline build for Mac and Windows. Every prediction model, the 3D viewer and the
     case library run entirely on the machine — no network calls, no patient data leaves the
-    device. Cloud features (chat, note parsing, sync and share links) are compiled out.
+    device.
   </p>
 
   <div class="card">

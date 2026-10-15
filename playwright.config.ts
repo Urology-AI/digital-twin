@@ -3,8 +3,7 @@ import { defineConfig } from "@playwright/test";
 /**
  * End-to-end browser tests (e2e/). Runs the real app on its own dev server
  * port and drives the installed Google Chrome — no Playwright browser download.
- * The Turso/Worker backend is replaced per test by an in-memory fake
- * (e2e/fakeWorker.ts), so no test data ever reaches the real database.
+ * The app has no data backend, so nothing here needs faking.
  */
 export default defineConfig({
   testDir: "e2e",

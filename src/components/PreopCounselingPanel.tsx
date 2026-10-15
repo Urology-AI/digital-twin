@@ -2,16 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Activity, AlertTriangle, BedDouble, Bike, BookOpen, Brain, Briefcase, CalendarDays, Car, ChevronDown,
   ChevronLeft, ChevronRight, CircleCheck, Circle, Coffee, Dog, Droplets, Dumbbell, Flag, Footprints,
-  GlassWater, Hammer, Heart, HeartPulse, House, Info, Loader2, MessageCircleQuestion, Phone, Plus,
-  Printer, Salad, ScanSearch, ShowerHead, Soup, Sparkles, Stethoscope, Timer, Trophy,
+  GlassWater, Hammer, Heart, HeartPulse, House, Info, MessageCircleQuestion, Phone, Plus,
+  Printer, Salad, ScanSearch, ShowerHead, Soup, Stethoscope, Timer, Trophy,
   Type, UserCheck, UtensilsCrossed, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePatientStore } from "@/store/patientStore";
-import { useUiStore } from "@/store/uiStore";
 import { deriveClinicalFromLesions, lesionsFromRows } from "@/lib/utils/normalization";
 import { clinicalStateFromRecord } from "@/lib/compass/clinicalFromRecord";
-import { generatePreopNarrative } from "@/lib/api";
 import { isDemoMode } from "@/lib/demoMode";
 import {
   OUTCOME_TIMEPOINTS,
@@ -20,7 +18,6 @@ import {
   RED_FLAGS,
   addDays,
   buildPrintHtml,
-  counselingContext,
   counselingFingerprint,
   counselingFlags,
   daysFromSurgery,
@@ -145,7 +142,6 @@ function reviewState(review: Prostate3DInputV1["preop_review"], fingerprint: str
 
 function ReviewStamp({ review, fingerprint, readOnly = false }: { review: Prostate3DInputV1["preop_review"]; fingerprint: string; readOnly?: boolean }) {
   const { t, lang } = useT();
-  const locked = useUiStore((s) => s.patientViewLocked);
   const setPreopReview = usePatientStore((s) => s.setPreopReview);
   const [name, setName] = useState("");
   const state = reviewState(review, fingerprint);
@@ -167,7 +163,7 @@ function ReviewStamp({ review, fingerprint, readOnly = false }: { review: Prosta
       </div>
     );
 
-  if (locked || readOnly) return banner;
+  if (readOnly) return banner;
 
   // Clinician previewing their own case: can sign off or clear. English only — clinician-facing.
   return (
@@ -291,11 +287,10 @@ function Checklist({ S, surgery, done, toggle }: { S: ClinicalState; surgery: Da
 function HealthInputs({ S }: { S: ClinicalState }) {
   const { t } = useT();
   const update = usePatientStore((s) => s.updateClinicalForm);
-  const locked = useUiStore((s) => s.patientViewLocked);
   const chip = (k: "prior_abdominal_surgery" | "anticoagulant" | "osa" | "dm" | "htn", label: string) => {
     const on = !!S[k];
     return (
-      <button type="button" disabled={locked} aria-pressed={on} onClick={() => update({ [k]: !on })}
+      <button type="button" aria-pressed={on} onClick={() => update({ [k]: !on })}
         className={`rounded-full border px-3.5 py-2 text-sm transition-colors disabled:cursor-default ${FOCUS} ${on ? "border-sky-500 bg-sky-500/15 font-medium text-sky-800 dark:text-sky-200" : "border-border text-muted-foreground hover:border-sky-500/50 hover:text-foreground"}`}>
         {on ? "✓ " : ""}{t(label)}
       </button>
@@ -307,11 +302,11 @@ function HealthInputs({ S }: { S: ClinicalState }) {
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="space-y-1.5 text-sm">
           <span className="font-medium text-foreground">{t("Body-mass index (BMI)")}</span>
-          <input type="number" step="0.1" disabled={locked} value={S.bmi} onChange={(e) => update({ bmi: parseFloat(e.target.value) || 27 })} className={field} />
+          <input type="number" step="0.1" value={S.bmi} onChange={(e) => update({ bmi: parseFloat(e.target.value) || 27 })} className={field} />
         </label>
         <label className="space-y-1.5 text-sm">
           <span className="font-medium text-foreground">{t("Overall health for anesthesia")} <span className="font-normal text-muted-foreground">(ASA)</span></span>
-          <select disabled={locked} value={S.asa_class} onChange={(e) => update({ asa_class: parseInt(e.target.value) })} className={field}>
+          <select value={S.asa_class} onChange={(e) => update({ asa_class: parseInt(e.target.value) })} className={field}>
             <option value={1}>1 · {t("Healthy")}</option>
             <option value={2}>2 · {t("Mild, well-controlled conditions")}</option>
             <option value={3}>3 · {t("Serious conditions")}</option>
@@ -577,33 +572,6 @@ function Questions({ questions, setQuestions }: { questions: string[]; setQuesti
   );
 }
 
-function AiLetter({ S }: { S: ClinicalState }) {
-  const { t, lang } = useT();
-  const predictions = usePatientStore((s) => s.predictions);
-  const [text, setText] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  async function run() {
-    setBusy(true); setErr(null);
-    try { setText(await generatePreopNarrative(counselingContext(S, predictions), PREOP_REFERENCES.map((r) => r.key), lang)); }
-    catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
-    finally { setBusy(false); }
-  }
-  return (
-    <Section id="letter" title={t("Your personal letter")} subtitle={t("A plain-language letter written by AI that pulls all of this together.")}>
-      <Button onClick={run} disabled={busy} className="h-11 gap-1.5">
-        {busy ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <Sparkles aria-hidden className="h-4 w-4" />}
-        {text ? t("Write it again") : t("Write my letter")}
-      </Button>
-      <p className="mt-2 text-sm text-muted-foreground">{t("No name or dates are sent. AI can make mistakes, so go over it with your surgeon.")}</p>
-      <div aria-live="polite">
-        {err && <div role="alert" className="mt-3 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">{err}</div>}
-        {text && <div className="mt-4 whitespace-pre-wrap rounded-xl border border-border bg-background/60 p-4 text-[0.95em] leading-relaxed text-foreground">{text}</div>}
-      </div>
-    </Section>
-  );
-}
-
 function Sources() {
   const { t } = useT();
   const [open, setOpen] = useState(false);
@@ -693,7 +661,6 @@ function PreopCounselingPage() {
     { id: "questions", label: "Questions", node: <Questions questions={prep.questions} setQuestions={(q) => setPrep((p) => ({ ...p, questions: q }))} /> },
     { id: "redflags", label: "Call us if", node: <RedFlags /> },
     { id: "health", label: "Your health", node: <HealthInputs S={S} /> },
-    { id: "letter", label: "AI letter", node: <AiLetter S={S} /> },
   ];
   const cur = Math.min(step, sections.length - 1);
   const go = (i: number) => {

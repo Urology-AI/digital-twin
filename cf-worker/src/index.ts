@@ -1,90 +1,38 @@
 /**
  * Narrow jobs only (see wrangler.jsonc routes — bound to exactly these
- * path patterns, nothing else):
+ * path patterns, nothing else). No patient data passes through this Worker:
+ * there is no database, no share-link store and no AI proxy. Everything
+ * clinical stays in the clinician's browser.
  *
- * 1. /api/turso/* — Turso proxy. Holds the Turso auth token as a Worker
- *    secret so it never ships in the client bundle. The case-log
- *    schema/column-mapping logic stays in src/lib/turso.ts unchanged;
- *    only the transport moves here, as a thin pass-through of the exact
- *    SQL that code already builds.
+ * 1. /api/updates/* — update feed for the desktop app and the web app's
+ *    version check. Holds RELEASES_READ_PAT so the shipped app carries no
+ *    credential of its own.
  *
- * 2. /patient/* and /clinical/* — SPA fallback. GitHub Pages has no
- *    server-side rewrite capability, so a fresh visit to a client-side
- *    route (no matching file) 404s. This fetches /index.html from the
- *    same custom domain instead — a same-zone fetch, which Cloudflare
- *    docs confirm bypasses Worker routing entirely and goes straight to
- *    the zone's normal origin (the plain proxied CNAME to GitHub Pages),
- *    preserving the custom-domain Host header GitHub Pages needs to
- *    serve this project without redirecting.
+ * 2. /clinical/* — SPA fallback. GitHub Pages has no server-side rewrite
+ *    capability, so a fresh visit to a client-side route (no matching file)
+ *    404s. This fetches /index.html from the same custom domain instead — a
+ *    same-zone fetch, which Cloudflare docs confirm bypasses Worker routing
+ *    entirely and goes straight to the zone's normal origin (the plain
+ *    proxied CNAME to GitHub Pages), preserving the custom-domain Host header
+ *    GitHub Pages needs to serve this project without redirecting.
+ *    /clinical/download is a Worker-rendered page (see downloadPage.ts).
  *
  * Root ("/") and anything else passes straight through untouched — this
  * Worker never sees it. Cloudflare Access has exactly one application,
- * scoped to /clinical/* only; root and /patient/* are genuinely public by
- * having no Access application on them at all, not by a bypass rule (no
- * path-precedence ambiguity between competing apps that way).
- *
- * /clinical/* is authenticated by Access before it reaches this Worker.
- * /api/turso/* and /api/chat are not under Access, so the Worker verifies the
- * Access JWT itself (requireAccess / accessEmail). The only unauthenticated
- * database statement is the patient share lookup by id.
+ * scoped to /clinical/*; it authenticates before requests reach this Worker.
  */
-import { createClient } from "@libsql/client/web";
 import { downloadPageHtml } from "./downloadPage";
 
 interface Env {
-  TURSO_URL: string;
-  TURSO_AUTH_TOKEN: string;
   // Fine-grained, read-only PAT for the PRIVATE releases repo. Held here as a
   // Worker secret so the desktop app can ship with no credential at all —
   // before this, every build carried the token inside the bundle, where any
   // user could extract it and it could not be rotated without a new release.
   RELEASES_READ_PAT?: string;
-  // Optional — bound only once the `ratelimits` namespace is provisioned
-  // (see wrangler.jsonc). Absent in local dev / before first provision, so
-  // every use is guarded with `?.`.
-  TURSO_RL?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
-  // Google Generative Language API key (free tier: aistudio.google.com/apikey).
-  //   npx wrangler secret put GEMINI_API_KEY
-  GEMINI_API_KEY?: string;
-  // Cloudflare Access application audience (AUD) tag for the /clinical app.
-  // REQUIRED: without it /api/chat refuses every request. See verifyAccessJwt.
-  //   npx wrangler secret put ACCESS_AUD
-  ACCESS_AUD?: string;
-  // Cloudflare Access team domain, e.g. "yourteam.cloudflareaccess.com".
-  //   npx wrangler secret put ACCESS_TEAM_DOMAIN
-  ACCESS_TEAM_DOMAIN?: string;
-  // Optional comma-separated email-domain allowlist, e.g. "mountsinai.org".
-  // Defence in depth only — the Access application policy is the real control
-  // over who gets a token at all.
-  ACCESS_ALLOWED_DOMAINS?: string;
-  // Bearer token the ePSA admin dashboard sends to read case_log server-side.
-  // Grants the case_log SELECT only — nothing else, no writes.
-  //   npx wrangler secret put DASHBOARD_READ_TOKEN
-  DASHBOARD_READ_TOKEN?: string;
-  // Separate, much tighter limiter for the metered Gemini route.
-  CHAT_RL?: { limit(opts: { key: string }): Promise<{ success: boolean }> };
 }
 
-// COMPASS's own Gemini call lives here so the API key never ships in the
-// client bundle — the browser hits this Worker same-origin at /api/chat.
-// NOTE: the Google Generative Language API is NOT covered by a BAA. The
-// client de-identifies before sending (src/lib/deidentify.ts) and this
-// Worker logs status codes only — never prompt or response text.
-const GEMINI_MODEL = "gemini-2.5-flash";
-const GEMINI_URL = (model: string, key: string) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
-const MAX_CHAT_BODY_BYTES = 600_000; // room for a base64 screenshot
-// `model` is caller-supplied and is interpolated into the Gemini URL PATH.
-// Unvalidated, a value like "../../v1beta/tunedModels/x" walks to a different
-// Google API path with our key attached. Host is pinned, so this is not full
-// SSRF, but the key must only ever be spent on the path we intend.
-const MODEL_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
-
 /**
- * Origin allowlist — the two front-ends that legitimately call this proxy.
- * A browser on any other site gets its request rejected. (Non-browser
- * clients send no Origin header and so aren't stopped here — the SQL
- * allowlist below is the real guard; this is defence in depth.)
+ * Origin allowlist for the web app's version check (/api/updates/latest.json).
  */
 const ALLOWED_ORIGINS = new Set([
   "https://digital-twin.urology.edu.eu.org",
@@ -93,176 +41,11 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:4173", // vite preview
 ]);
 
-/**
- * SQL allowlist. There is no Access application on /api/* (requireAccess
- * checks the Access JWT in the Worker instead), so
- * without this any caller could `SELECT * FROM patient_shares` and dump
- * every shared patient record — or `SELECT * FROM sqlite_master` to map the
- * whole schema. Only the exact statements src/lib/turso.ts issues are
- * permitted:
- *  - patient_shares (holds identified records) — full statement + arg count.
- *  - case_log (de-identified research log) — the one SELECT it runs, plus
- *    the CREATE/ALTER shapes its schema-evolution path emits.
- * There is deliberately NO bare "select " allowance: a generic SELECT prefix
- * would re-open arbitrary reads of any non-patient_shares table (and the
- * schema). Anything not matched below is refused.
- */
-function normalizeSql(sql: string): string {
-  return sql.trim().replace(/\s+/g, " ").replace(/;\s*$/, "");
-}
-
-const SHARE_GET = "SELECT record FROM patient_shares WHERE id = ?";
-const SHARE_PUT =
-  "INSERT OR REPLACE INTO patient_shares (id, record, created_at) VALUES (?, ?, ?)";
-const SHARE_CREATE =
-  "CREATE TABLE IF NOT EXISTS patient_shares ( id TEXT PRIMARY KEY, record TEXT NOT NULL, created_at TEXT NOT NULL )";
-// The single read pullCases() issues (src/lib/turso.ts) — case_log is the
-// de-identified research log, so a full-table read of it is by design.
-const CASE_LOG_SELECT = "SELECT * FROM case_log ORDER BY date DESC";
-
-const ALLOWED_SQL_PREFIXES = [
-  "create table if not exists case_log ",
-  "alter table case_log add column ",
-  "insert or replace into case_log ",
-];
-
-function isAllowedSql(sql: string, args: unknown[]): boolean {
-  const s = normalizeSql(sql);
-  if (s === SHARE_GET) return args.length === 1;
-  if (s === SHARE_PUT) return args.length === 3;
-  if (s === SHARE_CREATE) return true;
-  if (s === CASE_LOG_SELECT) return args.length === 0;
-  // Nothing else may touch patient_shares, and no other SELECT is allowed.
-  if (/patient_shares/i.test(s) || /^select\b/i.test(s)) return false;
-  const low = s.toLowerCase();
-  return ALLOWED_SQL_PREFIXES.some((p) => low.startsWith(p));
-}
-
 function jsonError(message: string, status: number): Response {
   return new Response(JSON.stringify({ error: message }), {
     status,
     headers: { "Content-Type": "application/json" },
   });
-}
-
-/**
- * @libsql/client/web (the HTTP-based build that runs in Workers) requires
- * an https:// URL — it does not accept the libsql:// connection string
- * Turso hands you in its dashboard. Normalize either form here.
- */
-function tursoClient(env: Env) {
-  const url = env.TURSO_URL.replace(/^libsql:\/\//, "https://");
-  return createClient({ url, authToken: env.TURSO_AUTH_TOKEN });
-}
-
-type Args = (string | number | null)[];
-
-/**
- * GET for reads (?sql=...&args=[...] as query params), POST for writes
- * (JSON body) — matches how the two are actually used: pullCases() only
- * ever SELECTs, pushCases()'s ensureSchema() only ever CREATE/ALTERs.
- */
-async function handleTursoExecute(request: Request, env: Env): Promise<Response> {
-  let sql: unknown;
-  let args: unknown;
-
-  if (request.method === "GET") {
-    const params = new URL(request.url).searchParams;
-    sql = params.get("sql");
-    try {
-      args = params.has("args") ? JSON.parse(params.get("args")!) : [];
-    } catch {
-      return jsonError("'args' query param must be JSON", 400);
-    }
-  } else if (request.method === "POST") {
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return jsonError("Invalid JSON body", 400);
-    }
-    sql = (body as { sql?: unknown })?.sql;
-    args = (body as { args?: unknown })?.args ?? [];
-  } else {
-    return jsonError("GET or POST only", 405);
-  }
-
-  if (typeof sql !== "string" || !sql.trim()) return jsonError("Missing 'sql' string", 400);
-  if (!Array.isArray(args)) return jsonError("'args' must be an array", 400);
-  if (!isAllowedSql(sql, args)) return jsonError("SQL statement not permitted", 403);
-
-  // Only a patient share lookup by id is public (/patient/<id> links). The
-  // case_log read also admits the dashboard's read token; everything else
-  // needs a signed-in /clinical user.
-  const s = normalizeSql(sql);
-  if (s !== SHARE_GET) {
-    const denied = await requireAccess(request, env, { allowDashboard: s === CASE_LOG_SELECT });
-    if (denied) return denied;
-  }
-
-  try {
-    const result = await tursoClient(env).execute({ sql, args: args as Args });
-    // libsql's Row objects support both row[0] and row.columnName access but
-    // are NOT plain arrays — JSON.stringify on them directly does not
-    // reliably carry the actual values across. Force each row into a real
-    // array first.
-    const rows = result.rows.map((row) => Array.from(row));
-    return new Response(JSON.stringify({ rows, columns: result.columns }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    return jsonError(`Turso execute failed: ${err instanceof Error ? err.message : String(err)}`, 502);
-  }
-}
-
-/** Real connectivity check — not just "are the env vars set", an actual round-trip to Turso. */
-async function handleTursoHealth(request: Request, env: Env): Promise<Response> {
-  const denied = await requireAccess(request, env);
-  if (denied) return denied;
-  try {
-    await tursoClient(env).execute({ sql: "SELECT 1", args: [] });
-    return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json" } });
-  } catch (err) {
-    return jsonError(`Turso unreachable: ${err instanceof Error ? err.message : String(err)}`, 502);
-  }
-}
-
-interface BatchStatement {
-  sql: string;
-  args: Args;
-}
-
-async function handleTursoBatch(request: Request, env: Env): Promise<Response> {
-  if (request.method !== "POST") return jsonError("POST only", 405);
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return jsonError("Invalid JSON body", 400);
-  }
-  const statements = (body as { statements?: unknown })?.statements;
-  if (!Array.isArray(statements) || statements.length === 0) {
-    return jsonError("Missing non-empty 'statements' array", 400);
-  }
-  // Every batch statement is a write — signed-in /clinical users only.
-  const denied = await requireAccess(request, env);
-  if (denied) return denied;
-
-  for (const s of statements as BatchStatement[]) {
-    if (typeof s.sql !== "string" || !Array.isArray(s.args)) {
-      return jsonError("Each statement needs 'sql' (string) and 'args' (array)", 400);
-    }
-    if (!isAllowedSql(s.sql, s.args)) return jsonError("SQL statement not permitted", 403);
-  }
-
-  try {
-    await tursoClient(env).batch(statements as BatchStatement[], "write");
-    return new Response(JSON.stringify({ ok: true, count: statements.length }), {
-      headers: { "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    return jsonError(`Turso batch failed: ${err instanceof Error ? err.message : String(err)}`, 502);
-  }
 }
 
 // Baseline security headers for the HTML documents this Worker serves.
@@ -279,313 +62,6 @@ function withSecurityHeaders(response: Response, status = response.status): Resp
   const headers = new Headers(response.headers);
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) headers.set(k, v);
   return new Response(response.body, { status, headers });
-}
-
-// ── Cloudflare Access verification for the metered Gemini route ───────────────
-//
-// /api/chat spends a real Google API key on every call. Origin checks do not
-// stop a non-browser client (curl sends no Origin), and a per-IP rate limit
-// does not stop a botnet — so without this the key is spendable by anyone who
-// knows the URL, which is how a free-tier key gets suspended.
-//
-// The chat widget only renders outside demo mode (src/App.tsx), i.e. only on
-// /clinical, which already sits behind a Cloudflare Access application. So
-// requiring an Access JWT here costs no legitimate user anything: add /api/chat
-// to that same Access application, then set ACCESS_AUD + ACCESS_TEAM_DOMAIN.
-//
-// This gate fails CLOSED. With the secrets unset the route returns 503 rather
-// than serving Gemini to anyone who finds the URL.
-//
-// The JWT signature is verified against Access's published keys — the
-// Cf-Access-Jwt-Assertion header alone is not trusted, since a header can be
-// forged by anything that reaches the Worker directly.
-
-interface Jwk { kid: string; kty: string; n: string; e: string; alg?: string }
-
-let jwksCache: { keys: Jwk[]; fetchedAt: number } | null = null;
-const JWKS_TTL_MS = 60 * 60 * 1000;
-const JWKS_MIN_REFETCH_MS = 60 * 1000;
-
-async function fetchAccessKeys(teamDomain: string): Promise<Jwk[]> {
-  const res = await fetch(`https://${teamDomain}/cdn-cgi/access/certs`);
-  if (!res.ok) throw new Error(`Access certs ${res.status}`);
-  const { keys } = (await res.json()) as { keys: Jwk[] };
-  jwksCache = { keys, fetchedAt: Date.now() };
-  return keys;
-}
-
-async function accessKeys(teamDomain: string): Promise<Jwk[]> {
-  const now = Date.now();
-  if (jwksCache && now - jwksCache.fetchedAt < JWKS_TTL_MS) return jwksCache.keys;
-  return fetchAccessKeys(teamDomain);
-}
-
-/** Force one refresh (rate-limited) when a kid isn't in the cached set —
- *  handles an Access signing-key rotation before the TTL lapses, so a rotation
- *  doesn't 401 every request for up to an hour. */
-async function accessKeysForKid(teamDomain: string, kid: string): Promise<Jwk[]> {
-  const keys = await accessKeys(teamDomain);
-  if (keys.some((k) => k.kid === kid)) return keys;
-  if (jwksCache && Date.now() - jwksCache.fetchedAt < JWKS_MIN_REFETCH_MS) return keys;
-  return fetchAccessKeys(teamDomain);
-}
-
-function b64urlToBytes(s: string): Uint8Array {
-  const b64 = s.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(s.length / 4) * 4, "=");
-  const bin = atob(b64);
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-
-/**
- * Returns the authenticated email, or null if the request is not a valid
- * Access session. Never throws to the caller's advantage — any failure is a
- * rejection.
- */
-async function verifyAccessJwt(token: string, aud: string, teamDomain: string): Promise<string | null> {
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  let header: { kid?: string; alg?: string };
-  let payload: { aud?: string | string[]; exp?: number; iss?: string; email?: string };
-  try {
-    header = JSON.parse(new TextDecoder().decode(b64urlToBytes(parts[0])));
-    payload = JSON.parse(new TextDecoder().decode(b64urlToBytes(parts[1])));
-  } catch {
-    return null;
-  }
-  if (header.alg !== "RS256" || !header.kid) return null;
-
-  let keys: Jwk[];
-  try {
-    keys = await accessKeysForKid(teamDomain, header.kid);
-  } catch {
-    return null;
-  }
-  const jwk = keys.find((k) => k.kid === header.kid);
-  if (!jwk) return null;
-
-  let ok = false;
-  try {
-    const key = await crypto.subtle.importKey(
-      "jwk",
-      { kty: jwk.kty, n: jwk.n, e: jwk.e, alg: "RS256", ext: true },
-      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-      false,
-      ["verify"],
-    );
-    ok = await crypto.subtle.verify(
-      "RSASSA-PKCS1-v1_5",
-      key,
-      b64urlToBytes(parts[2]),
-      new TextEncoder().encode(`${parts[0]}.${parts[1]}`),
-    );
-  } catch {
-    return null;
-  }
-  if (!ok) return null;
-
-  const auds = Array.isArray(payload.aud) ? payload.aud : payload.aud ? [payload.aud] : [];
-  if (!auds.includes(aud)) return null;
-  if (typeof payload.exp !== "number" || payload.exp * 1000 <= Date.now()) return null;
-  if (payload.iss !== `https://${teamDomain}`) return null;
-  return payload.email ?? "authenticated";
-}
-
-/** Verified Access email from the header or the CF_Authorization cookie, else null. */
-async function accessEmail(request: Request, env: Env): Promise<string | null> {
-  if (!env.ACCESS_AUD || !env.ACCESS_TEAM_DOMAIN) return null;
-  const token =
-    request.headers.get("Cf-Access-Jwt-Assertion") ??
-    (/CF_Authorization=([^;]+)/.exec(request.headers.get("Cookie") ?? "")?.[1] ?? "");
-  return token ? verifyAccessJwt(token, env.ACCESS_AUD, env.ACCESS_TEAM_DOMAIN) : null;
-}
-
-// Optional second check on the identity Access vouched for. The Access
-// application policy already decides who gets a token; this only limits the
-// blast radius if that policy is ever widened by accident.
-function emailDomainAllowed(email: string, env: Env): boolean {
-  const allowed = (env.ACCESS_ALLOWED_DOMAINS ?? "")
-    .split(",")
-    .map((d) => d.trim().toLowerCase())
-    .filter(Boolean);
-  if (!allowed.length) return true;
-  const domain = email.split("@")[1]?.toLowerCase() ?? "";
-  return allowed.some((d) => domain === d || domain.endsWith(`.${d}`));
-}
-
-function timingSafeEqual(a: string, b: string): boolean {
-  const x = new TextEncoder().encode(a);
-  const y = new TextEncoder().encode(b);
-  if (x.length !== y.length) return false;
-  let diff = 0;
-  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
-  return diff === 0;
-}
-
-// ── /api/turso gate ───────────────────────────────────────────────────────────
-// /api/* has no Access application in front of it, so the Worker checks the
-// same Access JWT /api/chat does. Fails CLOSED: with ACCESS_AUD or
-// ACCESS_TEAM_DOMAIN unset, gated statements are refused with 503.
-// Returns null when the request may proceed, else the error response.
-async function requireAccess(
-  request: Request,
-  env: Env,
-  opts: { allowDashboard?: boolean } = {},
-): Promise<Response | null> {
-  if (opts.allowDashboard && env.DASHBOARD_READ_TOKEN) {
-    const auth = request.headers.get("Authorization") ?? "";
-    if (auth.startsWith("Bearer ") && timingSafeEqual(auth.slice(7), env.DASHBOARD_READ_TOKEN)) return null;
-  }
-  if (!env.ACCESS_AUD || !env.ACCESS_TEAM_DOMAIN) return jsonError("Case sync is not configured on this server", 503);
-  const email = await accessEmail(request, env);
-  if (!email) return jsonError("Sign in to sync cases", 401);
-  if (!emailDomainAllowed(email, env)) return jsonError("This account is not permitted to sync cases", 403);
-  return null;
-}
-
-// ── /api/chat — COMPASS's own Gemini call ─────────────────────────────────────
-// The browser POSTs an OpenAI-style body ({ messages, temperature?, max_tokens?,
-// model? }) to this same-origin route; the Worker translates to Gemini's
-// generateContent, calls Google with the server-held key, and translates the
-// reply back to the OpenAI shape src/lib/api.ts already expects.
-
-interface OaPart { type: "text" | "image_url"; text?: string; image_url?: { url: string } }
-interface OaMessage { role: "system" | "user" | "assistant"; content: string | OaPart[] }
-interface GeminiPart { text?: string; inline_data?: { mime_type: string; data: string } }
-
-function toGeminiParts(content: string | OaPart[]): GeminiPart[] {
-  if (typeof content === "string") return [{ text: content }];
-  const parts: GeminiPart[] = [];
-  for (const p of content) {
-    if (p.type === "text" && p.text) parts.push({ text: p.text });
-    else if (p.type === "image_url" && p.image_url?.url?.startsWith("data:")) {
-      const m = /^data:([^;]+);base64,(.*)$/s.exec(p.image_url.url);
-      if (m) parts.push({ inline_data: { mime_type: m[1], data: m[2] } });
-    }
-  }
-  return parts.length ? parts : [{ text: "" }];
-}
-
-interface GeminiBody {
-  system_instruction?: { parts: GeminiPart[] };
-  contents: { role: "user" | "model"; parts: GeminiPart[] }[];
-  generationConfig: { temperature: number; maxOutputTokens: number };
-}
-
-function oaToGemini(messages: OaMessage[], temperature: number, maxTokens: number): GeminiBody {
-  const sys = messages.filter((m) => m.role === "system").map((m) => toGeminiParts(m.content)).flat();
-  const contents = messages
-    .filter((m) => m.role !== "system")
-    .map((m) => ({ role: (m.role === "assistant" ? "model" : "user") as "user" | "model", parts: toGeminiParts(m.content) }));
-  const body: GeminiBody = { contents, generationConfig: { temperature, maxOutputTokens: maxTokens } };
-  if (sys.length) body.system_instruction = { parts: sys };
-  return body;
-}
-
-async function handleChat(request: Request, env: Env): Promise<Response> {
-  const origin = request.headers.get("Origin");
-  const cors: Record<string, string> = {
-    "Access-Control-Allow-Origin": origin && ALLOWED_ORIGINS.has(origin) ? origin : "null",
-    "Vary": "Origin",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-  };
-  const reply = (obj: unknown, status: number) =>
-    new Response(JSON.stringify(obj), { status, headers: { "Content-Type": "application/json", ...cors } });
-
-  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
-  if (request.method !== "POST") return reply({ error: "POST only" }, 405);
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return reply({ error: "Origin not allowed" }, 403);
-  if (!env.GEMINI_API_KEY) return reply({ error: "Chat not configured on server" }, 503);
-
-  // Access gate — FAILS CLOSED.
-  //
-  // If the Access secrets are missing, this route refuses rather than falling
-  // back to open. A configuration gap must not silently reopen a public proxy
-  // to a metered API key: that is what drained the key once already, and an
-  // unconfigured deploy is exactly when nobody is watching.
-  if (!env.ACCESS_AUD || !env.ACCESS_TEAM_DOMAIN) {
-    return reply({ error: "Chat is not configured on this server" }, 503);
-  }
-  const email = await accessEmail(request, env);
-  if (!email) return reply({ error: "Sign in to use chat" }, 401);
-  if (!emailDomainAllowed(email, env)) {
-    return reply({ error: "This account is not permitted to use chat" }, 403);
-  }
-
-  // Content-Length is a hint the client can simply omit (chunked encoding), so
-  // it is only a cheap early-out. The authoritative check is on the bytes we
-  // actually read, below.
-  if (Number(request.headers.get("Content-Length") || 0) > MAX_CHAT_BODY_BYTES) {
-    return reply({ error: "Request too large" }, 413);
-  }
-  // Metered route: its own limiter, far tighter than the Turso one. Falls back
-  // to the shared limiter if CHAT_RL has not been provisioned yet.
-  const limiter = env.CHAT_RL ?? env.TURSO_RL;
-  if (limiter) {
-    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-    const { success } = await limiter.limit({ key: `chat:${ip}` });
-    if (!success) return reply({ error: "Rate limit exceeded — slow down" }, 429);
-  }
-
-  let parsed: { messages?: OaMessage[]; temperature?: number; max_tokens?: number; model?: string };
-  let raw: string;
-  try {
-    raw = await request.text();
-  } catch {
-    return reply({ error: "Could not read body" }, 400);
-  }
-  if (new TextEncoder().encode(raw).length > MAX_CHAT_BODY_BYTES) {
-    return reply({ error: "Request too large" }, 413);
-  }
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return reply({ error: "Invalid JSON" }, 400);
-  }
-  if (!Array.isArray(parsed.messages) || parsed.messages.length === 0) {
-    return reply({ error: "Missing 'messages'" }, 400);
-  }
-
-  const model = typeof parsed.model === "string" && parsed.model.trim() ? parsed.model.trim() : GEMINI_MODEL;
-  if (!MODEL_NAME.test(model)) return reply({ error: "Invalid 'model'" }, 400);
-  const geminiBody = oaToGemini(
-    parsed.messages,
-    typeof parsed.temperature === "number" ? parsed.temperature : 0.3,
-    typeof parsed.max_tokens === "number" ? parsed.max_tokens : 1024,
-  );
-
-  let res: Response;
-  try {
-    res = await fetch(GEMINI_URL(model, env.GEMINI_API_KEY), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(geminiBody),
-    });
-  } catch (err) {
-    return reply({ error: `Gemini unreachable: ${err instanceof Error ? err.message : String(err)}` }, 502);
-  }
-
-  if (!res.ok) {
-    // Google's error bodies can echo request content — surface status only.
-    return reply({ error: `Gemini error ${res.status}` }, 502);
-  }
-
-  const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[];
-    promptFeedback?: { blockReason?: string };
-  };
-  if (data.promptFeedback?.blockReason) {
-    return reply({ error: `Blocked by safety filter (${data.promptFeedback.blockReason})` }, 502);
-  }
-  const text = (data.candidates?.[0]?.content?.parts ?? [])
-    .map((p) => p.text ?? "")
-    .join("")
-    .trim();
-
-  // OpenAI-shaped so src/lib/api.ts needs no special-casing.
-  return reply({ choices: [{ message: { role: "assistant", content: text } }] }, 200);
 }
 
 // The download page for the desktop app. Served here rather than from the React
@@ -727,21 +203,6 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url);
     try {
-      if (pathname.startsWith("/api/turso/")) {
-        const origin = request.headers.get("Origin");
-        if (origin && !ALLOWED_ORIGINS.has(origin)) {
-          return jsonError("Origin not allowed", 403);
-        }
-        // Per-IP rate limit on the DB-backed endpoints. Defence against
-        // scraping / cost-abuse now that the SQL allowlist (not the Origin
-        // header) is the real guard. No-ops until the binding is provisioned.
-        if (env.TURSO_RL) {
-          const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-          const { success } = await env.TURSO_RL.limit({ key: ip });
-          if (!success) return jsonError("Rate limit exceeded — slow down", 429);
-        }
-      }
-      if (pathname === "/api/chat") return await handleChat(request, env);
       if (pathname === "/api/updates/latest.json") return await handleUpdateLatest(request, env);
       if (pathname.startsWith("/api/updates/")) {
         if (request.method !== "GET" && request.method !== "HEAD") {
@@ -749,15 +210,12 @@ export default {
         }
         return await handleUpdateAsset(pathname.slice("/api/updates/".length), request, env);
       }
-      if (pathname === "/api/turso/health") return await handleTursoHealth(request, env);
-      if (pathname === "/api/turso/execute") return await handleTursoExecute(request, env);
-      if (pathname === "/api/turso/batch") return await handleTursoBatch(request, env);
       // Before the SPA fallback: this path is a Worker-rendered page, not a
       // client-side route.
       if (pathname === "/clinical/download" || pathname === "/clinical/download/") {
         return await handleDownloadPage(env);
       }
-      if (pathname.startsWith("/patient/") || pathname.startsWith("/clinical")) {
+      if (pathname.startsWith("/clinical")) {
         return await handleSpaFallback(request);
       }
       return jsonError("Not found", 404);

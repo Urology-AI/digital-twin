@@ -1,11 +1,9 @@
 /**
- * Best-effort PHI scrub applied to any free text before it leaves the browser
- * for the LLM proxy (which forwards to Google Gemini — see `src/lib/api.ts`).
+ * Best-effort PHI scrub for free text and for the "PHI removed" JSON export
+ * (see CaseLog).
  *
  * This is a safety net, NOT a compliance guarantee: regex de-identification
- * cannot reliably catch every name or identifier in prose. The real guard is
- * that AI parsing is off by default and the user is told, in plain terms, that
- * turning it on sends text to Google. Keep both.
+ * cannot reliably catch every name or identifier in prose.
  *
  * Clinical numbers the models actually need (PSA, age, grade group, PI-RADS,
  * mm/cc measurements, ADC ~4 digits) are all short or decimal, so the "6+ bare
