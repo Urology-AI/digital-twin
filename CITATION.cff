@@ -11,7 +11,7 @@ authors:
     affiliation: "Department of Urology, Icahn School of Medicine at Mount Sinai"
     email: "ash.tewari@mountsinai.org"
 repository-code: "https://github.com/Urology-AI/digital-twin"
-url: "https://urology-ai.github.io/digital-twin/"
+url: "https://digital-twin.urology.edu.eu.org/"
 abstract: >
   COMPASS is a preoperative decision-support platform that integrates clinical
   data with three imaging modalities (MRI, micro-ultrasound, PSMA PET/CT) plus

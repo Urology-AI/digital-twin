@@ -5,7 +5,7 @@
 **Date:** May 2026
 **Maintainers:** Department of Urology, Icahn School of Medicine at Mount Sinai
 **Repository:** https://github.com/Urology-AI/digital-twin
-**Web tool:** https://urology-ai.github.io/digital-twin/
+**Web tool:** https://digital-twin.urology.edu.eu.org/
 
 ---
 

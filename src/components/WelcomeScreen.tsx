@@ -5,7 +5,7 @@ import { useUiStore } from "@/store/uiStore";
 import { isDemoMode } from "@/lib/demoMode";
 import { isOfflineBuild } from "@/lib/offlineBuild";
 
-const APP_URL = "https://urology-ai.github.io/digital-twin/";
+const APP_URL = "https://digital-twin.urology.edu.eu.org/";
 
 /**
  * Mount Sinai brand mark — uses the official asset files in /public.
@@ -276,7 +276,7 @@ export function WelcomeScreen() {
               className="text-muted-foreground/80 underline-offset-2 hover:text-foreground hover:underline"
               style={{ fontSize: "clamp(0.625rem, 1.05vw, 0.6875rem)" }}
             >
-              {offline ? "Online version · " : "Scan to open · "}urology-ai.github.io/digital-twin
+              {offline ? "Online version · " : "Scan to open · "}digital-twin.urology.edu.eu.org
             </a>
           </div>
 

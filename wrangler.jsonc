@@ -1,0 +1,38 @@
+{
+  "$schema": "./cf-worker/node_modules/wrangler/config-schema.json",
+  // Deployed by Cloudflare Workers Builds (connected to this repo, main
+  // branch): build command `npm run build`, deploy command `npx wrangler
+  // deploy`, root directory `/`. The name must match the connected Worker.
+  "name": "digital-twin",
+  "main": "cf-worker/src/index.ts",
+  "compatibility_date": "2026-07-27",
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  // Workers Builds runs `npx wrangler preview` for every PR branch (Worker
+  // Previews); that command requires this block, even empty.
+  "previews": {},
+  // The web app is served from here as static assets. No patient data is
+  // handled by this Worker — no database, no share links, no AI proxy.
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    // Client-side routes (/clinical/...) get index.html.
+    "not_found_handling": "single-page-application",
+    // Only these reach cf-worker/src/index.ts; everything else is a static file.
+    //  - /api/*             — update feed (needs RELEASES_READ_PAT); other
+    //                         /api paths 404 instead of returning the SPA.
+    //  - /clinical/download — Worker-rendered desktop-app download page.
+    "run_worker_first": ["/api/*", "/clinical/download", "/clinical/download/"]
+  },
+  // The whole hostname. Cloudflare Access (if configured, scoped to
+  // /clinical*) authenticates at the edge before this Worker runs; root ("/")
+  // is the public demo.
+  "routes": [
+    { "pattern": "digital-twin.urology.edu.eu.org/*", "zone_name": "urology.edu.eu.org" }
+  ]
+  // Secrets — never put them here. Set with
+  //   npx wrangler secret put RELEASES_READ_PAT
+  // (read-only, fine-grained PAT for Urology-AI/digital-twin-releases).
+}

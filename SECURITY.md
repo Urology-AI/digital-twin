@@ -40,7 +40,7 @@ Include:
 In scope:
 
 - The React frontend (`src/`) and its build/deploy pipeline.
-- The Cloudflare Worker (`cf-worker/`): update feed and `/clinical` SPA fallback.
+- The Cloudflare Worker (`cf-worker/`): hosts the app (static assets) and the update feed.
 - Handling of clinical input JSON and `localStorage` persistence.
 
 Out of scope:

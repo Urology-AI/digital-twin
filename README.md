@@ -2,7 +2,7 @@
 
 A production-style React + TypeScript port of the COMPASS 3D decision-support viewer for preoperative surgical planning in prostate cancer. All models run in the browser; patient data loads from `src/data/patients.json` with optional `localStorage` persistence.
 
-**Web tool:** https://urology-ai.github.io/digital-twin/
+**Web tool:** https://digital-twin.urology.edu.eu.org/
 **Repository:** https://github.com/Urology-AI/digital-twin
 
 > ⚠️ **Research Use Only.** Not FDA cleared. IRB STUDY-14-00050 (Mount Sinai). Predictions are decision support, not a substitute for clinical judgment.

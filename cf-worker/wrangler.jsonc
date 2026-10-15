@@ -1,5 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  // The app is hosted by the `digital-twin` Worker (config at the repo root),
+  // which sits behind Cloudflare Access. This Worker keeps the update feed and
+  // download page OUTSIDE Access: the desktop app's updater cannot complete an
+  // Access login. It holds RELEASES_READ_PAT. Same code (src/index.ts).
+  // Deploy: `cd cf-worker && npx wrangler deploy`.
   "name": "compass-spa-fallback",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-27",
@@ -7,23 +12,9 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
-  // Narrow routes only. No patient data is handled by this Worker — no
-  // database, no share links, no AI proxy.
-  //  - /api/updates/* — update feed for the desktop app (holds
-  //                    RELEASES_READ_PAT, so the shipped app carries no
-  //                    credential of its own) and the web app's version check.
-  //  - /clinical/*   — SPA fallback for the clinical app (Access-gated —
-  //                    the ONLY Access application is scoped to this path).
-  // Root ("/") and anything else passes straight through untouched to
-  // this zone's normal DNS/origin (the plain proxied CNAME to GitHub
-  // Pages) as a genuinely public landing page — no Access application on
-  // it at all. The Worker never sees it, and has no business touching it.
+  // More specific than digital-twin's /* route, so these win.
   "routes": [
     { "pattern": "digital-twin.urology.edu.eu.org/api/updates/*", "zone_name": "urology.edu.eu.org" },
-    { "pattern": "digital-twin.urology.edu.eu.org/clinical", "zone_name": "urology.edu.eu.org" },
-    { "pattern": "digital-twin.urology.edu.eu.org/clinical/*", "zone_name": "urology.edu.eu.org" }
+    { "pattern": "digital-twin.urology.edu.eu.org/clinical/download*", "zone_name": "urology.edu.eu.org" }
   ]
-  // Secrets — never put them here. Set with `npx wrangler secret put <NAME>`:
-  //   RELEASES_READ_PAT             — /api/updates/* (read-only, fine-grained
-  //                                   PAT for Urology-AI/digital-twin-releases)
 }
