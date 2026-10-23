@@ -19,6 +19,10 @@ import { HealerBands } from "@/components/outcomes/HealerBands";
 import { FactorContributionTable } from "@/components/outcomes/FactorContributionTable";
 import { BiologicalAgeCard } from "@/components/outcomes/BiologicalAgeCard";
 import type { DietPattern } from "@/lib/compass/biologicalAge";
+import { bcrTier, type BcrHorizon } from "@/lib/models/vnext/bcrCox";
+import { BMI_BCR_HAZARD } from "@/lib/compass/planningEvidence";
+import { bmiAdjustedBcr } from "@/lib/compass/bcrBmiAdjusted";
+import { EvidenceInfo } from "@/components/EvidenceInfo";
 
 /** Approximate 90% CI on logit scale (SE ≈ 0.58 logit units, z = 1.64) */
 function computeCI(pct: number): { lo: number; hi: number } {
@@ -28,6 +32,32 @@ function computeCI(pct: number): { lo: number; hi: number } {
   const lo = 1 / (1 + Math.exp(-(L - 0.951)));
   const hi = 1 / (1 + Math.exp(-(L + 0.951)));
   return { lo: Math.round(Math.max(1, lo * 100)), hi: Math.round(Math.min(99, hi * 100)) };
+}
+
+/** 12 / 24 / 36-month BCR risks, coloured by the Cox tier cutoffs. */
+function BcrHorizonRow({ values }: { values: number[] }) {
+  const horizons: BcrHorizon[] = [12, 24, 36];
+  return (
+    <div className="grid grid-cols-3 gap-2 text-center">
+      {horizons.map((h, i) => {
+        const v = values[i] ?? NaN;
+        const tier = Number.isFinite(v) ? bcrTier(h, v) : null;
+        return (
+          <div key={h}>
+            <div className={cn(
+              "text-2xl font-bold tabular-nums",
+              !tier ? "text-muted-foreground/50"
+              : tier.index === 1 ? "text-emerald-500"
+              : tier.index === 2 ? "text-amber-500" : "text-red-500",
+            )}>
+              {tier ? `${(v * 100).toFixed(1)}%` : "N/A"}
+            </div>
+            <div className="text-xs text-muted-foreground">{h} mo{tier ? ` · ${tier.label}` : ""}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 // ── Recovery trajectory expand modal ────────────────────────────────────────────
@@ -440,6 +470,28 @@ export function FunctionalOutcomesPanel() {
         </Card>
       </div>
 
+
+      {/* Literature BMI overlay on the Cox risk; the unadjusted model numbers stay on Predictions */}
+      {S.bmi > 0 && Number.isFinite(predictions.bcr36) && (
+        <Card className="relative overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-amber-500 to-primary" />
+          <CardContent className="p-4">
+            <div className="mb-2 flex items-center justify-center gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                BCR risk · BMI-adjusted (literature)
+              </span>
+              <EvidenceInfo title="BMI-adjusted BCR" entries={[BMI_BCR_HAZARD]} />
+            </div>
+            <BcrHorizonRow
+              values={[predictions.bcr12, predictions.bcr24, predictions.bcr36].map((v) => bmiAdjustedBcr(v, S.bmi))}
+            />
+            <p className="mt-2 text-center text-[10px] leading-tight text-muted-foreground/70">
+              BMI {S.bmi} vs reference {BMI_BCR_HAZARD.value.referenceBmi} · HR {BMI_BCR_HAZARD.value.rrPer5} per 5 kg/m²
+              (Cao &amp; Ma 2011) · not a validated model
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Erectile-recovery phenotype */}
       {result.healerTier && result.healerBands && (

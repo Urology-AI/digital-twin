@@ -186,7 +186,7 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
       "Body mass index, prostate cancer-specific mortality, and biochemical recurrence: a systematic review and meta-analysis.",
     source: "Cancer Prev Res (Phila). 2011;4(4):486-501.",
     group: "external",
-    usedFor: ["Obesity → BCR risk"],
+    usedFor: ["Obesity → BCR risk", "BMI → BCR hazard (per 5 kg/m²)"],
     verified: true,
   },
   {
