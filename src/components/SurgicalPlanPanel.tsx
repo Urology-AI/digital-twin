@@ -643,23 +643,13 @@ export function SurgicalPlanPanel() {
               withPlan={withPlan.continence12 / 100}
               accent="bg-violet-500/80"
             />
-            {baseline.potency12 != null && withPlan.potency12 != null ? (
-              <ImpactTile
-                label="Potency"
-                sub="at 12 months · SHIM ≥ 12"
-                baseline={baseline.potency12 / 100}
-                withPlan={withPlan.potency12 / 100}
-                accent="bg-blue-500/80"
-              />
-            ) : (
-              <div className="rounded-lg border border-border p-3.5">
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Potency
-                </div>
-                <div className="mt-1 text-2xl font-semibold text-muted-foreground/50">N/A</div>
-                <div className="mt-1 text-[10px] text-muted-foreground">SHIM &lt; 12 at baseline</div>
-              </div>
-            )}
+            <ImpactTile
+              label="Potency"
+              sub={baseline.lowShimModel ? "at 12 months · SHIM < 12 model, low confidence" : "at 12 months · SHIM ≥ 12"}
+              baseline={baseline.potency12 / 100}
+              withPlan={withPlan.potency12 / 100}
+              accent="bg-blue-500/80"
+            />
             {Number.isFinite(predictions.bcr36) && (
               <>
               <ImpactTile

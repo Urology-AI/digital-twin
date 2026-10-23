@@ -68,9 +68,9 @@ export function PlanSummaryStrip({
       <Tile label="Apex" value={apex} tone={STEP_TONE[apex]} />
       <Tile
         label="Recovery reserve"
-        value={reserve.available && reserve.tier ? reserve.tier : "N/A"}
-        tone={reserve.available && reserve.tier ? RESERVE_TONE[reserve.tier] : "muted"}
-        sub={reserve.available ? "Baseline capacity" : "SHIM < 12"}
+        value={reserve.tier}
+        tone={RESERVE_TONE[reserve.tier]}
+        sub={reserve.lowShimModel ? "SHIM < 12 model" : "Baseline capacity"}
       />
     </div>
   );

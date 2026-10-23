@@ -154,9 +154,9 @@ export function OverviewPanel({ tab }: { tab: DesktopTab }) {
     ) : tab === "outcomes" ? (
       <>
         <Row label="Potency at 12 months"
-             value={fn.shimValid ? `${fn.potency12}%` : "n/a"}
-             tone={fn.shimValid ? (fn.potency12! >= 70 ? "good" : fn.potency12! >= 40 ? "warn" : "bad") : undefined}
-             note={fn.shimValid ? "SHIM ≥ 12 at baseline" : "baseline SHIM < 12 — not modelled"} />
+             value={`${fn.potency12}%`}
+             tone={fn.potency12 >= 70 ? "good" : fn.potency12 >= 40 ? "warn" : "bad"}
+             note={fn.lowShimModel ? "baseline SHIM < 12 — separate model, low confidence" : "SHIM ≥ 12 at baseline"} />
         <Row label="Continence at 12 months" value={`${fn.continence12}%`}
              tone={fn.continence12 >= 90 ? "good" : fn.continence12 >= 75 ? "warn" : "bad"}
              note="0–1 pad" />

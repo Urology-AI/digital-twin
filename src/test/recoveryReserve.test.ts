@@ -15,20 +15,20 @@ const reserveOf = (over: Record<string, unknown>, ageShim = { age: 60, shim: 24 
 };
 
 describe("PIPS-R recovery reserve", () => {
-  it("is available with a probability and tier when baseline SHIM >= 12", () => {
+  it("has a probability and tier when baseline SHIM >= 12", () => {
     const r = reserveOf({});
-    expect(r.available).toBe(true);
+    expect(r.lowShimModel).toBe(false);
     expect(r.probability).toBeGreaterThan(0);
     expect(r.probability).toBeLessThanOrEqual(1);
     expect(r.tier).not.toBeNull();
   });
 
-  it("is not estimated when baseline SHIM < 12", () => {
+  it("comes from the low-SHIM model when baseline SHIM < 12", () => {
     const r = reserveOf({}, { age: 60, shim: 8 });
-    expect(r.available).toBe(false);
-    expect(r.probability).toBeNull();
-    expect(r.tier).toBeNull();
-    expect(r.drivers).toEqual([]);
+    expect(r.lowShimModel).toBe(true);
+    expect(r.probability).toBeLessThan(reserveOf({}).probability);
+    expect(r.tier).toBe("poor");
+    expect(r.drivers.map((d) => d.label)).toContain("Baseline erectile function");
   });
 
   it("falls with age, lower baseline SHIM, diabetes, and current smoking", () => {

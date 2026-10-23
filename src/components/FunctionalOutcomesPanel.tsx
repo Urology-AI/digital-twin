@@ -61,12 +61,12 @@ function BcrHorizonRow({ values }: { values: number[] }) {
 }
 
 // ── Recovery trajectory expand modal ────────────────────────────────────────────
-function RecoveryChartModal({ open, onClose, potency, continence, shimValid }: {
+function RecoveryChartModal({ open, onClose, potency, continence, lowShimModel }: {
   open: boolean;
   onClose: () => void;
   potency: (number | null)[];
   continence: (number | null)[];
-  shimValid: boolean;
+  lowShimModel: boolean;
 }) {
   if (!open) return null;
   return (
@@ -80,12 +80,10 @@ function RecoveryChartModal({ open, onClose, potency, continence, shimValid }: {
           <div className="flex items-center gap-3">
             <h2 className="text-base font-semibold">Recovery Trajectories</h2>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              {shimValid && (
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-4 rounded-full bg-blue-500 inline-block" />
-                  Potency
-                </span>
-              )}
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-4 rounded-full bg-blue-500 inline-block" />
+                Potency{lowShimModel && " (SHIM < 12 model, low confidence)"}
+              </span>
               <span className="flex items-center gap-1.5">
                 <span className="h-2 w-4 rounded-full bg-violet-500 inline-block" />
                 Continence
@@ -226,7 +224,7 @@ function InfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
                   ["Age 65–70", "×0.85–0.95", "×0.95"],
                   ["SHIM 21–25 (required)", "×1.0", "—"],
                   ["SHIM 12–16", "×0.85–0.92", "—"],
-                  ["SHIM < 12", "N/A (not shown)", "—"],
+                  ["SHIM < 12", "Separate model (Alenizi 2016)", "—"],
                   ["Daily PDE5i", "+8 pp", "—"],
                   ["Intensive PFMT", "+6 pp", "+10 pp"],
                   ["Active exercise", "+4 pp", "+3 pp"],
@@ -376,9 +374,9 @@ export function FunctionalOutcomesPanel() {
       <RecoveryChartModal
         open={chartExpanded}
         onClose={() => setChartExpanded(false)}
-        potency={result.shimValid ? result.potencyTimeline : result.potencyTimeline.map(() => null)}
+        potency={result.potencyTimeline}
         continence={result.continenceTimeline}
-        shimValid={result.shimValid}
+        lowShimModel={result.lowShimModel}
       />
 
       {/* NS Grade selectors */}
@@ -423,20 +421,13 @@ export function FunctionalOutcomesPanel() {
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
               Potency at 12 mo
             </div>
-            {result.shimValid ? (
-              <>
-                <div className="text-5xl font-bold text-blue-500">{result.potency12}%</div>
-                <div className="text-xs text-muted-foreground mt-0.5">SHIM ≥12</div>
-                {(() => { const ci = computeCI(result.potency12 ?? 0); return (
-                  <div className="text-[10px] leading-tight text-muted-foreground/60 mt-0.5">{ci.lo}–{ci.hi}%</div>
-                ); })()}
-              </>
-            ) : (
-              <>
-                <div className="text-3xl font-bold text-muted-foreground/50">N/A</div>
-                <div className="text-xs text-muted-foreground mt-0.5">SHIM &lt; 12</div>
-              </>
-            )}
+            <div className="text-5xl font-bold text-blue-500">{result.potency12}%</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {result.lowShimModel ? "SHIM < 12 model · low confidence" : "SHIM ≥12"}
+            </div>
+            {(() => { const ci = computeCI(result.potency12); return (
+              <div className="text-[10px] leading-tight text-muted-foreground/60 mt-0.5">{ci.lo}–{ci.hi}%</div>
+            ); })()}
             {/* Delta badge */}
             <div className={cn(
               "absolute right-3 top-4 rounded-full px-2 py-0.5 text-xs font-bold",
@@ -510,12 +501,10 @@ export function FunctionalOutcomesPanel() {
               >i</button>
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              {result.shimValid && (
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-4 rounded-full bg-blue-500 inline-block" />
-                  Potency
-                </span>
-              )}
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-4 rounded-full bg-blue-500 inline-block" />
+                Potency{result.lowShimModel && " (SHIM < 12 model)"}
+              </span>
               <span className="flex items-center gap-1.5">
                 <span className="h-2 w-4 rounded-full bg-violet-500 inline-block" />
                 Continence
@@ -533,7 +522,7 @@ export function FunctionalOutcomesPanel() {
         </CardHeader>
         <CardContent className="pt-0 pb-3">
           <RecoveryLineChart
-            potency={result.shimValid ? result.potencyTimeline : result.potencyTimeline.map(() => null)}
+            potency={result.potencyTimeline}
             continence={result.continenceTimeline}
           />
         </CardContent>

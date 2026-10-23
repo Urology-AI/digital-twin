@@ -154,25 +154,21 @@ export function buildPlanningHtml(S: ClinicalState, predictions: CompassPredicti
   )}${stepCard("Apex / anastomosis", ap)}</div>`;
 
   // ── Outcomes ─────────────────────────────────────────────────────────────
-  const row = (label: string, a: number | null, b: number | null, invert = false) =>
-    a == null || b == null
-      ? `<tr><th>${label}</th><td colspan="3" class="muted">Not estimated (baseline SHIM below 12)</td></tr>`
-      : `<tr><th>${label}</th><td>${pct(a)}</td><td>${pct(b)}</td><td>${delta(a, b, invert)}</td></tr>`;
+  const row = (label: string, a: number, b: number, invert = false) =>
+    `<tr><th>${label}</th><td>${pct(a)}</td><td>${pct(b)}</td><td>${delta(a, b, invert)}</td></tr>`;
   const hb = (t: string | null) => (t ? HEALER[t] ?? t : "—");
   const outcomesHtml = `<table class="grid">
     <thead><tr><th></th><th>Model-recommended</th><th>Planned</th><th>Change</th></tr></thead>
     <tbody>
       ${row("Continence, 12 mo (0–1 pad)", baseline.continence12 / 100, withPlan.continence12 / 100)}
-      ${row("Potency, 12 mo (SHIM ≥ 12)", baseline.potency12 == null ? null : baseline.potency12 / 100, withPlan.potency12 == null ? null : withPlan.potency12 / 100)}
+      ${row(baseline.lowShimModel ? "Potency, 12 mo (SHIM < 12 model, low confidence)" : "Potency, 12 mo (SHIM ≥ 12)", baseline.potency12 / 100, withPlan.potency12 / 100)}
       ${Number.isFinite(predictions.bcr36) ? row("BCR, 1 year", bcr.baseline.y1, bcr.withPlan.y1, true) + row("BCR, 2–3 years", bcr.baseline.y23, bcr.withPlan.y23, true) : ""}
       <tr><th>Erectile-recovery phenotype</th><td>${hb(baseline.healerTier)}</td><td>${hb(withPlan.healerTier)}</td><td></td></tr>
     </tbody></table>
-    <p class="note">${
-      reserve.available && reserve.tier
-        ? `<b>Recovery reserve (PIPS-R):</b> ${esc(cap(reserve.tier))}. Baseline capacity to recover, independent of the planned operation.${
-            reserve.notModelled.length ? ` Not modelled: ${esc(reserve.notModelled.join("; ").toLowerCase())}.` : ""
-          }`
-        : `<b>Recovery reserve (PIPS-R):</b> not estimated (baseline SHIM below 12).`
+    <p class="note"><b>Recovery reserve (PIPS-R):</b> ${esc(cap(reserve.tier))}. Baseline capacity to recover, independent of the planned operation.${
+      reserve.lowShimModel ? " From the SHIM < 12 model, low confidence." : ""
+    }${
+      reserve.notModelled.length ? ` Not modelled: ${esc(reserve.notModelled.join("; ").toLowerCase())}.` : ""
     }</p>
     ${counseling.uncertainty.length ? `<p class="note"><b>Key uncertainty:</b> ${counseling.uncertainty.map(esc).join("; ")}.</p>` : ""}`;
 
