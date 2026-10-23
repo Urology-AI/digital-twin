@@ -241,6 +241,12 @@
     "bmi_ge_30": 0.03,
     "bmi_ge_35": 0.06
   },
+  "bmi_bcr_hazard": {
+    "source": "literature",
+    "citation": "Cao & Ma 2011 meta-analysis: RR 1.21 per +5 kg/m² BMI, applied as a hazard ratio to the preop Cox BCR risk vs an assumed cohort-average BMI of 27",
+    "rr_per_5_kg_m2": 1.21,
+    "reference_bmi": 27
+  },
   "modifiable_factor_deltas_pp": {
     "_note": "Per-factor grounding for the MF table in src/lib/compass/functionalOutcomes.ts. Values mirror the runtime table; the TypeScript is the source of truth and src/test/surgicalPlanning.test.ts fails if the two drift.",
     "age_and_shim": {

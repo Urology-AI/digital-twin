@@ -572,6 +572,16 @@ export const MODIFIABLE_BCR = ev(
     "shown as a caveated estimate only.",
 );
 
+export const BMI_BCR_HAZARD = ev(
+  { rrPer5: 1.21, referenceBmi: 27 },
+  "literature",
+  "BMI → BCR hazard (per 5 kg/m²)",
+  "Each +5 kg/m² BMI raises BCR risk by RR 1.21 (95% CI 1.11–1.31; 16 studies, " +
+    "26,479 men; Cao Y & Ma J, Cancer Prev Res 2011). Applied as a hazard ratio " +
+    "to the preop Cox risk, relative to an assumed cohort-average BMI of 27 " +
+    "(the Cox model has no BMI term). Literature overlay, not a validated model.",
+);
+
 /* ================================================================== */
 /* Biological age — modifiable-factor burden expressed in years        */
 /* ================================================================== */
