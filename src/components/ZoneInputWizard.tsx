@@ -923,12 +923,12 @@ export function ZoneInputWizard() {
         <button
           type="button"
           onClick={() => setShowNoteImport(true)}
-          title="Paste clinic note"
+          title="Paste full case"
           className="flex shrink-0 items-center gap-1.5 border-l border-border px-3 text-xs font-bold text-primary transition-colors hover:bg-primary/10"
         >
           <span aria-hidden>↑</span>
-          <span className="hidden lg:inline">Paste note</span>
-          <span className="sr-only">Paste clinic note</span>
+          <span className="hidden lg:inline">Paste full case</span>
+          <span className="sr-only">Paste full case</span>
         </button>
       </div>
 

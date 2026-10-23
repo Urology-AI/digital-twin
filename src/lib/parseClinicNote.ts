@@ -244,7 +244,8 @@ function parseBiopsyLines(lines: string[], warnings: string[]): LesionRow[] {
     }
     // Warn for lines that had content but produced no rows
     const trimmed = line.trim();
-    if (result.length === before && trimmed.length >= 6) {
+    // A bare "3/12 cores" count is read by the case-field pass, not here.
+    if (result.length === before && trimmed.length >= 6 && !/^\d+\s*(?:\/|of)\s*\d+\s*(?:positive\s+)?cores?\b/i.test(trimmed)) {
       warnings.push(`Biopsy: no Gleason score found — line skipped: "${truncate(trimmed)}"`);
     }
   }
