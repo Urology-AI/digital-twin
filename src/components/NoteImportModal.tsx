@@ -108,7 +108,8 @@ const SCORE_PH: Partial<Record<LesionSource, string>> = {
   MRI: "PI-RADS", MUS: "PRI-MUS", PSMA: "SUV", Bx: "GG",
 };
 
-const EXAMPLE_NOTE = `Biopsy
+const EXAMPLE_NOTE = `Age 64, PSA 7.8, BMI 27.5, SHIM 21, IPSS 9, Decipher 0.45
+Biopsy 3/12 cores
 Gleason 7 (4+3) 5% Right PL PZ
 Gleason 6 (3+3) 5% Left
 Gleason 6 (3+3) 50% midline
@@ -171,16 +172,16 @@ export function NoteImportModal({ onClose, onApply }: Props) {
       const sheet = parseSafeSheet(noteText);
       setPhi(sheet.phi);
       const parsed = sheet.note;
-      if (parsed.lesions.length === 0 && !parsed.prostateVolumeCc && parsed.biopsyGG === undefined) {
-        setParseError("No recognizable data found. Make sure your note has section headers: Biopsy, MRI, MUS, PSMA.");
+      // Per-side biopsy results (no location on the sheet) replace the note
+      // parser's invented Bx rows — see SheetImportPatch.dropBxRows.
+      const patch = sheetImportPatch(sheet);
+      if (parsed.lesions.length === 0 && Object.keys(patch.clinical).length === 0) {
+        setParseError("No recognizable data found. Put patient details (Age, PSA…) on any line and findings under section headers: Biopsy, MRI, MUS, PSMA.");
         return;
       }
       const noteWarnings = [...(sheet.warnings ?? [])];
       noteWarnings.push("Parsed in your browser — the note text was not sent anywhere. Anything the parser could not find is left blank for you to fill in.");
 
-      // Per-side biopsy results (no location on the sheet) replace the note
-      // parser's invented Bx rows — see SheetImportPatch.dropBxRows.
-      const patch = sheetImportPatch(sheet);
       setSheetPatch(patch);
       setEntries(collapseToReviewEntries(patch.dropBxRows ? sheet.lesions.filter((l) => l.source !== "Bx") : sheet.lesions));
       // Row-scoped safe-sheet fields win over the free-text parser: the row
@@ -236,7 +237,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
       >
         {/* Title bar */}
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3">
-          <h2 className="text-base font-semibold text-foreground">Import from clinical note</h2>
+          <h2 className="text-base font-semibold text-foreground">Paste full case</h2>
           <button onClick={onClose} className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground">✕</button>
         </div>
 
@@ -280,6 +281,10 @@ export function NoteImportModal({ onClose, onApply }: Props) {
               {/* Two rules, stated once — then show, don't tell. */}
               <ul className="space-y-1.5 text-sm text-muted-foreground">
                 <li className="flex gap-2">
+                  <span aria-hidden className="text-primary">•</span>
+                  <span>Patient details — age, PSA, BMI, SHIM, IPSS, Decipher — can go on any line.</span>
+                </li>
+                <li className="flex gap-2">
                   <span aria-hidden className="text-primary">1.</span>
                   <span>Start each section with its header on its own line — <span className="font-mono font-semibold text-foreground">Biopsy</span>, <span className="font-mono font-semibold text-foreground">MRI</span>, <span className="font-mono font-semibold text-foreground">MUS</span>, <span className="font-mono font-semibold text-foreground">PSMA</span>.</span>
                 </li>
@@ -298,10 +303,11 @@ export function NoteImportModal({ onClose, onApply }: Props) {
                 <p className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">Words the parser recognises</p>
                 <dl className="divide-y divide-border/60 rounded-lg border border-border bg-muted/10 text-xs">
                   {[
+                    { term: "Patient", vals: ["Age 64 / 64 yo", "PSA 7.8", "BMI", "SHIM", "IPSS", "Decipher 0.45", "3/12 cores"], mono: true },
                     { term: "Sections", vals: ["Biopsy", "MRI", "MUS", "PSMA"], mono: true },
                     { term: "Zones", vals: ["PL PZ (posterolateral)", "PZ (posterior)", "TZ (anterior)", "CZ (medial)"], mono: false },
                     { term: "Levels", vals: ["base", "mid", "apex", "base to apex"], mono: false },
-                    { term: "Scores", vals: ["Gleason X (a+b) %", "PIRADS 1–5", "PRIMUS 1–5", "SUV (any)"], mono: true },
+                    { term: "Scores", vals: ["Gleason a+b %", "PI-RADS 1–5", "PRIMUS 1–5", "SUV (any)"], mono: true },
                   ].map(({ term, vals, mono }) => (
                     <div key={term} className="flex flex-col gap-1 px-3 py-2 sm:flex-row sm:gap-4">
                       <dt className="shrink-0 font-semibold text-muted-foreground sm:w-20">{term}</dt>
@@ -333,7 +339,7 @@ export function NoteImportModal({ onClose, onApply }: Props) {
         {step === "paste" && (
           <>
             <div className="flex-1 overflow-y-auto px-5 py-4">
-              <p className="mb-2 text-sm text-muted-foreground">Paste a clinic note or a pre-operative safe sheet. Names, MRN and dates are removed in your browser before anything is parsed.</p>
+              <p className="mb-2 text-sm text-muted-foreground">Paste the whole case — patient details, MRI, biopsy, PSMA — as a clinic note or a pre-operative safe sheet. Names, MRN and dates are removed in your browser before anything is parsed.</p>
               <p className="mb-3 rounded-md border border-emerald-500/30 bg-emerald-500/5 px-2.5 py-1.5 text-xs text-emerald-600">
                 Offline parsing — note text stays in your browser. Nothing is sent out.
               </p>
@@ -473,7 +479,9 @@ export function NoteImportModal({ onClose, onApply }: Props) {
               <Button variant="ghost" size="sm" onClick={() => setStep("paste")}>← Back</Button>
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-                <Button size="sm" disabled={entries.length === 0} onClick={() => setStep("fix")}>Fix entries →</Button>
+                {entries.length === 0 && Object.keys(clinical).length > 0
+                  ? <Button size="sm" onClick={handleApply}>Apply patient details</Button>
+                  : <Button size="sm" disabled={entries.length === 0} onClick={() => setStep("fix")}>Fix entries →</Button>}
               </div>
             </div>
           </>
