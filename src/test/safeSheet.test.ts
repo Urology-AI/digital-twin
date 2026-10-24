@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseSafeSheet, parseSheetFields, sheetToNote, stripSheetPhi } from "@/lib/safeSheet";
+import { parseSafeSheet, parseSheetFields, sheetImportPatch, sheetToNote, stripSheetPhi } from "@/lib/safeSheet";
 
 /** The real pre-operative safe sheet layout, as pasted out of Word. */
 const SHEET = `Patient\tBMI: 29.1\tSMITH, JOHN  64\tMRN 4471829\tDOB 03/14/1961\tDATE OF SURGERY 02/02/2025
@@ -225,5 +225,46 @@ describe("extension findings", () => {
   });
   it("does not invent a left-sided finding", () => {
     expect(rows.every((x) => x.startsWith("R/"))).toBe(true);
+  });
+});
+
+describe("full case pasted as free text", () => {
+  // Invented values only.
+  const CASE = `58 yo man, PSA: 6.2, BMI 26.4, SHIM 22, IPSS 7, Decipher 0.38
+MRI 39cc PI-RADS 4 left PZ mid 11mm abuts capsule no EPE
+Biopsy 3/12 cores
+Gleason score 3+4=7 30% left mid PL
+Gleason 3+3 10% right base`;
+  const r = parseSafeSheet(CASE);
+  const p = sheetImportPatch(r);
+
+  it("reads patient details from unlabelled free text", () => {
+    expect(p.clinical).toMatchObject({ age: 58, psa: 6.2, bmi: 26.4, shim: 22, ipss: 7, decipher: "0.38", vol: 39, cores: 3 });
+  });
+
+  it("reads PI-RADS and Gleason a+b findings", () => {
+    const rows = r.lesions.map((l) => `${l.source}/${l.side}/${l.level}/${l.score}`);
+    expect(rows).toContain("MRI/L/Mid/4");
+    expect(rows).toContain("Bx/L/Mid/2");
+    expect(rows).toContain("Bx/R/Base/1");
+    expect(p.clinical.gg).toBe(2);
+  });
+
+  it("does not warn about the bare cores count", () => {
+    expect(r.warnings.some((w) => w.includes("3/12"))).toBe(false);
+  });
+
+  it("accepts the other common age spellings", () => {
+    expect(parseSheetFields("Age: 71").age).toBe(71);
+    expect(parseSheetFields("a 66-year-old man").age).toBe(66);
+  });
+
+  it("does not read PSA density or PSMA as PSA", () => {
+    expect(parseSheetFields("PSA density 0.15").psa).toBeUndefined();
+    expect(parseSheetFields("PSMA SUV 9.1").psa).toBeUndefined();
+  });
+
+  it("does not read a fraction without 'cores' as a core count", () => {
+    expect(parseSheetFields("ratio 3/12").positiveCores).toBeUndefined();
   });
 });

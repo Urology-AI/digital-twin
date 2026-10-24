@@ -139,6 +139,8 @@ export function stripSheetPhi(input: string): SheetPhiResult {
 
 export interface SheetFields {
   age?: number;
+  /** Decipher genomic classifier score, 0–1. */
+  decipher?: number;
   /**
    * Nerve-sparing grade the surgeon expected, per side — the `Left: 2` /
    * `Right: 3` cells on the PSA row. Kept separate from the model's predicted
@@ -246,6 +248,43 @@ export function parseSheetFields(text: string): SheetFields {
       if (v !== undefined) (out as Record<string, number>)[key] = v;
     }
   }
+  Object.assign(out, freeTextFields(text, out));
+  return out;
+}
+
+/**
+ * A whole case pasted as free text ("65 yo, PSA: 7.8, Decipher 0.45, 4/12
+ * cores") has no row labels to scope its values, so each one is matched only
+ * with its own keyword or unit beside it. Fills fields the sheet pass left
+ * empty; never overrides it.
+ */
+function freeTextFields(text: string, have: SheetFields): SheetFields {
+  const out: SheetFields = {};
+  if (have.psa === undefined) {
+    // "PSA 7.8", "PSA: 7.8", "PSA of 7.8" — not "PSA density" or PSAD.
+    const m = new RegExp(String.raw`\bPSA\b(?!\s*density)[ \t]*(?:level|value|of|was|is)?[ \t]*[:=]?[ \t]*${NUM}`, "i").exec(text);
+    if (m?.[1]) out.psa = parseFloat(m[1]);
+  }
+  if (have.age === undefined) {
+    const m =
+      /\bage[ \t]*[:=]?[ \t]*(\d{2,3})\b/i.exec(text) ??
+      /\b(\d{2,3})[ \t-]*(?:yo|y\/o|y\.o\.|years?[ \t-]*old|yrs?[ \t-]*old|year-old)\b/i.exec(text);
+    const age = m?.[1] ? parseInt(m[1], 10) : NaN;
+    if (age >= 18 && age <= 110) out.age = age;
+  }
+  if (have.decipher === undefined) {
+    const m = /\bdecipher\b[ \t]*(?:score)?[ \t]*[:=]?[ \t]*(0?\.\d+|[01](?:\.\d+)?)(?![\d.])/i.exec(text);
+    if (m?.[1]) out.decipher = parseFloat(m[1]);
+  }
+  if (have.positiveCores === undefined) {
+    // "4/12 cores", "4 of 12 cores positive" — the word "core" is required so
+    // a bare fraction elsewhere is never read as a biopsy count.
+    const m = /(?<![\d./])(\d{1,2})\s*(?:\/|of)\s*(\d{1,3})\s*(?:positive\s+)?cores?\b/i.exec(text);
+    if (m?.[1] && m[2] && parseInt(m[1], 10) <= parseInt(m[2], 10)) {
+      out.positiveCores = parseInt(m[1], 10);
+      out.totalCores = parseInt(m[2], 10);
+    }
+  }
   return out;
 }
 
@@ -278,7 +317,7 @@ function normalizeScoreWords(line: string): string {
       // The sheet writes "Gleason 4+3"; parseClinicNote matches
       // "Gleason <sum> (<major>+<minor>)". Add the sum rather than loosen that
       // regex, which also guards against a bare "4+3" elsewhere in a sentence.
-      .replace(/\bGleason\s*(\d)\s*\+\s*(\d)\b(?!\s*\))/gi, (_m, a: string, b: string) =>
+      .replace(/\bGleason(?:\s+score)?\s*(\d)\s*\+\s*(\d)(?:\s*=\s*\d+)?\b(?!\s*\))/gi, (_m, a: string, b: string) =>
         `Gleason ${Number(a) + Number(b)} (${a}+${b})`)
       // Zone words are matched as abbreviations ("PL"), not spelled out.
       .replace(/\bpostero[- ]?lateral\b/gi, "PL")
@@ -506,7 +545,10 @@ function dedupeLesions(rows: LesionRow[]): LesionRow[] {
 export function parseSafeSheet(input: string): SafeSheetResult {
   const phi = stripSheetPhi(input);
   const fields = parseSheetFields(phi.text);
-  const note = parseClinicNote(sheetToNote(phi.text));
+  const sheetNote = sheetToNote(phi.text);
+  // A free-text paste comes back unchanged, but still needs the score
+  // spellings ("PI-RADS 4", "Gleason 3+4") the note parser expects.
+  const note = parseClinicNote(sheetNote === phi.text ? normalizeScoreWords(phi.text) : sheetNote);
   const warnings = [...note.warnings];
 
   if (fields.prostateVolumeCc === undefined && note.prostateVolumeCc === undefined) {
@@ -522,6 +564,7 @@ export interface SheetImportPatch {
   clinical: {
     vol?: number; gg?: number; cores?: number; maxcore?: number;
     age?: number; psa?: number; bmi?: number; shim?: number; ipss?: number;
+    decipher?: string;
   };
   /**
    * Extra `updateClinicalForm` fields: per-side biopsy, laterality, history
@@ -553,6 +596,7 @@ export function sheetImportPatch(sheet: SafeSheetResult): SheetImportPatch {
     bmi: fields.bmi,
     shim: fields.shim ?? note.shim,
     ipss: fields.ipss,
+    decipher: fields.decipher === undefined ? undefined : String(fields.decipher),
   };
   const form: Record<string, unknown> = { ...extras.history };
   const { left, right } = extras.biopsy;
