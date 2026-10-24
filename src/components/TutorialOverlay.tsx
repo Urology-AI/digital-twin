@@ -42,7 +42,7 @@ const STEPS: Step[] = [
   {
     icon: ClipboardList,
     title: "Enter Clinical Data",
-    body: "Start with the required fields: PSA, prostate volume, biopsy grade group (1–5), number of positive cores, and maximum core involvement (%). PSAD calculates automatically. Add Decipher score, SHIM, and IPSS when available.",
+    body: "Start with the required fields: PSA, prostate volume, biopsy grade group (1–5), number of positive cores, and maximum core involvement (%). PSAD calculates automatically. Add SHIM and IPSS when available.",
     hint: "Fill in the Demographics & Labs form shown here.",
     target: "clinical-form",
   },

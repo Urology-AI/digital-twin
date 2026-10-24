@@ -85,7 +85,7 @@ export function CaseSummary() {
             isHighRisk ? "bg-red-500/15 text-red-600 dark:text-red-400" : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
           )}
         >
-          {isHighRisk ? "NCCN high risk" : "Non-high risk"}
+          {isHighRisk ? "NCCN high risk" : "Not NCCN high risk"}
         </span>
       </div>
 

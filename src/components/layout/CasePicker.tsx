@@ -12,12 +12,12 @@ import { DEMO_CASES } from "@/data/demoCases";
 const DEMO_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Q", "W", "E", "R", "T", "Y"];
 import { cn } from "@/lib/utils";
 
-/** Compact risk label from the current predictions, for the trigger chip. */
+/** Compact ECE/SVI risk label from the current predictions, for the trigger chip. */
 function riskChip(ece: number | undefined, svi: number | undefined) {
   const top = Math.max(ece ?? 0, svi ?? 0);
-  if (top >= 0.3) return { label: "High risk", cls: "bg-red-500/15 text-red-500" };
-  if (top >= 0.12) return { label: "Intermediate", cls: "bg-amber-500/15 text-amber-500" };
-  return { label: "Low risk", cls: "bg-emerald-500/15 text-emerald-500" };
+  if (top >= 0.3) return { label: "High ECE/SVI", cls: "bg-red-500/15 text-red-500" };
+  if (top >= 0.12) return { label: "Mid ECE/SVI", cls: "bg-amber-500/15 text-amber-500" };
+  return { label: "Low ECE/SVI", cls: "bg-emerald-500/15 text-emerald-500" };
 }
 
 function caseSubtitle(record: Parameters<typeof clinicalStateFromRecord>[0]) {

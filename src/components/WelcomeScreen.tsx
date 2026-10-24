@@ -45,7 +45,7 @@ const FEATURES = [
   {
     Icon: Layers,
     title: "Multi-Modal Imaging",
-    body: "Combines MRI, micro-ultrasound, and PSMA PET findings with the optional Decipher genomic classifier.",
+    body: "Combines biopsy, MRI, micro-ultrasound, and PSMA PET findings.",
   },
 ] as const;
 
