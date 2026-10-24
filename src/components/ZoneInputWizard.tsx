@@ -583,7 +583,6 @@ export function ZoneInputWizard() {
   const [age,      setAge]      = useState("");
   const [psa,      setPsa]      = useState("");
   const [vol,      setVol]      = useState("");
-  const [decipher, setDecipher] = useState("");
   const [shim,     setShim]     = useState("");
   const [ipss,     setIpss]     = useState("");
   // Height/weight kept in the user-facing unit; canonical (cm, kg) values are
@@ -604,7 +603,6 @@ export function ZoneInputWizard() {
     setPsa(rec.patient.psa != null && rec.patient.psa > 0 ? String(rec.patient.psa) : "");
     setVol(rec.prostate.volume_cc != null && rec.prostate.volume_cc > 0 ? String(rec.prostate.volume_cc) : "");
     setZoneData(rowsToZoneData(entry.lesionRows));
-    setDecipher(rec.biopsy.decipher_score !== null && rec.biopsy.decipher_score !== undefined ? String(rec.biopsy.decipher_score) : "");
     setShim(String(rec.patient.shim ?? ""));
     setIpss(String(rec.patient.ipss ?? ""));
   }, [entry?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -672,7 +670,6 @@ export function ZoneInputWizard() {
   const handleAgeChange      = (v: string) => { setAge(v);      updateClinicalForm({ age: parseInt(v) || undefined }); };
   const handlePsaChange      = (v: string) => { setPsa(v);      updateClinicalForm({ psa: parseFloat(v) || 0 }); };
   const handleVolChange      = (v: string) => { setVol(v);      updateClinicalForm({ vol: parseFloat(v) || 45 }); };
-  const handleDecipherChange = (v: string) => { setDecipher(v); const d = parseFloat(v); updateClinicalForm({ dec: v === "" || isNaN(d) ? null : d }); };
   const handleShimChange     = (v: string) => { setShim(v);     updateClinicalForm({ shim: parseInt(v) || undefined }); };
   const handleIpssChange     = (v: string) => { setIpss(v);     updateClinicalForm({ ipss: parseInt(v) || undefined }); };
 
@@ -835,7 +832,6 @@ export function ZoneInputWizard() {
         updateClinicalForm({ bmi: clinical.bmi });
       }
       if (clinical.decipher !== undefined) {
-        setDecipher(clinical.decipher);
         updateClinicalForm({ decipher: clinical.decipher });
       }
       if (clinical.shim !== undefined) {
@@ -985,14 +981,7 @@ export function ZoneInputWizard() {
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-3 sm:gap-5">
-              <div className="space-y-1.5 sm:space-y-2">
-                <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-dec">
-                  Decipher <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–1)</span>
-                  <InfoHint text="Decipher genomic classifier score. ≥0.6 is 'high' risk and raises upgrade/BCR predictions; leave blank if not tested." />
-                </label>
-                <Input id="wiz-dec" type="text" inputMode="decimal" placeholder="0.52" value={decipher} onChange={(e) => handleDecipherChange(e.target.value)} className={cn("h-11 text-base", fld(decipher))} />
-              </div>
+            <div className="grid grid-cols-2 gap-3 sm:gap-5">
               <div className="space-y-1.5 sm:space-y-2">
                 <label className="flex items-center text-sm font-semibold text-foreground" htmlFor="wiz-shim">SHIM <span className="font-normal text-muted-foreground text-xs sm:text-sm">(0–25)</span><InfoHint text="Sexual Health Inventory for Men — baseline erectile function. 22–25 no dysfunction, 17–21 mild, 12–16 mild-moderate, 8–11 moderate, 1–7 severe." /></label>
                 <Input id="wiz-shim" type="number" min={0} max={25} inputMode="numeric" placeholder="21" value={shim} onChange={(e) => handleShimChange(e.target.value)} className={cn("h-11 text-base", fld(shim))} />
@@ -1160,7 +1149,7 @@ export function ZoneInputWizard() {
           <button
             type="button"
             onClick={() => {
-              setAge(""); setPsa(""); setVol(""); setDecipher(""); setShim(""); setIpss("");
+              setAge(""); setPsa(""); setVol(""); setShim(""); setIpss("");
               setHeightVal(""); setHeightFtVal(""); setHeightInVal(""); setWeightVal(""); setBmiDirectVal("");
               updateClinicalForm({ age: undefined, psa: 0, vol: 45, dec: null, shim: undefined, ipss: undefined, bmi: undefined });
             }}

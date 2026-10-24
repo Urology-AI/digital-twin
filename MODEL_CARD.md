@@ -255,7 +255,7 @@ and 2–3 years under the chosen plan.
 | tag | meaning |
 |---|---|
 | `institutional` | derived from the Mount Sinai RARP cohort / an existing fitted COMPASS model (side ECE/SVI models, the 5,003-side NS-grade→PSM→BCR database) |
-| `literature` | a published estimate, paper cited (NS-plane thresholds, SV/hydrodissection rules, functional-choice deltas, BCR event-timing) |
+| `literature` | a published estimate, paper cited (NS-plane thresholds, SV/hydrodissection rules, functional-choice deltas) |
 | `provisional` | an expert-prior default not yet calibrated on COMPASS data — surfaced in the UI as "provisional" (inflammation-risk weights + cutpoints, GG→zone prior, healer threshold, PSM plan-modulation, the functional-outcome nomogram) |
 
 The app renders an **"Evidence & sources"** panel (Planning and Outcomes tabs)

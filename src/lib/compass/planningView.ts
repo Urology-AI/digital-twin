@@ -82,8 +82,7 @@ export function computePlanningView(S: ClinicalState, predictions: CompassPredic
   });
 
   const bcr = bcrByPlan(
-    S,
-    predictions.bcr36,
+    predictions,
     {
       nsGrade: Math.max(plan.left.recommendedGrade, plan.right.recommendedGrade),
       hydrodissection: false,
