@@ -164,7 +164,7 @@ export function buildPlanningHtml(S: ClinicalState, predictions: CompassPredicti
     <tbody>
       ${row("Continence, 12 mo (0–1 pad)", baseline.continence12 / 100, withPlan.continence12 / 100)}
       ${row("Potency, 12 mo (SHIM ≥ 12)", baseline.potency12 == null ? null : baseline.potency12 / 100, withPlan.potency12 == null ? null : withPlan.potency12 / 100)}
-      ${Number.isFinite(predictions.bcr36) ? row("BCR, 1 year", bcr.baseline.y1, bcr.withPlan.y1, true) + row("BCR, 2–3 years", bcr.baseline.y23, bcr.withPlan.y23, true) : ""}
+      ${Number.isFinite(predictions.bcr36) ? row("BCR, 1 year", bcr.baseline.y1, bcr.withPlan.y1, true) + row("BCR, 3 years", bcr.baseline.y3, bcr.withPlan.y3, true) : ""}
       <tr><th>Erectile-recovery phenotype</th><td>${hb(baseline.healerTier)}</td><td>${hb(withPlan.healerTier)}</td><td></td></tr>
     </tbody></table>
     <p class="note">${

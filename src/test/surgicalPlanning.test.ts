@@ -510,25 +510,31 @@ describe("bcrByPlan", () => {
     ...o,
   });
 
-  it("projects y1 below y2-3 and both below the plateau", () => {
-    const S = defaultClinicalState();
-    const r = bcrByPlan(S, 0.2, arm(), arm());
-    expect(r.baseline.y1).toBeLessThan(r.baseline.y23);
-    expect(r.baseline.y23).toBeLessThan(r.baseline.plateau + 1e-9);
+  const cox = { bcr12: 0.09, bcr36: 0.23 };
+
+  it("baseline arm equals the Cox model's 12- and 36-month risk", () => {
+    for (const g of [1, 2, 3]) {
+      const r = bcrByPlan(cox, arm({ nsGrade: g }), arm({ nsGrade: g }));
+      expect(r.baseline.y1).toBeCloseTo(0.09, 10);
+      expect(r.baseline.y3).toBeCloseTo(0.23, 10);
+    }
+  });
+
+  it("an NS-grade override alone does not move BCR", () => {
+    const r = bcrByPlan(cox, arm({ nsGrade: 2 }), arm({ nsGrade: 3 }));
+    expect(r.withPlan.y3).toBeCloseTo(r.baseline.y3, 10);
   });
 
   it("hydrodissection lowers the projected BCR", () => {
-    const S = defaultClinicalState();
-    const r = bcrByPlan(S, 0.2, arm(), arm({ hydrodissection: true }));
-    expect(r.withPlan.y23).toBeLessThan(r.baseline.y23);
+    const r = bcrByPlan(cox, arm(), arm({ hydrodissection: true }));
+    expect(r.withPlan.y3).toBeLessThan(r.baseline.y3);
   });
 
   it("high inflammation raises the projected BCR more than moderate", () => {
-    const S = defaultClinicalState();
-    const mod = bcrByPlan(S, 0.2, arm(), arm({ inflammationTier: "moderate" }));
-    const high = bcrByPlan(S, 0.2, arm(), arm({ inflammationTier: "high" }));
-    expect(mod.withPlan.y23).toBeGreaterThan(mod.baseline.y23);
-    expect(high.withPlan.y23).toBeGreaterThan(mod.withPlan.y23);
+    const mod = bcrByPlan(cox, arm(), arm({ inflammationTier: "moderate" }));
+    const high = bcrByPlan(cox, arm(), arm({ inflammationTier: "high" }));
+    expect(mod.withPlan.y3).toBeGreaterThan(mod.baseline.y3);
+    expect(high.withPlan.y3).toBeGreaterThan(mod.withPlan.y3);
   });
 });
 

@@ -539,15 +539,6 @@ export const NSG_OUTCOME_DATA = ev(
     "and by zone.",
 );
 
-export const BCR_HAZARD = ev(
-  { y1Fraction: 0.35, y23Fraction: 0.7 },
-  "literature",
-  "BCR event-timing fractions",
-  "Fraction of eventual BCR events realised by 1 yr and by 2–3 yr, from " +
-    "post-prostatectomy recurrence-timing series (Han M et al., J Urol 2003; " +
-    "Freedland SJ et al., JAMA 2005).",
-);
-
 export const PSM_PLAN_MODULATION = ev(
   {
     hydrodissection: -0.03,

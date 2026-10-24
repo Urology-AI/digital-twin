@@ -670,10 +670,10 @@ export function SurgicalPlanPanel() {
                 invert
               />
               <ImpactTile
-                label="BCR 2–3 years"
+                label="BCR 3 years"
                 sub="cumulative incidence"
-                baseline={bcr.baseline.y23}
-                withPlan={bcr.withPlan.y23}
+                baseline={bcr.baseline.y3}
+                withPlan={bcr.withPlan.y3}
                 invert
               />
               </>

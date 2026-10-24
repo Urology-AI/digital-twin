@@ -222,12 +222,6 @@
     "source": "institutional",
     "citation": "Mount Sinai 5,003-side RP database — PSM rate and BCR rate (margin- vs margin+) by NS grade and zone"
   },
-  "bcr_hazard": {
-    "source": "literature",
-    "citation": "Han 2003; Freedland 2005 recurrence-timing series",
-    "fraction_of_eventual_bcr_by_1y": 0.35,
-    "fraction_of_eventual_bcr_by_2_3y": 0.7
-  },
   "psm_plan_modulation": {
     "source": "provisional",
     "citation": "directional expert-prior adjustments to the NS-grade PSM rate",

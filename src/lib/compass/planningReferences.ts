@@ -160,26 +160,6 @@ export const PLANNING_REFERENCES: PlanningReference[] = [
     verified: true,
   },
   {
-    key: "han2003",
-    authors: "Han M, Partin AW, Zahurak M, et al.",
-    title:
-      "Biochemical (prostate specific antigen) recurrence probability following radical prostatectomy for clinically localized prostate cancer.",
-    source: "J Urol. 2003;169(2):517-23.",
-    group: "external",
-    usedFor: ["BCR event-timing fractions"],
-    verified: true,
-  },
-  {
-    key: "freedland2005",
-    authors: "Freedland SJ, Humphreys EB, Mangold LA, et al.",
-    title:
-      "Risk of prostate cancer-specific mortality following biochemical recurrence after radical prostatectomy.",
-    source: "JAMA. 2005;294(4):433-9.",
-    group: "external",
-    usedFor: ["BCR event-timing fractions"],
-    verified: true,
-  },
-  {
     key: "cao2011",
     authors: "Cao Y, Ma J.",
     title:
